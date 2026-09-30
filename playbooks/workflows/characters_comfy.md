@@ -1,5 +1,7 @@
 # Workflow: characters (Comfy)
 
+Оригинал на русском. Для модели: `playbooks/workflows/characters_comfy.en.md`.
+
 Граф: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`.
 
 Берёт одежду из картинки 1, скелет позы из картинки 2 и лицо из картинки 3. Это гипотеза из `playbooks/stages/characters.md`: граф на шотах ещё не прогонялся. Сначала проверка на 1–2 шотах.

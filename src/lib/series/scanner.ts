@@ -121,7 +121,10 @@ function playbooksForStage(stageId: StageId): string[] {
       path.join("workflows", "comfy", "character_pose_outfit_qwen.json"),
     );
   }
-  return candidates
+  const withEnglish = candidates.flatMap((rel) =>
+    rel.endsWith(".md") ? [rel, rel.replace(/\.md$/, ".en.md")] : [rel],
+  );
+  return withEnglish
     .filter((rel) => fs.existsSync(path.join(root, rel)))
     .map((rel) => toPosix(rel));
 }

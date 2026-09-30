@@ -1,5 +1,7 @@
 # Model: Qwen Image Edit
 
+Оригинал на русском. Для модели: `playbooks/models/qwen_image.en.md`.
+
 Промпты для shot-персонажа и других image-этапов (`characters`, `location`, `first_frame`). Сборка позы под кадр описана в `playbooks/stages/characters.md`. Граф: `playbooks/workflows/characters_comfy.md`.
 
 ## Параметры
