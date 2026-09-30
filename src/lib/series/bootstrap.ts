@@ -111,10 +111,11 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
 }
 
 function defaultWorkflow(stageId: StageId): string {
+  const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nГраф: playbooks/workflows/comfy/character_pose_outfit_qwen.json\nИнструкция: playbooks/workflows/characters_comfy.md\nЗдесь — конкретные настройки этого кадра (поза, кадрирование, какие refs взяты).\n`;
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: поза, кадрирование, какие входы взяты. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/character_pose_outfit_qwen.json\n`;
   }
-  return `# Workflow\n\nСм. глобальные playbooks для этого этапа. Здесь — конкретные настройки кадра.\n`;
+  return note;
 }
 
 function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {

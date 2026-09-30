@@ -31,6 +31,8 @@ shots/{shotId}/characters/
   prompt.md  llm_notes.md  refs.md  workflow.md  status.json
 ```
 
+`workflow.md` — необязательная заметка на этот кадр. Можно оставить пустым.
+
 Утверждённый файл: `approve/{name}_{shotId}.png` (пример: `lena_s01.png`).
 
 Это референс персонажа для `video_preview` и `final_render`. Отдельной папки `env/` в серии нет.

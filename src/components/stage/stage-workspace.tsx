@@ -2,12 +2,30 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StageId } from "@/lib/series/constants";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { StatusPill } from "@/components/board/status-pill";
+
+function DocFieldLabel({
+  children,
+  optional,
+  note,
+}: {
+  children: ReactNode;
+  optional?: boolean;
+  note?: string;
+}) {
+  const hint = [note, optional ? "необязательно" : ""].filter(Boolean).join(" · ");
+  return (
+    <label className="flex flex-wrap items-baseline gap-x-2 text-xs font-medium text-stone-600">
+      <span>{children}</span>
+      {hint ? <span className="font-normal text-stone-400">{hint}</span> : null}
+    </label>
+  );
+}
 
 function MediaCard({
   file,
@@ -262,27 +280,29 @@ export function StageWorkspace({
             Input
           </h2>
           <div className="mt-4 space-y-3">
-            <label className="block text-xs font-medium text-stone-600">Prompt</label>
+            <DocFieldLabel>Prompt</DocFieldLabel>
             <Textarea
               value={docs.prompt}
               onChange={(e) => setDocs((d) => ({ ...d, prompt: e.target.value }))}
               className="min-h-28"
             />
-            <label className="block text-xs font-medium text-stone-600">
-              Рекомендация LLM
-            </label>
+            <DocFieldLabel optional>Рекомендация LLM</DocFieldLabel>
             <Textarea
               value={docs.llmNotes}
               onChange={(e) => setDocs((d) => ({ ...d, llmNotes: e.target.value }))}
               className="min-h-24"
             />
-            <label className="block text-xs font-medium text-stone-600">Refs.md</label>
+            <DocFieldLabel optional note="заметка">
+              Refs.md
+            </DocFieldLabel>
             <Textarea
               value={docs.refs}
               onChange={(e) => setDocs((d) => ({ ...d, refs: e.target.value }))}
               className="min-h-24 font-mono text-xs"
             />
-            <label className="block text-xs font-medium text-stone-600">Workflow.md</label>
+            <DocFieldLabel optional note="заметка на этот кадр">
+              Workflow.md
+            </DocFieldLabel>
             <Textarea
               value={docs.workflow}
               onChange={(e) => setDocs((d) => ({ ...d, workflow: e.target.value }))}

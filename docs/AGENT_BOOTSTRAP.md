@@ -8,6 +8,7 @@
 - Этапы каждого shot: `characters`, `location`, `first_frame`, `video_preview`, `final_render`
 - Папки этапа: `refs/`, `output/`, `approve/`
 - Документы этапа: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
+- `workflow.md` — необязательная заметка на кадр. Можно оставить пустым. Выбор графа там не задаётся.
 
 ## Базы identity
 Shot-персонаж и shot-локация собираются из общих баз, а не с нуля:

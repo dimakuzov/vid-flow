@@ -31,6 +31,8 @@ shots/{shotId}/characters/
   prompt.md  llm_notes.md  refs.md  workflow.md  status.json
 ```
 
+`workflow.md` is an optional note for this shot. It can stay empty.
+
 Approved file: `approve/{name}_{shotId}.png` (example: `lena_s01.png`).
 
 That file is the character reference for `video_preview` and `final_render`. There is no `env/` folder in the series.
