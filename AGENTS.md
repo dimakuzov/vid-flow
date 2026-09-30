@@ -8,6 +8,7 @@ This repo is a local-first board for structuring video generation.
 - Shot variants stay in `data/series/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
 - Character Comfy graph: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
+- Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
 
 ## First useful agent task

@@ -105,7 +105,7 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   }
   if (stageId === "location") {
     const location = shot.location || "{locationId}";
-    return `# Refs\n\nБаза: data/series/locations/${location}/.\nСюда кладётся общий вид. Shot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
+    return `# Refs\n\nБаза: data/series/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
   }
   return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
 }
@@ -114,6 +114,9 @@ function defaultWorkflow(stageId: StageId): string {
   const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: поза, кадрирование, какие входы взяты. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/character_pose_outfit_qwen.json\n`;
+  }
+  if (stageId === "location") {
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;
   }
   return note;
 }

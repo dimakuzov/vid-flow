@@ -15,7 +15,7 @@
 Shot-персонаж и shot-локация собираются из общих баз, а не с нуля:
 
 - `data/series/characters/{name}/` — `portrait.png`, `side.png`, `full_body.png`
-- `data/series/locations/{locationId}/` — общий вид локации
+- `data/series/locations/{locationId}/` — `view.png` и `description.txt`
 
 Имя персонажа и локации — как в `scenario.md`. Эти папки не заменяют этапы `shots/sXX/characters` и `shots/sXX/location`.
 
@@ -24,7 +24,7 @@ Shot-персонаж и shot-локация собираются из общи�
 Перед заполнением этапа прочитай playbook:
 
 - персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`
-- локация: `playbooks/stages/location.md`
+- локация: `playbooks/stages/location.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
 
 ## Вход
 Прочитай `data/series/scenario.md` (весь сценарий серии).

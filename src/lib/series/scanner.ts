@@ -114,8 +114,14 @@ function playbooksForStage(stageId: StageId): string[] {
     candidates.push(path.join("models", "wan_video.md"));
     candidates.push(path.join("models", "minimax_video.md"));
   }
-  if (stageId === "characters" || stageId === "location" || stageId === "first_frame") {
+  if (stageId === "characters" || stageId === "first_frame") {
     candidates.push(path.join("models", "qwen_image.md"));
+  }
+  if (stageId === "location") {
+    candidates.push(path.join("models", "qwen_location.md"));
+    candidates.push(
+      path.join("workflows", "comfy", "location_views_multiple_angles.json"),
+    );
   }
   if (stageId === "characters") {
     candidates.push(

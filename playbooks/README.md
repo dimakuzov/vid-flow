@@ -23,4 +23,11 @@ Shot-этапы `characters` и `location` собирают вариант ка�
 - `workflows/characters_comfy.md` — оригинал на русском, для модели `workflows/characters_comfy.en.md`
 - `workflows/comfy/character_pose_outfit_qwen.json`
 
-Страница этапа показывает путь к `stages/{stage}.md`, `workflows/{stage}_comfy.md` и model playbook. Граф персонажа дополнительно указан в списке этапа `characters`.
+Ракурсы локации (проверено на прошлом проекте: ветка objects чаще всего идёт в работу):
+
+- `stages/location.md` — оригинал на русском, для модели `stages/location.en.md`
+- `models/qwen_location.md` — оригинал на русском, для модели `models/qwen_location.en.md`
+- `workflows/location_comfy.md` — оригинал на русском, для модели `workflows/location_comfy.en.md`
+- `workflows/comfy/location_views_multiple_angles.json`
+
+Страница этапа показывает путь к `stages/{stage}.md`, `workflows/{stage}_comfy.md`, английскую пару `.en.md` и model playbook. Граф персонажа виден на этапе `characters`, граф ракурсов локации — на этапе `location`.

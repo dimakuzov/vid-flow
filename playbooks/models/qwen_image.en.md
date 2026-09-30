@@ -2,7 +2,9 @@
 
 English copy for the model. Russian original: `playbooks/models/qwen_image.md`.
 
-Prompts for the shot character and the other image stages (`characters`, `location`, `first_frame`). Shot pose assembly is in `playbooks/stages/characters.en.md`. Graph: `playbooks/workflows/characters_comfy.en.md`.
+Prompts for the shot character and the first frame. Shot pose assembly is in `playbooks/stages/characters.en.md`. Graph: `playbooks/workflows/characters_comfy.en.md`.
+
+Location prompts are in `playbooks/models/qwen_location.en.md`.
 
 ## Parameters
 
