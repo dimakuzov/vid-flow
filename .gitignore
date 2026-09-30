@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Series pictures and video stay on disk. Shot notes stay in git.
+data/series/**/refs/
+data/series/**/output/
+data/series/**/approve/
+data/series/**/*.png
+data/series/**/*.jpg
+data/series/**/*.jpeg
+data/series/**/*.webp
+data/series/**/*.gif
+data/series/**/*.mp4
+data/series/**/*.webm
+data/series/**/*.mov
+data/series/**/*.mkv
