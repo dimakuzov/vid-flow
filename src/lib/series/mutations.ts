@@ -1,0 +1,122 @@
+import fs from "fs";
+import path from "path";
+import type { StageId } from "./constants";
+import { listMediaFiles } from "./media";
+import { assertSafeSegment, ensureStageDirs, stageDir } from "./paths";
+import { writeStatusFile } from "./status";
+
+function uniqueTarget(dir: string, filename: string): string {
+  const parsed = path.parse(filename);
+  let candidate = filename;
+  let i = 1;
+  while (fs.existsSync(path.join(dir, candidate))) {
+    candidate = `${parsed.name}_${i}${parsed.ext}`;
+    i += 1;
+  }
+  return candidate;
+}
+
+export async function saveUpload(options: {
+  shotId: string;
+  stageId: StageId;
+  target: "refs" | "output";
+  filename: string;
+  bytes: Buffer;
+  approveAfter?: boolean;
+}): Promise<{ savedAs: string; approvedAs?: string }> {
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  ensureStageDirs(shotId);
+  const dir = path.join(stageDir(shotId, options.stageId), options.target);
+  fs.mkdirSync(dir, { recursive: true });
+  const savedAs = uniqueTarget(dir, path.basename(options.filename));
+  fs.writeFileSync(path.join(dir, savedAs), options.bytes);
+
+  if (options.approveAfter) {
+    const approvedAs = approveFiles({
+      shotId,
+      stageId: options.stageId,
+      filenames: [savedAs],
+      from: options.target === "refs" ? "refs" : "output",
+    })[0];
+    return { savedAs, approvedAs };
+  }
+
+  if (options.target === "output") {
+    writeStatusFile(shotId, options.stageId, { status: "review" });
+  }
+
+  return { savedAs };
+}
+
+export function approveFiles(options: {
+  shotId: string;
+  stageId: StageId;
+  filenames: string[];
+  from?: "output" | "refs";
+}): string[] {
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  ensureStageDirs(shotId);
+  const stagePath = stageDir(shotId, options.stageId);
+  const fromDir = path.join(stagePath, options.from || "output");
+  const approveDir = path.join(stagePath, "approve");
+  fs.mkdirSync(approveDir, { recursive: true });
+
+  if (options.stageId !== "characters") {
+    for (const existing of fs.readdirSync(approveDir)) {
+      fs.unlinkSync(path.join(approveDir, existing));
+    }
+  }
+
+  const saved: string[] = [];
+  for (const name of options.filenames) {
+    const safeName = path.basename(name);
+    const source = path.join(fromDir, safeName);
+    if (!fs.existsSync(source)) {
+      throw new Error(`Файл не найден: ${safeName}`);
+    }
+    const targetName =
+      options.stageId === "characters"
+        ? safeName
+        : safeName;
+    const target = path.join(approveDir, targetName);
+    fs.copyFileSync(source, target);
+    saved.push(targetName);
+  }
+
+  writeStatusFile(shotId, options.stageId, { status: "approved" });
+  return saved;
+}
+
+export function setWaiting(shotId: string, stageId: StageId): void {
+  writeStatusFile(assertSafeSegment(shotId, "shot"), stageId, {
+    status: "waiting",
+  });
+}
+
+export function updateStageDocs(options: {
+  shotId: string;
+  stageId: StageId;
+  prompt?: string;
+  llmNotes?: string;
+  refs?: string;
+  workflow?: string;
+}): void {
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  const dir = stageDir(shotId, options.stageId);
+  fs.mkdirSync(dir, { recursive: true });
+  const mapping: Array<[string | undefined, string]> = [
+    [options.prompt, "prompt.md"],
+    [options.llmNotes, "llm_notes.md"],
+    [options.refs, "refs.md"],
+    [options.workflow, "workflow.md"],
+  ];
+  for (const [value, filename] of mapping) {
+    if (typeof value === "string") {
+      fs.writeFileSync(path.join(dir, filename), value, "utf8");
+    }
+  }
+}
+
+export function listApprove(shotId: string, stageId: StageId) {
+  return listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
+}

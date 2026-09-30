@@ -1,0 +1,137 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
+import type { SeriesSummary } from "@/lib/series/types";
+import { BootstrapPanel } from "./bootstrap-panel";
+import { StageCell } from "./stage-cell";
+
+export function SeriesBoard() {
+  const [series, setSeries] = useState<SeriesSummary | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/series");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
+      setSeries(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return (
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="relative overflow-hidden rounded-[28px] border border-teal-900/10 bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.18),_transparent_40%),linear-gradient(135deg,#f7f4ef_0%,#e7eef0_45%,#d9e7e4_100%)] px-6 py-8 sm:px-10">
+        <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(28,57,56,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(28,57,56,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="relative max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-900/70">
+            Frameboard
+          </p>
+          <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-stone-950 sm:text-5xl">
+            {series?.title || "Серия"}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base text-stone-700">
+            {series?.description ||
+              "Таблица статусов для персонажей, локаций, первого кадра, preview и финального рендера."}
+          </p>
+          <p className="mt-3 text-xs text-stone-500">
+            Корень серии: <code className="rounded bg-white/70 px-1.5 py-0.5">{series?.root}</code>
+          </p>
+        </div>
+      </header>
+
+      <BootstrapPanel onImported={reload} />
+
+      <section className="rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl text-stone-900">
+            Таблица кадров
+          </h2>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="text-sm text-teal-800 underline-offset-4 hover:underline"
+          >
+            Обновить
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-stone-500">Загрузка серии…</p>
+        ) : null}
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+        {!loading && series && series.shots.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
+            Кадров пока нет. Вставьте сценарий выше и нажмите «Создать выбранные»,
+            либо попросите агента собрать структуру из <code>data/series/scenario.md</code>.
+          </p>
+        ) : null}
+
+        {series && series.shots.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[960px] border-separate border-spacing-2">
+              <thead>
+                <tr>
+                  <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    Кадр
+                  </th>
+                  {STAGES.map((stageId) => (
+                    <th
+                      key={stageId}
+                      className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500"
+                    >
+                      {STAGE_LABELS[stageId]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {series.shots.map((shot) => (
+                  <tr key={shot.id}>
+                    <td className="align-top">
+                      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
+                          {shot.id}
+                        </div>
+                        <div className="mt-1 text-sm font-medium text-stone-900">
+                          {shot.title}
+                        </div>
+                        <div className="mt-2 text-xs text-stone-500">
+                          {shot.characters.join(", ") || "—"}
+                          <br />
+                          {shot.location || "локация не задана"}
+                        </div>
+                      </div>
+                    </td>
+                    {STAGES.map((stageId) => (
+                      <td key={stageId} className="align-top">
+                        <StageCell
+                          shotId={shot.id}
+                          stageId={stageId}
+                          stage={shot.stages[stageId]}
+                          onChanged={reload}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
