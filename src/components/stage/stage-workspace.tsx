@@ -57,25 +57,29 @@ function MediaCard({
 export function StageWorkspace({
   shotId,
   stageId,
+  initialDetail,
 }: {
   shotId: string;
   stageId: StageId;
+  initialDetail: StageDetail;
 }) {
-  const [detail, setDetail] = useState<StageDetail | null>(null);
+  const [detail, setDetail] = useState<StageDetail>(initialDetail);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedOutput, setSelectedOutput] = useState<string[]>([]);
   const [docs, setDocs] = useState({
-    prompt: "",
-    llmNotes: "",
-    refs: "",
-    workflow: "",
+    prompt: initialDetail.docs.prompt || "",
+    llmNotes: initialDetail.docs.llmNotes || "",
+    refs: initialDetail.docs.refs || "",
+    workflow: initialDetail.docs.workflow || "",
   });
 
   const reload = useCallback(async () => {
     setError("");
-    const res = await fetch(`/api/shots/${shotId}/stages/${stageId}`);
+    const res = await fetch(`/api/shots/${shotId}/stages/${stageId}`, {
+      cache: "no-store",
+    });
     const data = await res.json();
     if (!res.ok) {
       setError(data.error || "Не удалось открыть этап");
@@ -91,8 +95,14 @@ export function StageWorkspace({
   }, [shotId, stageId]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    setDetail(initialDetail);
+    setDocs({
+      prompt: initialDetail.docs.prompt || "",
+      llmNotes: initialDetail.docs.llmNotes || "",
+      refs: initialDetail.docs.refs || "",
+      workflow: initialDetail.docs.workflow || "",
+    });
+  }, [initialDetail]);
 
   async function saveDocs() {
     setBusy(true);
@@ -201,10 +211,6 @@ export function StageWorkspace({
         </Link>
       </div>
     );
-  }
-
-  if (!detail) {
-    return <div className="mx-auto max-w-5xl px-4 py-10 text-stone-500">Загрузка этапа…</div>;
   }
 
   return (

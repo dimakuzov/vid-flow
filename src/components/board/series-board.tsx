@@ -1,34 +1,42 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
-import type { SeriesSummary } from "@/lib/series/types";
+import type { BootstrapPreview, SeriesSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
 import { StageCell } from "./stage-cell";
 
-export function SeriesBoard() {
-  const [series, setSeries] = useState<SeriesSummary | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/series");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
-      setSeries(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка загрузки");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export function SeriesBoard({
+  initialSeries,
+  initialScenario,
+  initialPreview,
+}: {
+  initialSeries: SeriesSummary;
+  initialScenario: string;
+  initialPreview: BootstrapPreview;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [series, setSeries] = useState(initialSeries);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    setSeries(initialSeries);
+  }, [initialSeries]);
+
+  function reload() {
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/series", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
+        setSeries(data);
+        router.refresh();
+      } catch {
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -39,19 +47,23 @@ export function SeriesBoard() {
             Frameboard
           </p>
           <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-stone-950 sm:text-5xl">
-            {series?.title || "Серия"}
+            {series.title}
           </h1>
           <p className="mt-4 max-w-2xl text-base text-stone-700">
-            {series?.description ||
-              "Таблица статусов для персонажей, локаций, первого кадра, preview и финального рендера."}
+            {series.description}
           </p>
           <p className="mt-3 text-xs text-stone-500">
-            Корень серии: <code className="rounded bg-white/70 px-1.5 py-0.5">{series?.root}</code>
+            Корень серии:{" "}
+            <code className="rounded bg-white/70 px-1.5 py-0.5">{series.root}</code>
           </p>
         </div>
       </header>
 
-      <BootstrapPanel onImported={reload} />
+      <BootstrapPanel
+        initialScenario={initialScenario}
+        initialPreview={initialPreview}
+        onImported={reload}
+      />
 
       <section className="rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -60,26 +72,20 @@ export function SeriesBoard() {
           </h2>
           <button
             type="button"
-            onClick={() => void reload()}
+            onClick={reload}
             className="text-sm text-teal-800 underline-offset-4 hover:underline"
           >
-            Обновить
+            {pending ? "Обновление…" : "Обновить"}
           </button>
         </div>
 
-        {loading ? (
-          <p className="text-sm text-stone-500">Загрузка серии…</p>
-        ) : null}
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-
-        {!loading && series && series.shots.length === 0 ? (
+        {series.shots.length === 0 ? (
           <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
             Кадров пока нет. Вставьте сценарий выше и нажмите «Создать выбранные»,
-            либо попросите агента собрать структуру из <code>data/series/scenario.md</code>.
+            либо попросите агента собрать структуру из{" "}
+            <code>data/series/scenario.md</code>.
           </p>
-        ) : null}
-
-        {series && series.shots.length > 0 ? (
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] border-separate border-spacing-2">
               <thead>
@@ -130,7 +136,7 @@ export function SeriesBoard() {
               </tbody>
             </table>
           </div>
-        ) : null}
+        )}
       </section>
     </div>
   );

@@ -1,32 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { BootstrapPreview } from "@/lib/series/types";
 
 interface BootstrapPanelProps {
+  initialScenario: string;
+  initialPreview: BootstrapPreview;
   onImported: () => void;
 }
 
-export function BootstrapPanel({ onImported }: BootstrapPanelProps) {
-  const [scenario, setScenario] = useState("");
-  const [preview, setPreview] = useState<BootstrapPreview | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
+export function BootstrapPanel({
+  initialScenario,
+  initialPreview,
+  onImported,
+}: BootstrapPanelProps) {
+  const [scenario, setScenario] = useState(initialScenario);
+  const [preview, setPreview] = useState<BootstrapPreview>(initialPreview);
+  const [selected, setSelected] = useState<string[]>(
+    initialPreview.shots.map((shot) => shot.id),
+  );
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    void (async () => {
-      const res = await fetch("/api/series/bootstrap");
-      const data = await res.json();
-      if (res.ok) {
-        setScenario(data.scenario || "");
-        setPreview(data.preview || null);
-        setSelected((data.preview?.shots || []).map((shot: { id: string }) => shot.id));
-      }
-    })();
-  }, []);
 
   async function previewScenario() {
     setBusy(true);
@@ -36,6 +32,7 @@ export function BootstrapPanel({ onImported }: BootstrapPanelProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario, previewOnly: true }),
+        cache: "no-store",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось разобрать сценарий");
@@ -65,6 +62,7 @@ export function BootstrapPanel({ onImported }: BootstrapPanelProps) {
           shotIds: selected,
           overwriteDocs: false,
         }),
+        cache: "no-store",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось создать структуру");
@@ -115,7 +113,7 @@ export function BootstrapPanel({ onImported }: BootstrapPanelProps) {
         placeholder={`# Название серии\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.`}
       />
 
-      {preview?.shots?.length ? (
+      {preview.shots.length ? (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {preview.shots.map((shot) => {
             const checked = selected.includes(shot.id);
