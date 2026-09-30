@@ -4,7 +4,10 @@ This repo is a local-first board for structuring video generation.
 
 ## Important paths
 - Series root: `data/series` (override with `SERIES_ROOT`)
+- Identity libraries: `data/series/characters/{name}/`, `data/series/locations/{locationId}/`
+- Shot variants stay in `data/series/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
+- Character Comfy graph: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
 
 ## First useful agent task

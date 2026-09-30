@@ -116,6 +116,11 @@ function playbooksForStage(stageId: StageId): string[] {
   if (stageId === "characters" || stageId === "location" || stageId === "first_frame") {
     candidates.push(path.join("models", "qwen_image.md"));
   }
+  if (stageId === "characters") {
+    candidates.push(
+      path.join("workflows", "comfy", "character_pose_outfit_qwen.json"),
+    );
+  }
   return candidates
     .filter((rel) => fs.existsSync(path.join(root, rel)))
     .map((rel) => toPosix(rel));

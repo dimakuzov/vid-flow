@@ -44,6 +44,8 @@ SERIES_ROOT=/absolute/path/to/series npm run dev
 data/series/
   series.md
   scenario.md
+  characters/          # база: {name}/portrait.png, side.png, full_body.png
+  locations/           # база: {locationId}/ — общий вид
   shots/
     s01/
       shot.md
@@ -67,7 +69,8 @@ data/series/
 ## Агент и playbooks
 
 - Инструкция агенту по сборке структуры: `docs/AGENT_BOOTSTRAP.md`
-- Свои model/workflow гайды клади в `playbooks/` — приложение подхватит их на странице этапа
+- Гайды модели и этапа: `playbooks/`. Страница этапа показывает связанные файлы
+- Shot-персонаж собирается из `data/series/characters/` графом `playbooks/workflows/comfy/character_pose_outfit_qwen.json` (открывается в ComfyUI вручную)
 
 ## Стек
 

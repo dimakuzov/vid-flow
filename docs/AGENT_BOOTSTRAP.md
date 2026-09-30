@@ -9,6 +9,21 @@
 - Папки этапа: `refs/`, `output/`, `approve/`
 - Документы этапа: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
 
+## Базы identity
+Shot-персонаж и shot-локация собираются из общих баз, а не с нуля:
+
+- `data/series/characters/{name}/` — `portrait.png`, `side.png`, `full_body.png`
+- `data/series/locations/{locationId}/` — общий вид локации
+
+Имя персонажа и локации — как в `scenario.md`. Эти папки не заменяют этапы `shots/sXX/characters` и `shots/sXX/location`.
+
+Утверждённый персонаж кадра: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Отдельной папки `env/` нет.
+
+Перед заполнением этапа прочитай playbook:
+
+- персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`
+- локация: `playbooks/stages/location.md`
+
 ## Вход
 Прочитай `data/series/scenario.md` (весь сценарий серии).
 

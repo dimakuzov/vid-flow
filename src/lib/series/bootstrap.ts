@@ -86,9 +86,9 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
   switch (stageId) {
     case "characters":
-      return `Создай персонажей для кадра ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nОдежда и поза должны соответствовать действию кадра.`;
+      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/series/characters/{name}/ (portrait, side, full_body).\nВ этом кадре задай одежду и позу. В промпте не описывай внешность и одежду текстом.\nПравила: playbooks/stages/characters.md`;
     case "location":
-      return `Создай локацию без персонажей для кадра ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.`;
+      return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/series/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
     case "first_frame":
       return `Собери первый кадр: объедини approved локацию и персонажей для ${shot.id}.\nДействие: ${shot.summary || shot.title}`;
     case "video_preview":
@@ -98,6 +98,25 @@ function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
   }
 }
 
+function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
+  if (stageId === "characters") {
+    const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
+    return `# Refs\n\nБаза: data/series/characters/{name}/ — portrait.png, side.png, full_body.png.\nПерсонажи кадра: ${names}.\nВ refs/ этого кадра: {name}_outfit.png, {name}_pose.png, {name}_face.png.\nСм. playbooks/stages/characters.md.\n`;
+  }
+  if (stageId === "location") {
+    const location = shot.location || "{locationId}";
+    return `# Refs\n\nБаза: data/series/locations/${location}/.\nСюда кладётся общий вид. Shot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
+  }
+  return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
+}
+
+function defaultWorkflow(stageId: StageId): string {
+  if (stageId === "characters") {
+    return `# Workflow\n\nГраф: playbooks/workflows/comfy/character_pose_outfit_qwen.json\nИнструкция: playbooks/workflows/characters_comfy.md\nЗдесь — конкретные настройки этого кадра (поза, кадрирование, какие refs взяты).\n`;
+  }
+  return `# Workflow\n\nСм. глобальные playbooks для этого этапа. Здесь — конкретные настройки кадра.\n`;
+}
+
 function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {
   const dir = stageDir(shot.id, stageId);
   writeText(path.join(dir, "prompt.md"), defaultPrompt(stageId, shot) + "\n");
@@ -105,14 +124,8 @@ function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {
     path.join(dir, "llm_notes.md"),
     "Рекомендации агента появятся здесь после подготовки этапа.\n",
   );
-  writeText(
-    path.join(dir, "refs.md"),
-    `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`,
-  );
-  writeText(
-    path.join(dir, "workflow.md"),
-    `# Workflow\n\nСм. глобальные playbooks для этого этапа. Здесь — конкретные настройки кадра.\n`,
-  );
+  writeText(path.join(dir, "refs.md"), defaultRefs(stageId, shot));
+  writeText(path.join(dir, "workflow.md"), defaultWorkflow(stageId));
   writeStatusFile(shot.id, stageId, {
     status: "prep",
     expectedCharacters:

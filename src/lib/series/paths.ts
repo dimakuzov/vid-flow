@@ -37,6 +37,8 @@ export function stageDir(
 export function ensureSeriesScaffold(seriesRoot = getSeriesRoot()): void {
   fs.mkdirSync(seriesRoot, { recursive: true });
   fs.mkdirSync(shotsDir(seriesRoot), { recursive: true });
+  fs.mkdirSync(path.join(seriesRoot, "characters"), { recursive: true });
+  fs.mkdirSync(path.join(seriesRoot, "locations"), { recursive: true });
   for (const file of ["series.md", "scenario.md"]) {
     const full = path.join(seriesRoot, file);
     if (!fs.existsSync(full)) {
