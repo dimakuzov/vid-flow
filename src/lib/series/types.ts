@@ -54,6 +54,11 @@ export interface StageDetail {
   approve: MediaFile[];
   playbooks: string[];
   relativeDir: string;
+  agentRequest: {
+    status: "pending" | "done";
+    createdAt: string;
+    refsChangedByUser: boolean;
+  } | null;
 }
 
 export interface BootstrapShotDraft {

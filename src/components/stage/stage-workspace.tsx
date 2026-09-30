@@ -122,6 +122,37 @@ export function StageWorkspace({
     });
   }, [initialDetail]);
 
+  async function sendToAgent() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/agent-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: docs.llmNotes,
+          prompt: docs.prompt,
+          refs: docs.refs,
+          workflow: docs.workflow,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не отправлено");
+      setDetail(data.stage);
+      setDocs({
+        prompt: data.stage.docs.prompt || "",
+        llmNotes: data.stage.docs.llmNotes || "",
+        refs: data.stage.docs.refs || "",
+        workflow: data.stage.docs.workflow || "",
+      });
+      setMessage(data.message);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveDocs() {
     setBusy(true);
     setMessage("");
@@ -286,11 +317,14 @@ export function StageWorkspace({
               onChange={(e) => setDocs((d) => ({ ...d, prompt: e.target.value }))}
               className="min-h-28"
             />
-            <DocFieldLabel optional>Рекомендация LLM</DocFieldLabel>
+            <DocFieldLabel optional note="сообщение агенту">
+              Рекомендация для LLM
+            </DocFieldLabel>
             <Textarea
               value={docs.llmNotes}
               onChange={(e) => setDocs((d) => ({ ...d, llmNotes: e.target.value }))}
               className="min-h-24"
+              placeholder="Напиши, что не так и что переделать."
             />
             <DocFieldLabel optional note="заметка">
               Refs.md
@@ -308,9 +342,28 @@ export function StageWorkspace({
               onChange={(e) => setDocs((d) => ({ ...d, workflow: e.target.value }))}
               className="min-h-24 font-mono text-xs"
             />
-            <Button disabled={busy} onClick={saveDocs}>
-              Сохранить документы
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} onClick={saveDocs}>
+                Сохранить документы
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={sendToAgent}>
+                Отправить агенту
+              </Button>
+            </div>
+            <p className="text-xs leading-5 text-stone-500">
+              Кнопка кладёт сообщение и список изменений в{" "}
+              <code>data/series/agent_inbox.md</code>. Если референсы загружены вручную,
+              агент оставляет их и переписывает промпт. Если нет — может собрать референсы
+              заново.
+            </p>
+            {detail.agentRequest?.status === "pending" ? (
+              <p className="text-xs leading-5 text-stone-500">
+                Ждёт агента с {detail.agentRequest.createdAt}.{" "}
+                {detail.agentRequest.refsChangedByUser
+                  ? "Референсы менялись вручную."
+                  : "Референсы вручную не менялись."}
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-6">

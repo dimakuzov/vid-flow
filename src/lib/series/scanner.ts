@@ -22,6 +22,7 @@ import {
   locationApproved,
   readStatusFile,
 } from "./status";
+import { readAgentRequestSummary } from "./agent-request";
 import type { SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
 
 function parseSeriesMarkdown(content: string): { title: string; description: string } {
@@ -158,5 +159,6 @@ export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
     approve: listMediaFiles(path.join(dir, "approve")),
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(getSeriesRoot(), dir)),
+    agentRequest: readAgentRequestSummary(shotId, stageId),
   };
 }

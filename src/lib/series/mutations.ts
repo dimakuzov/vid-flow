@@ -31,6 +31,17 @@ export async function saveUpload(options: {
   const savedAs = uniqueTarget(dir, path.basename(options.filename));
   fs.writeFileSync(path.join(dir, savedAs), options.bytes);
 
+  if (options.target === "refs") {
+    fs.writeFileSync(
+      path.join(stageDir(shotId, options.stageId), "agent_touch.json"),
+      JSON.stringify(
+        { refsTouchedByUser: true, touchedAt: new Date().toISOString() },
+        null,
+        2,
+      ) + "\n",
+    );
+  }
+
   if (options.approveAfter) {
     const approvedAs = approveFiles({
       shotId,

@@ -14,6 +14,13 @@ This repo is a local-first board for structuring video generation.
 Read `data/series/scenario.md` and materialize shot/stage folders.
 Prefer calling `POST /api/series/bootstrap` when the app is running, or create files directly using the contract in `docs/AGENT_BOOTSTRAP.md`.
 
+## User feedback
+Before other stage work, read `data/series/agent_inbox.md`. Each pending item points at `shots/{shotId}/{stage}/agent_request.md`.
+
+- Rewrite that stage's `prompt.md` from the user message.
+- Rebuild refs only when `refsChangedByUser` is false and the message means the references are wrong. When it is true, leave `refs/` untouched.
+- Then write `agent_baseline.json` (`capturedAt`, `prompt`, `refsNote`, `workflowNote`, `refs` with `name`, `sha256`, `bytes`), set `agent_touch.json` to `{ "refsTouchedByUser": false }`, and set `"status": "done"` in `agent_request.json`.
+
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation
 - Put playbooks inside a series folder; they are global

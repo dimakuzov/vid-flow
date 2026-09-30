@@ -123,7 +123,7 @@ function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {
   writeText(path.join(dir, "prompt.md"), defaultPrompt(stageId, shot) + "\n");
   writeText(
     path.join(dir, "llm_notes.md"),
-    "Рекомендации агента появятся здесь после подготовки этапа.\n",
+    "",
   );
   writeText(path.join(dir, "refs.md"), defaultRefs(stageId, shot));
   writeText(path.join(dir, "workflow.md"), defaultWorkflow(stageId));
