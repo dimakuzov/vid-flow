@@ -30,4 +30,11 @@ Shot-этапы `characters` и `location` собирают вариант ка�
 - `workflows/location_comfy.md` — оригинал на русском, для модели `workflows/location_comfy.en.md`
 - `workflows/comfy/location_views_multiple_angles.json`
 
-Страница этапа показывает путь к `stages/{stage}.md`, `workflows/{stage}_comfy.md`, английскую пару `.en.md` и model playbook. Граф персонажа виден на этапе `characters`, граф ракурсов локации — на этапе `location`.
+Первый кадр (вписать утверждённых персонажей в утверждённую локацию):
+
+- `stages/first_frame.md` — оригинал на русском, для модели `stages/first_frame.en.md`
+- `models/qwen_first_frame.md` — оригинал на русском, для модели `models/qwen_first_frame.en.md`
+- `workflows/first_frame_comfy.md` — оригинал на русском, для модели `workflows/first_frame_comfy.en.md`
+- `workflows/comfy/qwen21_character_compositing.json`
+
+Страница этапа показывает путь к `stages/{stage}.md`, `workflows/{stage}_comfy.md`, английскую пару `.en.md` и model playbook. Граф персонажа виден на этапе `characters`, граф ракурсов — на `location`, граф сборки кадра — на `first_frame`.

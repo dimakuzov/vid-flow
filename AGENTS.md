@@ -9,6 +9,7 @@ This repo is a local-first board for structuring video generation.
 - Global playbooks: `playbooks/`
 - Character Comfy graph: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
 - Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
+- First-frame Comfy graph: `playbooks/workflows/comfy/qwen21_character_compositing.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
 
 ## First useful agent task

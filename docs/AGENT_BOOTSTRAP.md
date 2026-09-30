@@ -25,6 +25,7 @@ Shot-персонаж и shot-локация собираются из общи�
 
 - персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`
 - локация: `playbooks/stages/location.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
+- первый кадр: `playbooks/stages/first_frame.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 
 ## Вход
 Прочитай `data/series/scenario.md` (весь сценарий серии).

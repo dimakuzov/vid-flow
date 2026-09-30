@@ -107,6 +107,10 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
     const location = shot.location || "{locationId}";
     return `# Refs\n\nБаза: data/series/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
   }
+  if (stageId === "first_frame") {
+    const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
+    return `# Refs\n\nЛокация: утверждённый файл из shots/${shot.id}/location/approve/.\nПерсонажи: ${names}, файлы shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nСырые базы сюда не класть.\nСм. playbooks/stages/first_frame.md.\n`;
+  }
   return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
 }
 
@@ -117,6 +121,9 @@ function defaultWorkflow(stageId: StageId): string {
   }
   if (stageId === "location") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;
+  }
+  if (stageId === "first_frame") {
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: режим сборки или правки, сколько персонажей. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/qwen21_character_compositing.json\n`;
   }
   return note;
 }
