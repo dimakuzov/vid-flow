@@ -4,12 +4,20 @@ import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { updateStageDocs } from "./mutations";
-import { agentInboxRelative, assertSafeSegment, getSeriesRoot, stageDir } from "./paths";
+import { readShotMeta } from "./shot-meta";
+import {
+  agentInboxRelative,
+  assertSafeSegment,
+  getCharactersRoot,
+  getSeriesRoot,
+  stageDir,
+} from "./paths";
 
 const TOUCH_FILE = "agent_touch.json";
 const BASELINE_FILE = "agent_baseline.json";
 const REQUEST_JSON = "agent_request.json";
 const REQUEST_MD = "agent_request.md";
+const LLM_TASK = "llm_task.md";
 
 export interface RefFingerprint {
   name: string;
@@ -275,6 +283,92 @@ export function rebuildAgentInbox(): void {
   writeText(path.join(root, "agent_inbox.md"), lines.join("\n"));
 }
 
+function listFileNames(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((name) => {
+      try {
+        return fs.statSync(path.join(dir, name)).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function bulletFiles(dir: string): string {
+  const names = listFileNames(dir);
+  return names.length ? names.map((name) => `- ${name}`).join("\n") : "- (пусто)";
+}
+
+function renderLlmTask(request: AgentRequestFile): string {
+  const dir = stageDir(request.shotId, request.stageId);
+  const meta = readShotMeta(request.shotId);
+  const characters = meta.characters.length ? meta.characters.join(", ") : "(в shot.md не указаны)";
+  const libraries = meta.characters.length
+    ? meta.characters
+        .map((name) => {
+          const folder = path.join(getCharactersRoot(), name);
+          return `### data/characters/${name}/\n\n${bulletFiles(folder)}`;
+        })
+        .join("\n\n")
+    : "(папки персонажей не перечислены, потому что в shot.md нет списка)";
+
+  const charactersBlock =
+    request.stageId === "characters"
+      ? `
+## Персонажи этого кадра
+
+Делай только их: ${characters}.
+Файл в approve/ с другим именем — не результат этого кадра. Не удаляй его и не подставляй вместо нужного персонажа.
+
+Одежда и поза — только текст в разделе «Сообщение пользователя». Если там нет, что надеть, остановись и напиши это одной фразой. Форму и человека не выдумывай.
+
+Прогон, не останавливаясь на тексте prompt.md: прочитай уже лежащий на диске файл \`playbooks/workflows/characters_comfy.md\`, раздел «Команда». Git pull для этого файла не делай. JSON графа не редактируй. \`update_comfyui.bat\` не запускай. Один персонаж за проход. Старые файлы в output/ и approve/ не удаляй.
+
+Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь этап \`status.json\` в done и \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь.
+`
+      : `
+## Что сделать
+
+Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить.
+`;
+
+  return `# Задача для LLM
+
+Этот файл уже на диске. Его читает Claude, Cursor или локальный Gemini. Других инструкций не жди.
+
+- Не делай git pull и не проси логин GitHub.
+- Работай только в этой папке: \`${dir}\`
+- Кадр ${request.shotId}, этап ${request.stageId}. Другие кадры не открывай.
+- ComfyUI уже запущен на этом же компьютере: http://127.0.0.1:8188
+- Команды запускай в локальной оболочке, которая читает эту папку. Если первая оболочка не открывает этот адрес, это удалённая машина: переключись на локальную оболочку компьютера с этой папкой и повтори. Не останавливайся и не проси заменить модель.
+
+## Сообщение пользователя
+
+${request.message.trim()}
+
+## Уже лежит в папке этапа
+
+### refs/
+
+${bulletFiles(path.join(dir, "refs"))}
+
+### output/
+
+${bulletFiles(path.join(dir, "output"))}
+
+### approve/
+
+${bulletFiles(path.join(dir, "approve"))}
+
+## База персонажей
+
+${libraries}
+${charactersBlock}`;
+}
+
 export function submitAgentRequest(options: {
   shotId: string;
   stageId: StageId;
@@ -341,6 +435,7 @@ export function submitAgentRequest(options: {
   const dir = stageDir(shotId, options.stageId);
   writeText(path.join(dir, REQUEST_JSON), JSON.stringify(request, null, 2) + "\n");
   writeText(path.join(dir, REQUEST_MD), renderRequestMarkdown(request));
+  writeText(path.join(dir, LLM_TASK), renderLlmTask(request));
   rebuildAgentInbox();
   return request;
 }

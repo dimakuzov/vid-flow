@@ -1,7 +1,8 @@
+import path from "path";
 import { NextResponse } from "next/server";
 import { STAGES, type StageId } from "@/lib/series/constants";
 import { submitAgentRequest } from "@/lib/series/agent-request";
-import { agentInboxRelative } from "@/lib/series/paths";
+import { stageDir } from "@/lib/series/paths";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -31,12 +32,10 @@ export async function POST(
       workflowNote: body.workflow || "",
     });
 
-    const refsLine = submitted.refsChangedByUser
-      ? "Референсы менялись вручную, агент оставит их и перепишет промпт."
-      : "Референсы вручную не менялись, агент может собрать их заново вместе с промптом.";
+    const taskFile = path.join(stageDir(shotId, stage as StageId), "llm_task.md");
 
     return NextResponse.json({
-      message: `Запрос лежит в ${agentInboxRelative()}. ${refsLine}`,
+      message: `Любому LLM одна фраза: прочитай ${taskFile} и выполни его до конца.`,
       refsChangedByUser: submitted.refsChangedByUser,
       stage: getStageDetail(shotId, stage as StageId),
     });
