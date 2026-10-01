@@ -50,6 +50,9 @@ ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `
 - Put playbooks inside a series folder; they are global
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 
+## Comfy queue
+Любой агент ставит прогон файлом `data/comfy_queue/<id>.json` (`status: pending`, `prompt` в формате API Comfy, `uploads`, `saveTo` внутри `data/`). Процесс доски на компьютере с ComfyUI отправляет его на `http://127.0.0.1:8188/` и пишет результат в тот же файл. Сам адрес из чужой оболочки не вызывать.
+
 ## Задача для любого LLM
 «Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188/` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.
 

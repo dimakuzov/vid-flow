@@ -36,6 +36,10 @@ export function getEpisodesRoot(): string {
   return path.join(getDataRoot(), "episodes");
 }
 
+export function getComfyQueueRoot(): string {
+  return path.join(getDataRoot(), "comfy_queue");
+}
+
 export function normalizeEpisodeId(raw: string): string {
   const id = raw.trim().toLowerCase().replace(/\s+/g, "_");
   if (!/^[a-z0-9][a-z0-9_-]{0,48}$/.test(id)) {
@@ -162,6 +166,7 @@ export function ensureDataScaffold(): void {
   fs.mkdirSync(getReferencesRoot(), { recursive: true });
   fs.mkdirSync(getScenariosRoot(), { recursive: true });
   fs.mkdirSync(getEpisodesRoot(), { recursive: true });
+  fs.mkdirSync(getComfyQueueRoot(), { recursive: true });
   const show = path.join(getDataRoot(), "show.md");
   if (!fs.existsSync(show)) {
     fs.writeFileSync(

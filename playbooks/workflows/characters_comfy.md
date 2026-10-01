@@ -67,7 +67,21 @@ image 1 = `refs/{name}_outfit.png`. image 2 = `refs/{name}_pose.png`. image 3 = 
 
 Промпт сборки одежду и внешность не описывает. Шаблон — в `playbooks/models/qwen_image.md`. Поза в тексте совпадает со скелетом, а не с действием кадра, если для этого действия нет своей пластины. Два прогона, новые seed. Лучший файл в `output/`. В `approve/{name}_{shotId}.png` класть только если слои, обувь и волосы совпали с образом.
 
-Очередь только на `http://127.0.0.1:8188/`: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
+Очередь только на `http://127.0.0.1:8188/`: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. Если эта оболочка не открывает этот адрес, запрос всё равно ставится отсюда. Запиши `data/comfy_queue/<id>.json` со статусом `pending`. Доска на компьютере с ComfyUI сама отправит его и допишет в тот же файл `status`, `files` и `error`. Жди `done` или `error`.
+
+```json
+{
+  "id": "s04-1",
+  "status": "pending",
+  "prompt": { "3": { "class_type": "LoadImage", "inputs": { "image": "image_police.jpg" } } },
+  "uploads": [{ "path": "data/episodes/teaser/shots/s04/characters/refs/image_police.jpg" }],
+  "saveTo": "data/episodes/teaser/shots/s04/characters/output"
+}
+```
+
+`prompt` — формат API Comfy: номер ноды, `class_type`, `inputs`. Это не JSON графа из интерфейса. Имя картинки в `inputs` совпадает с именем файла из `uploads`. `saveTo` только внутри `data/`.
+
+Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
 
 `status.json` этапа ставить в `done`, когда approve есть у каждого персонажа кадра. Итог прогона дописать в `run_log.md`. `llm_notes.md` — только рекомендация пользователя, её журналом не затирать. Перед заменой `prompt.md` предыдущий текст остаётся в `prompt_history.json`.
 
