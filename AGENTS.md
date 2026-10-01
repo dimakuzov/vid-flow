@@ -39,6 +39,10 @@ While this chat is open, check the current episode every 20 seconds.
 - If every shot is stopped or has a finished video, stop checking.
 - Do not commit `data/`.
 
+## First frame
+
+A shot with no specific characters and no specific location is made directly in `shots/{shotId}/first_frame/`. Do not wait for `characters/approve` or `location/approve`, and do not create those stages. The rule is in `playbooks/stages/first_frame.md`, section «Без персонажа и локации».
+
 ## Characters stage
 
 If the inbox item is `characters`, the paperwork above is not the result. Run ComfyUI with the command in `playbooks/workflows/characters_comfy.md` (English: `playbooks/workflows/characters_comfy.en.md`). Claude follows the same section.

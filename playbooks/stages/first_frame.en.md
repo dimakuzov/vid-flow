@@ -2,7 +2,13 @@
 
 English copy for the model. Russian original: `playbooks/stages/first_frame.md`.
 
-Build the start frame: place the approved shot characters into the approved shot location. Prompt: `playbooks/models/qwen_first_frame.en.md`. Graph: `playbooks/workflows/first_frame_comfy.en.md`.
+Build the start frame. When the shot has approved characters and a location, place them into it. When it has no specific characters and no location, make the frame directly. The earlier stages are not required. Prompt: `playbooks/models/qwen_first_frame.en.md`. Graph for compositing existing pictures: `playbooks/workflows/first_frame_comfy.en.md`.
+
+## No character and no location
+
+`shot.md` has empty `characters` and `location`, or the user said to make the frame now. Do not wait for `characters/approve` or `location/approve`. Do not create those stages. Do not invent a person's name or a place name that is not in the message.
+
+Build the picture from the shot text and the files in this stage's `refs/`. Put the result in `output/`. The chosen file goes in `approve/`. The character-into-location graph is not required for this path.
 
 ## Where the pictures come from
 

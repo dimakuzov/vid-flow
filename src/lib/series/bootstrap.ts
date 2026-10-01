@@ -92,7 +92,10 @@ function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
     case "location":
       return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
     case "first_frame":
-      return `Собери первый кадр: объедини approved локацию и персонажей для ${shot.id}.\nДействие: ${shot.summary || shot.title}`;
+      if (!shot.characters.length && !shot.location.trim()) {
+        return `Собери первый кадр ${shot.id} сразу. Персонажей и локации в кадре нет, предыдущие этапы не делать.\nДействие: ${shot.summary || shot.title}`;
+      }
+      return `Собери первый кадр для ${shot.id}.\nУтверждённые персонажи и локация, если они уже есть, входят в кадр. Если их нет, не жди предыдущие этапы и собери кадр по действию.\nДействие: ${shot.summary || shot.title}`;
     case "video_preview":
       return `Сгенерируй preview-видео низкого разрешения для ${shot.id}.\nПроверь движение и развитие кадра.\nДействие: ${shot.summary || shot.title}`;
     case "final_render":
@@ -110,8 +113,11 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
     return `# Refs\n\nБаза: data/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
   }
   if (stageId === "first_frame") {
+    if (!shot.characters.length && !shot.location.trim()) {
+      return `# Refs\n\nПерсонажей и локации нет. Предыдущие этапы не нужны.\nФайлы для кадра клади в refs/ этого этапа.\nСм. playbooks/stages/first_frame.md, раздел «Без персонажа и локации».\n`;
+    }
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nЛокация: утверждённый файл из shots/${shot.id}/location/approve/.\nПерсонажи: ${names}, файлы shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nСырые базы сюда не класть.\nСм. playbooks/stages/first_frame.md.\n`;
+    return `# Refs\n\nЕсли персонажи и локация уже утверждены: локация из shots/${shot.id}/location/approve/, персонажи ${names} из shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nЕсли их нет, не жди эти этапы. Файлы кадра клади в refs/ здесь.\nСм. playbooks/stages/first_frame.md.\n`;
   }
   return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
 }

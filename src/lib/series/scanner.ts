@@ -24,10 +24,8 @@ import {
 } from "./paths";
 import { readShotMeta } from "./shot-meta";
 import {
-  charactersApproved,
   deriveStageStatus,
   expectedApproveCount,
-  locationApproved,
   readStatusFile,
 } from "./status";
 import { readAgentRequestSummary } from "./agent-request";
@@ -54,10 +52,7 @@ function stageThumbnails(shotId: string, stageId: StageId) {
 }
 
 function buildStageSummary(shotId: string, stageId: StageId, characters: string[]): StageSummary {
-  const upstreamOk =
-    stageId !== "first_frame" ||
-    (charactersApproved(shotId, characters) && locationApproved(shotId));
-  const status = deriveStageStatus(shotId, stageId, characters, upstreamOk);
+  const status = deriveStageStatus(shotId, stageId, characters);
   const output = listMediaFiles(path.join(stageDir(shotId, stageId), "output"));
   const approve = listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
   return {
@@ -68,7 +63,7 @@ function buildStageSummary(shotId: string, stageId: StageId, characters: string[
     approveCount: approve.length,
     expectedApproveCount: expectedApproveCount(stageId, characters),
     thumbnails: stageThumbnails(shotId, stageId),
-    canAutoReady: upstreamOk,
+    canAutoReady: true,
   };
 }
 
@@ -209,10 +204,7 @@ function playbooksForStage(stageId: StageId): string[] {
 export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
   const meta = readShotMeta(shotId);
   const dir = stageDir(shotId, stageId);
-  const upstreamOk =
-    stageId !== "first_frame" ||
-    (charactersApproved(shotId, meta.characters) && locationApproved(shotId));
-  const status = deriveStageStatus(shotId, stageId, meta.characters, upstreamOk);
+  const status = deriveStageStatus(shotId, stageId, meta.characters);
   const stored = readStatusFile(shotId, stageId);
 
   return {

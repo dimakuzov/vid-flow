@@ -315,6 +315,17 @@ function renderLlmTask(request: AgentRequestFile): string {
         .join("\n\n")
     : "(папки персонажей не перечислены, потому что в shot.md нет списка)";
 
+  const firstFrameBlock =
+    request.stageId === "first_frame"
+      ? `
+## Первый кадр
+
+Предыдущие этапы не обязательны. Если в shot.md нет персонажей и нет локации, либо пользователь просит кадр сразу, не жди characters/approve и location/approve и не создавай эти этапы. Имя человека и название места, которых нет в сообщении, не выдумывай. Картинку собери по тексту кадра и файлам в refs/ этой папки. Результат положи в output/. В approve/ клади только выбранный файл.
+
+Если утверждённые персонажи и локация уже лежат в папках кадра, используй их. Команда графа сборки: playbooks/workflows/first_frame_comfy.md. JSON графа не редактируй.
+`
+      : "";
+
   const charactersBlock =
     request.stageId === "characters"
       ? `
@@ -367,7 +378,7 @@ ${bulletFiles(path.join(dir, "approve"))}
 ## База персонажей
 
 ${libraries}
-${charactersBlock}`;
+${charactersBlock}${firstFrameBlock}`;
 }
 
 export function submitAgentRequest(options: {
