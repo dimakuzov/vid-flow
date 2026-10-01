@@ -67,7 +67,7 @@ image 1 = `refs/{name}_outfit.png`. image 2 = `refs/{name}_pose.png`. image 3 = 
 
 The assembly prompt does not describe clothing or appearance. Template: `playbooks/models/qwen_image.en.md`. The pose sentence matches the skeleton, not the shot action, unless a pose plate for that action exists. Two runs, new seeds. Copy the best file to `output/`. Copy it to `approve/{name}_{shotId}.png` only when the layers, shoes, and hair match the outfit sheet.
 
-Queue: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. If the response has `node_errors`, record the node name and the text. Fill a missing field with that node's default. Do not change steps, cfg, sampler, or LoRA.
+Queue only at `http://127.0.0.1:8188/`: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. If the response has `node_errors`, record the node name and the text. Fill a missing field with that node's default. Do not change steps, cfg, sampler, or LoRA.
 
 Set the stage `status.json` to `done` only when every character in the shot has an approve file. Append the run note to `run_log.md`. `llm_notes.md` is only the user's recommendation. Do not overwrite it with the log. The previous `prompt.md` stays in `prompt_history.json` when the prompt is replaced.
 
