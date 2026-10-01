@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { StageId } from "./constants";
 import { listMediaFiles } from "./media";
-import { assertSafeSegment, ensureStageDirs, stageDir } from "./paths";
+import { assertSafeSegment, ensureStageDirs, shotDir, shotsDir, stageDir } from "./paths";
 import { writeStatusFile } from "./status";
 
 function uniqueTarget(dir: string, filename: string): string {
@@ -130,4 +130,15 @@ export function updateStageDocs(options: {
 
 export function listApprove(shotId: string, stageId: StageId) {
   return listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
+}
+
+export function deleteShot(shotId: string): void {
+  const id = assertSafeSegment(shotId, "кадр");
+  if (!/^s\d+$/i.test(id)) throw new Error("Некорректный кадр");
+  const dir = path.resolve(shotDir(id));
+  const root = path.resolve(shotsDir());
+  if (dir !== root && !dir.startsWith(root + path.sep)) {
+    throw new Error("Некорректный кадр");
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
 }

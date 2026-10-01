@@ -27,6 +27,11 @@ export interface ShotSummary {
   stages: Record<StageId, StageSummary>;
 }
 
+export interface SeriesChoice {
+  id: string;
+  title: string;
+}
+
 export interface SeriesSummary {
   id: string;
   title: string;
@@ -34,7 +39,7 @@ export interface SeriesSummary {
   root: string;
   episodeId: string | null;
   episodeTitle: string;
-  episodes: string[];
+  episodes: SeriesChoice[];
   shots: ShotSummary[];
   scenarioExists: boolean;
   hasRawScenario: boolean;

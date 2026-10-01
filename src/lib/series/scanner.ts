@@ -29,7 +29,7 @@ import {
   readStatusFile,
 } from "./status";
 import { readAgentRequestSummary } from "./agent-request";
-import type { SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
+import type { SeriesChoice, SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
 
 function parseSeriesMarkdown(content: string): { title: string; description: string } {
   const titleMatch = content.match(/^#\s+(.+)$/m);
@@ -84,7 +84,20 @@ function readShow(): { title: string; description: string } {
   return parseSeriesMarkdown(readTextIfExists(path.join(getDataRoot(), "show.md")));
 }
 
-function emptySeries(episodes: string[]): SeriesSummary {
+function episodeChoiceTitle(episodeId: string): string {
+  const root = episodeDir(episodeId);
+  const episodeMd = readTextIfExists(path.join(root, "episode.md"));
+  const legacySeriesMd = readTextIfExists(path.join(root, "series.md"));
+  const title = parseSeriesMarkdown(episodeMd || legacySeriesMd).title;
+  if (title === "Серия" && !episodeMd.trim() && !legacySeriesMd.trim()) return episodeId;
+  return title;
+}
+
+function listEpisodeChoices(): SeriesChoice[] {
+  return listEpisodeIds().map((id) => ({ id, title: episodeChoiceTitle(id) }));
+}
+
+function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
   const show = readShow();
   return {
     id: "series",
@@ -103,7 +116,7 @@ function emptySeries(episodes: string[]): SeriesSummary {
 
 export function scanSeries(): SeriesSummary {
   ensureDataScaffold();
-  const episodes = listEpisodeIds();
+  const episodes = listEpisodeChoices();
   const episodeId = readCurrentEpisodeId();
   if (!episodeId) return emptySeries(episodes);
 
