@@ -80,7 +80,7 @@ data/
 
 - Инструкция агенту по сборке структуры: `docs/AGENT_BOOTSTRAP.md`
 - Гайды модели и этапа: `playbooks/`. Страница этапа показывает связанные файлы
-- Shot-персонаж собирается из `data/characters/` графом `playbooks/workflows/comfy/character_pose_outfit_qwen.json` (открывается в ComfyUI вручную)
+- Shot-персонаж по умолчанию — правка одежды из `data/characters/`. Граф со скелетом `playbooks/workflows/comfy/character_pose_outfit_qwen.json` только если явно просят конкретную позу с референса
 - Сырой сценарий: кнопка «Отправить на разметку» пишет `scenario_raw.md` и строку в `agent_inbox.md`. Агент в Cursor форматирует его в `scenario.md`. «Создать выбранные» — отдельный скрипт, он только создаёт папки из уже размеченного текста
 
 ## Стек

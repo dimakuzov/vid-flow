@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/stages/characters.md`.
 
 Shot-specific character: the outfit and pose of this shot. Face and body come from the base asset, not from the prompt text.
 
-Assembly of one figure in the shot outfit, a skeleton with every limb, and a face is verified on teaser s07. The next run is done by the agent, using the Command section in `playbooks/workflows/characters_comfy.en.md`. Do not break the rules below.
+By default the agent only edits the outfit, using the Command section in `playbooks/workflows/characters_comfy.en.md`. The skeleton and the assembly of one figure, a skeleton, and a face stay off until the user explicitly asks for a specific pose from a reference. That assembly was already verified on teaser s07. Do not break the rules below.
 
 ## Depends on the identity library
 
@@ -56,11 +56,9 @@ No more than two characters per pass, or the surroundings drift.
 1. Take one source image from `data/characters/{name}/`.
 2. Make the shot outfit in a separate Qwen Image 2.1 edit. The pose graph does not change clothes. Do not change the pose on that pass.
 3. If the base lower garment still shows under the new clothes, replace it in a second edit. Write what is worn. Do not write “no trousers”.
-4. If the feet are missing because the frame is cropped, extend the same figure downward before the skeleton. Do not assemble without both feet.
-5. Extract the skeleton from `{name}_pose.png`. The preview shows both arms, both hands, both legs, and both feet.
-6. Assemble with `playbooks/workflows/comfy/character_pose_outfit_qwen.json`: image 1 = one outfit figure, image 2 = skeleton, image 3 = face.
-7. Compare the result to the outfit sheet: the same layers, the same shoes, the same hair, a similar face. Fix the error in the source image, not with a ban in the prompt.
-8. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `status.json` to `done` only when every character in the shot has that file.
+4. If the feet are missing because the frame is cropped, extend the same figure downward.
+5. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `status.json` to `done` only when every character in the shot has that file.
+6. Run the skeleton and `playbooks/workflows/comfy/character_pose_outfit_qwen.json` only when the user explicitly asks for a specific pose from a reference. Otherwise skip these steps. Then image 1 is one outfit figure, image 2 is the skeleton, image 3 is the face, and the skeleton must show both arms, both hands, both legs, and both feet.
 
 Prompt and parameters: `playbooks/models/qwen_image.en.md`. How to run the graph: `playbooks/workflows/characters_comfy.en.md`.
 
@@ -93,7 +91,7 @@ Removing visible base trousers by writing “no trousers” in the assembly prom
 
 ## Locked by the run
 
-Clothing comes only from the outfit sheet. Pose comes from a skeleton, with no clothing and no face. On teaser s07 the skeleton held in `character_pose_outfit_qwen.json` at 4 steps and cfg 1. ControlNet was not needed.
+Clothing comes only from the outfit sheet. A pose is taken from a skeleton only when the user explicitly asks for a specific pose from a reference. On teaser s07, in that case, the skeleton held in `character_pose_outfit_qwen.json` at 4 steps and cfg 1. ControlNet was not needed.
 
 Prompt templates are in the model playbook. The assembly text does not name clothes. The outfit-edit text names only the layer that changes, and it keeps the face, hair, pose, and shoes.
 

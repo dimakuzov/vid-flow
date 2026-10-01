@@ -2,7 +2,9 @@
 
 English copy for the model. Russian original: `playbooks/workflows/characters_comfy.md`.
 
-Two passes. A Qwen Image 2.1 edit changes the clothes. `playbooks/workflows/comfy/character_pose_outfit_qwen.json` assembles the pose: image 1 = one figure in the shot outfit, image 2 = the skeleton, image 3 = the face. On teaser s07 this produced `approve/katya_s07.png` and `approve/lena_s07.png`.
+By default there is one pass. A Qwen Image 2.1 edit changes the clothes, and that result is the character picture. Do not extract a skeleton. Do not run `playbooks/workflows/comfy/character_pose_outfit_qwen.json`.
+
+The skeleton and the pose assembly run only when the user message explicitly says to take a specific pose from a reference. A description of the shot action is not that instruction. On teaser s07 the skeleton was used for a separate request and produced `approve/katya_s07.png` and `approve/lena_s07.png`.
 
 Do not edit the graph JSON. Inject filenames, prompt text, and the seed into the queue. Do not run `update_comfyui.bat`. ComfyUI is at `http://127.0.0.1:8188/`.
 
@@ -38,7 +40,11 @@ If the base trousers still show under the new top, run a second edit on that sam
 
 If the feet are missing because the frame is cropped, use a taller canvas: `EmptyLatentImage`, both sides divisible by 32, switch true. The prompt extends the same figure downward: the head stays near the top, both feet and plain flat shoes are fully visible, and the clothes and hair already on the source stay. This is not a new person.
 
+Copy the finished edit to `output/`. Copy it to `approve/{name}_{shotId}.png` when the layers, shoes, and hair match the request. Do not run the Skeleton or Assembly sections below.
+
 ### Skeleton
+
+Only when the user explicitly asks for a specific pose from a reference. Otherwise skip this section and Assembly.
 
 `refs/{name}_pose.png` is that same single figure. DWPreprocessor: hand, body, and face = enable, resolution 1024, bbox `yolox_l.onnx`, pose `dw-ll_ucoco_384_bs5.torchscript.pt`, scale_stick disable.
 
@@ -46,7 +52,7 @@ The preview must show both arms, both hands, both legs, and both feet. If the fe
 
 ### Assembly
 
-Do not rewrite the graph file. Substitute the installed models in the API. The bf16 UNET name in the JSON is not on this machine.
+Only together with Skeleton, when a pose from a reference was explicitly requested. Do not rewrite the graph file. Substitute the installed models in the API. The bf16 UNET name in the JSON is not on this machine.
 
 | Node | Value |
 | --- | --- |

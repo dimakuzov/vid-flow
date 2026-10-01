@@ -37,7 +37,7 @@ For a man, change `woman` to `man`. If the face is not needed (seen from behind)
 
 The assembly text is locked on teaser s07. It does not name clothes. The sentence “wearing exactly the outfit” was not used: it describes clothes in text again.
 
-Pose from a skeleton (assembly step):
+Pose from a skeleton (only when the user explicitly asks for a specific pose from a reference; otherwise do not use this template):
 
 ```text
 Image 1 is the woman with her complete outfit. Image 2 is a pose skeleton. Image 3 is her face.
