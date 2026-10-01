@@ -13,6 +13,7 @@ export interface StageSummary {
   id: StageId;
   status: StageStatus;
   outputCount: number;
+  outputNames: string[];
   approveCount: number;
   expectedApproveCount: number;
   thumbnails: MediaFile[];

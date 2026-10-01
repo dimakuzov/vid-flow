@@ -77,8 +77,14 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
   }
 
   async function approveFirstOutput() {
-    const thumbnail = stage.thumbnails[0];
-    if (!thumbnail || thumbnail.relativePath.includes("/approve/")) {
+    const outputNames = stage.outputNames ?? [];
+    const filenames =
+      stageId === "characters"
+        ? outputNames
+        : stage.thumbnails[0] && !stage.thumbnails[0].relativePath.includes("/approve/")
+          ? [stage.thumbnails[0].name]
+          : [];
+    if (!filenames.length) {
       setMessage(
         stage.outputCount
           ? "Новый вариант в output. Откройте «Редактировать», отметьте имя файла и нажмите «Утвердить выбранные»."
@@ -86,17 +92,21 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
       );
       return;
     }
-    const name = thumbnail.name;
     setBusy(true);
     try {
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filenames: [name], from: "output" }),
+        body: JSON.stringify({ filenames, from: "output" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось утвердить");
-      setMessage(`Утверждено: ${data.approved?.join(", ")}`);
+      const approved = data.approved?.join(", ");
+      setMessage(
+        stageId === "characters" && data.stage?.status !== "approved"
+          ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
+          : `Утверждено: ${approved}`,
+      );
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка");

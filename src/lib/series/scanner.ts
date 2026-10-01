@@ -64,6 +64,7 @@ function buildStageSummary(shotId: string, stageId: StageId, characters: string[
     id: stageId,
     status,
     outputCount: output.length,
+    outputNames: output.map((file) => file.name),
     approveCount: approve.length,
     expectedApproveCount: expectedApproveCount(stageId, characters),
     thumbnails: stageThumbnails(shotId, stageId),

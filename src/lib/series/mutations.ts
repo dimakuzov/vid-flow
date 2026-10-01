@@ -7,10 +7,50 @@ import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
 
-function characterApproveName(filename: string, shotId: string): string {
+function matchCharacter(filename: string, characters: string[]): string | null {
+  const stem = path.parse(path.basename(filename)).name.toLowerCase();
+  const ranked = [...characters].sort((a, b) => b.length - a.length);
+  return (
+    ranked.find((name) => {
+      const token = name.toLowerCase();
+      return stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`);
+    }) ?? null
+  );
+}
+
+function characterApproveName(
+  filename: string,
+  shotId: string,
+  characters: string[],
+): string | null {
   const parsed = path.parse(path.basename(filename));
-  const character = parsed.name.split("_")[0];
+  const matched = matchCharacter(filename, characters);
+  const character = matched ?? (characters.length === 1 ? characters[0] : null);
+  if (!character) {
+    if (characters.length) return null;
+    const token = parsed.name.split("_")[0];
+    if (!token) return null;
+    return `${token}_${shotId}${parsed.ext.toLowerCase()}`;
+  }
   return `${character}_${shotId}${parsed.ext.toLowerCase()}`;
+}
+
+function approveRank(filename: string, shotId: string, characters: string[]): number {
+  const stem = path.parse(path.basename(filename)).name.toLowerCase();
+  const matched = matchCharacter(filename, characters);
+  if (!matched) return 0;
+  const token = `${matched}_${shotId}`.toLowerCase();
+  if (stem === token || stem.startsWith(`${token}_`)) return 2;
+  return 1;
+}
+
+function approvedSlot(filename: string, shotId: string): string {
+  const stem = path.parse(path.basename(filename)).name;
+  const suffix = `_${shotId}`;
+  if (stem.toLowerCase().endsWith(suffix.toLowerCase())) {
+    return stem.slice(0, stem.length - suffix.length).toLowerCase();
+  }
+  return (stem.split("_")[0] ?? stem).toLowerCase();
 }
 
 function uniqueTarget(dir: string, filename: string): string {
@@ -86,8 +126,19 @@ export function approveFiles(options: {
     }
   }
 
+  const characters =
+    options.stageId === "characters" ? readShotMeta(shotId).characters : [];
+  const filenames =
+    options.stageId === "characters"
+      ? [...options.filenames].sort(
+          (a, b) =>
+            approveRank(a, shotId, characters) - approveRank(b, shotId, characters) ||
+            a.localeCompare(b),
+        )
+      : options.filenames;
+
   const saved: string[] = [];
-  for (const name of options.filenames) {
+  for (const name of filenames) {
     const safeName = path.basename(name);
     const source = path.join(fromDir, safeName);
     if (!fs.existsSync(source)) {
@@ -95,12 +146,13 @@ export function approveFiles(options: {
     }
     const targetName =
       options.stageId === "characters"
-        ? characterApproveName(safeName, shotId)
+        ? characterApproveName(safeName, shotId, characters)
         : safeName;
+    if (!targetName) continue;
     if (options.stageId === "characters") {
-      const character = targetName.split("_")[0]?.toLowerCase();
+      const slot = approvedSlot(targetName, shotId);
       for (const existing of fs.readdirSync(approveDir)) {
-        if (existing.split("_")[0]?.toLowerCase() === character && existing !== targetName) {
+        if (approvedSlot(existing, shotId) === slot && existing !== targetName) {
           fs.unlinkSync(path.join(approveDir, existing));
         }
       }
@@ -110,8 +162,15 @@ export function approveFiles(options: {
     saved.push(targetName);
   }
 
+  if (!saved.length) {
+    const expected = characters.length ? characters.join(", ") : shotId;
+    throw new Error(
+      `Файл не совпал с персонажем кадра (${expected}). Назовите вариант именем персонажа, например katya.png.`,
+    );
+  }
+
   writeStatusFile(shotId, options.stageId, { status: "approved" });
-  return saved;
+  return [...new Set(saved)];
 }
 
 export function removeApprovedFile(shotId: string, stageId: StageId, filename: string): string {

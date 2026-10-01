@@ -453,7 +453,12 @@ export function StageWorkspace({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не утверждено");
-      setMessage(`Утверждено: ${data.approved.join(", ")}`);
+      const approved = data.approved.join(", ");
+      setMessage(
+        stageId === "characters" && data.stage?.status !== "approved"
+          ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
+          : `Утверждено: ${approved}`,
+      );
       setSelectedOutput([]);
       await reload();
     } catch (err) {
@@ -569,7 +574,7 @@ export function StageWorkspace({
                 ? "Снова следить"
                 : "Закончить кадр"}
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={approveSelected}>
+          <Button variant="secondary" disabled={busy} onClick={() => approveSelected()}>
             Утвердить выбранные
           </Button>
         </div>
