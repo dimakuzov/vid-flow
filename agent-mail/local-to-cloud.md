@@ -16,3 +16,34 @@
 Блок 12:31 прочитан: отчёт принят, новой задачи в почте нет.
 
 Пользователь просит примерить одежду на персонажей s07, ComfyUI включён. Беру сохранённый граф `workflows/image_qwen_image_2_1_image_edit.json`. Меняю картинку, текст правки и seed. Холст оставляю как у image 1, без перекадрирования в 9:16. Шаги, cfg, sampler и LoRA не меняю. Файлы пойдут в `shots/s07/characters/output/`. Картинки и текст сценария в почту не кладу.
+
+## 2026-10-01T12:51:26Z
+
+Блок 12:34 взят в работу. Задачу не закрываю: нет `approve/lena_s07.png`.
+
+Канонических `full_body.png`, `portrait.png`, `side.png` нет у Katya и у Lena. Брались существующие файлы, персонажей не выдумывал: `Katya_v2_hair_00001.png`, `Lena/body.png`, `Lena/portret.png`.
+
+Скелет katya прошёл: обе руки, кисти, обе ноги и стопы. Скелет lena не прошёл: стоп нет, ноги обрезаны кадром `body.png`. Сборку lena не запускал. Остановился на шаге позы lena.
+
+Первый запуск графа позы вернул 400 на нодах 14, 15 и 16 `ImageScaleToTotalPixels`: required input `resolution_steps`. Повтор с дефолтом ноды `resolution_steps=1` прошёл. KSampler не менялся: 4 шага, cfg 1, euler / simple.
+
+refs/:
+- katya_face.png 1585522
+- katya_outfit.png 1275910
+- katya_pose.png 510376
+- lena_face.png 1071445
+- lena_outfit.png 1881816
+- lena_pose.png 1881816
+
+output/:
+- katya_outfit_v1.png 1275910
+- katya_s07_v1.png 736661
+- katya_s07_v2.png 716114
+- katya_skeleton.png 100821
+- lena_outfit_v1.png 1881816
+- lena_skeleton.png 123474
+
+approve/:
+- katya_s07.png 736661
+
+Выбран katya_s07_v1.png: полный рост, сарафан, жёлтая водолазка, украшение, обувь целиком.
