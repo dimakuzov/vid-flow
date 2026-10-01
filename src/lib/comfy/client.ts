@@ -50,14 +50,18 @@ export async function submitComfyPrompt(
   return data.prompt_id;
 }
 
+export async function readComfyHistory(promptId: string): Promise<ComfyHistory | null> {
+  const res = await fetch(`${comfyBase()}/history/${promptId}`);
+  if (!res.ok) return null;
+  const data = (await res.json()) as Record<string, ComfyHistory>;
+  return data[promptId] ?? null;
+}
+
 export async function waitComfyHistory(promptId: string, timeoutMs = 15 * 60 * 1000): Promise<ComfyHistory> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    const res = await fetch(`${comfyBase()}/history/${promptId}`);
-    if (res.ok) {
-      const data = (await res.json()) as Record<string, ComfyHistory>;
-      if (data[promptId]) return data[promptId];
-    }
+    const history = await readComfyHistory(promptId);
+    if (history) return history;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   throw new Error(`история ${promptId} не пришла`);

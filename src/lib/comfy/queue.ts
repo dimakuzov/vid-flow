@@ -3,9 +3,9 @@ import path from "path";
 import {
   downloadComfyImage,
   listHistoryImages,
+  readComfyHistory,
   submitComfyPrompt,
   uploadComfyImage,
-  waitComfyHistory,
 } from "./client";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
 
@@ -22,12 +22,51 @@ export interface ComfyJob {
 }
 
 const running = new Set<string>();
+const HISTORY_TIMEOUT_MS = 15 * 60 * 1000;
+let draining = false;
+
+function processAlive(pid: number): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function comfyOffline(error: unknown): boolean {
+  const codes = new Set([
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "ETIMEDOUT",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_SOCKET",
+  ]);
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [error];
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || typeof current !== "object" || seen.has(current)) continue;
+    seen.add(current);
+    if ("code" in current && codes.has(String((current as { code: unknown }).code))) return true;
+    if ("cause" in current) stack.push((current as { cause: unknown }).cause);
+    if ("errors" in current && Array.isArray((current as { errors: unknown[] }).errors)) {
+      stack.push(...(current as { errors: unknown[] }).errors);
+    }
+  }
+  return error instanceof TypeError && /fetch failed|network/i.test(error.message);
+}
 
 function claimJob(id: string): boolean {
   const lock = path.join(queueDir(), `${id}.lock`);
   try {
     const stat = fs.statSync(lock);
-    if (Date.now() - stat.mtimeMs > 20 * 60 * 1000) fs.unlinkSync(lock);
+    const pid = Number(fs.readFileSync(lock, "utf8").trim());
+    const stale = Date.now() - stat.mtimeMs > 20 * 60 * 1000;
+    if (stale || !processAlive(pid)) fs.unlinkSync(lock);
   } catch {
     // No lock yet.
   }
@@ -75,8 +114,8 @@ function resolveSaveDir(filePath: string): string {
 }
 
 function writeJob(job: ComfyJob): void {
-  const file = jobPath(job.id);
-  fs.writeFileSync(file, JSON.stringify({ ...job, updatedAt: new Date().toISOString() }, null, 2) + "\n");
+  job.updatedAt = new Date().toISOString();
+  fs.writeFileSync(jobPath(job.id), JSON.stringify(job, null, 2) + "\n");
 }
 
 export function readComfyJob(id: string): ComfyJob | null {
@@ -94,7 +133,23 @@ export function enqueueComfyJob(job: ComfyJob): ComfyJob {
   return next;
 }
 
-async function runJob(job: ComfyJob): Promise<void> {
+function listJobs(): ComfyJob[] {
+  const dir = queueDir();
+  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json")).sort();
+  const jobs: ComfyJob[] = [];
+  for (const name of names) {
+    const id = name.slice(0, -".json".length);
+    try {
+      const job = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as ComfyJob;
+      if (job.id === id) jobs.push(job);
+    } catch {
+      // A writer still has this file open.
+    }
+  }
+  return jobs;
+}
+
+async function submitJob(job: ComfyJob): Promise<void> {
   const saveDir = resolveSaveDir(job.saveTo);
   fs.mkdirSync(saveDir, { recursive: true });
   for (const upload of job.uploads || []) {
@@ -102,10 +157,24 @@ async function runJob(job: ComfyJob): Promise<void> {
     const filename = upload.filename || path.basename(source);
     await uploadComfyImage(fs.readFileSync(source), filename);
   }
-  const promptId = await submitComfyPrompt(job.prompt);
-  job.promptId = promptId;
+  job.promptId = await submitComfyPrompt(job.prompt);
+  job.status = "running";
+  job.error = undefined;
   writeJob(job);
-  const history = await waitComfyHistory(promptId);
+}
+
+async function finishJob(job: ComfyJob): Promise<void> {
+  if (!job.promptId) return;
+  const history = await readComfyHistory(job.promptId);
+  if (!history) {
+    const started = job.updatedAt ? Date.parse(job.updatedAt) : Number.NaN;
+    if (Number.isFinite(started) && Date.now() - started > HISTORY_TIMEOUT_MS) {
+      throw new Error(`история ${job.promptId} не пришла`);
+    }
+    return;
+  }
+  const saveDir = resolveSaveDir(job.saveTo);
+  fs.mkdirSync(saveDir, { recursive: true });
   const saved: string[] = [];
   for (const image of listHistoryImages(history)) {
     const bytes = await downloadComfyImage(image);
@@ -120,38 +189,65 @@ async function runJob(job: ComfyJob): Promise<void> {
   writeJob(job);
 }
 
+function failJob(job: ComfyJob, error: unknown): void {
+  job.status = "error";
+  job.error = error instanceof Error ? error.message : "ошибка ComfyUI";
+  try {
+    writeJob(job);
+  } catch {
+    // The job id or save path was rejected before a file could be updated.
+  }
+}
+
 export async function drainComfyQueue(): Promise<void> {
-  const dir = queueDir();
-  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-  for (const name of names) {
-    const id = name.slice(0, -".json".length);
-    if (running.has(id)) continue;
-    let job: ComfyJob;
-    try {
-      job = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as ComfyJob;
-    } catch {
-      continue;
-    }
-    if (job.status !== "pending" || job.id !== id) continue;
-    if (!claimJob(id)) continue;
-    running.add(id);
-    job.status = "running";
-    job.error = undefined;
-    try {
-      writeJob(job);
-      await runJob(job);
-    } catch (error) {
-      job.status = "error";
-      job.error = error instanceof Error ? error.message : "ошибка ComfyUI";
+  if (draining) return;
+  draining = true;
+  try {
+    const jobs = listJobs();
+    let offline = false;
+    for (const job of jobs) {
+      const needsSubmit = job.status === "pending" || (job.status === "running" && !job.promptId);
+      if (!needsSubmit || offline || running.has(job.id) || !claimJob(job.id)) continue;
+      running.add(job.id);
+      job.status = "running";
+      job.error = undefined;
       try {
         writeJob(job);
-      } catch {
-        // The job id or save path was rejected before a file could be updated.
+        await submitJob(job);
+      } catch (error) {
+        if (comfyOffline(error)) {
+          offline = true;
+          job.status = "pending";
+          job.promptId = undefined;
+          job.error = undefined;
+          try {
+            writeJob(job);
+          } catch {
+            // Leave the file as the last successful write.
+          }
+        } else {
+          failJob(job, error);
+        }
+      } finally {
+        running.delete(job.id);
+        releaseJob(job.id);
       }
-    } finally {
-      running.delete(id);
-      releaseJob(id);
     }
+
+    for (const job of jobs) {
+      if (job.status !== "running" || !job.promptId || running.has(job.id) || !claimJob(job.id)) continue;
+      running.add(job.id);
+      try {
+        await finishJob(job);
+      } catch (error) {
+        if (!comfyOffline(error)) failJob(job, error);
+      } finally {
+        running.delete(job.id);
+        releaseJob(job.id);
+      }
+    }
+  } finally {
+    draining = false;
   }
 }
 

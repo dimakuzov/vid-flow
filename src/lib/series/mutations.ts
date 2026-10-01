@@ -7,15 +7,20 @@ import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
 
+function nameInStem(stem: string, token: string): boolean {
+  if (stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`)) return true;
+  const segments = stem.split(/[_-]+/).filter(Boolean);
+  const parts = token.split(/[_-]+/).filter(Boolean);
+  if (!parts.length) return false;
+  return segments.some((_, index) =>
+    parts.every((part, offset) => segments[index + offset] === part),
+  );
+}
+
 function matchCharacter(filename: string, characters: string[]): string | null {
   const stem = path.parse(path.basename(filename)).name.toLowerCase();
   const ranked = [...characters].sort((a, b) => b.length - a.length);
-  return (
-    ranked.find((name) => {
-      const token = name.toLowerCase();
-      return stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`);
-    }) ?? null
-  );
+  return ranked.find((name) => nameInStem(stem, name.toLowerCase())) ?? null;
 }
 
 function characterApproveName(
