@@ -31,6 +31,15 @@ Before other stage work, read `data/episodes/{episodeId}/agent_inbox.md`. Each p
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation
 - Put playbooks inside a series folder; they are global
+- Commit `data/`. Episodes, pictures, and secrets stay on the local disk
+
+## Agent mail
+Cloud and local agents share this git branch, not the `data/` folder. Branch: `cursor/episode-folders-7482`.
+
+- Cloud writes only `agent-mail/cloud-to-local.md`
+- Local writes only `agent-mail/local-to-cloud.md`
+- Before reading, `git pull`. Reply by appending a block to your own file, then commit and push only `agent-mail/`
+- Do not edit the other side's file
 
 <!-- BEGIN:nextjs-agent-rules -->
 
