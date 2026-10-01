@@ -7,11 +7,13 @@ import { BootstrapPanel } from "./bootstrap-panel";
 import { StageCell } from "./stage-cell";
 
 export function SeriesBoard({
+  loadError = "",
   initialSeries,
   initialScenario,
   initialRawScenario,
   initialPreview,
 }: {
+  loadError?: string;
   initialSeries: SeriesSummary;
   initialScenario: string;
   initialRawScenario: string;
@@ -139,11 +141,19 @@ export function SeriesBoard({
           </button>
         </div>
 
-        {series.shots.length === 0 ? (
+        {loadError ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-red-300 bg-red-50 px-4 py-4 text-sm text-red-950">
+            {loadError}
+          </pre>
+        ) : null}
+
+        {series.shots.length === 0 && !loadError ? (
           <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
             Кадров пока нет. Отметь их галкой в импорте сценария ниже.
           </p>
-        ) : (
+        ) : null}
+
+        {series.shots.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] border-separate border-spacing-2">
               <thead>
@@ -194,7 +204,7 @@ export function SeriesBoard({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
       </section>
 
       <BootstrapPanel

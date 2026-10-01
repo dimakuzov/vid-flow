@@ -21,11 +21,19 @@ function emptySeries(): SeriesSummary {
   };
 }
 
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.stack || `${error.name}: ${error.message}`;
+  return String(error);
+}
+
 export default function HomePage() {
+  const loadErrors: string[] = [];
   let series = emptySeries();
   try {
     series = scanSeries();
-  } catch {
+  } catch (error) {
+    console.error(error);
+    loadErrors.push(errorText(error));
     series = emptySeries();
   }
   let scenario = "";
@@ -33,19 +41,24 @@ export default function HomePage() {
   try {
     scenario = series.episodeId ? readScenarioText() : "";
     rawScenario = series.episodeId ? readRawScenarioText() : "";
-  } catch {
+  } catch (error) {
+    console.error(error);
+    loadErrors.push(errorText(error));
     scenario = "";
     rawScenario = "";
   }
   let preview: BootstrapPreview = { seriesTitle: series.episodeTitle || "Серия", shots: [] };
   try {
     preview = parseScenario(scenario.trim() ? scenario : "# Эпизод\n");
-  } catch {
+  } catch (error) {
+    console.error(error);
+    loadErrors.push(errorText(error));
     preview = { seriesTitle: series.episodeTitle || "Серия", shots: [] };
   }
 
   return (
     <SeriesBoard
+      loadError={loadErrors.join("\n\n")}
       initialSeries={series}
       initialScenario={scenario}
       initialRawScenario={rawScenario}
