@@ -9,7 +9,7 @@ This repo is a local-first board for structuring video generation.
 - `DATA_ROOT` overrides the `data/` directory. `SERIES_ROOT` overrides the current episode directory
 - Shot variants stay in `data/episodes/{episodeId}/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
-- Character Comfy graph: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
+- Character pose graph, only when a reference pose is explicitly requested: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
 - Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
 - First-frame Comfy graph: `playbooks/workflows/comfy/qwen21_character_compositing.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
