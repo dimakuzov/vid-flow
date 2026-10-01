@@ -77,11 +77,16 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
   }
 
   async function approveFirstOutput() {
-    const name = stage.thumbnails[0]?.name;
-    if (!name) {
-      setMessage("Нет файлов для утверждения. Сначала загрузите вариант.");
+    const thumbnail = stage.thumbnails[0];
+    if (!thumbnail || thumbnail.relativePath.includes("/approve/")) {
+      setMessage(
+        stage.outputCount
+          ? "Новый вариант в output. Откройте «Редактировать», отметьте имя файла и нажмите «Утвердить выбранные»."
+          : "Нет файлов для утверждения. Сначала загрузите вариант.",
+      );
       return;
     }
+    const name = thumbnail.name;
     setBusy(true);
     try {
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {

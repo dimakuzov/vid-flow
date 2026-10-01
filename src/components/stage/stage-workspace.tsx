@@ -166,6 +166,7 @@ function MediaCard({
   onOpen,
   onRemove,
   caption,
+  onApprove,
 }: {
   file: MediaFile;
   selected?: boolean;
@@ -173,6 +174,7 @@ function MediaCard({
   onOpen?: () => void;
   onRemove?: () => void;
   caption?: string;
+  onApprove?: () => void;
 }) {
   return (
     <div
@@ -231,6 +233,15 @@ function MediaCard({
           ) : null}
         </div>
       )}
+      {onApprove ? (
+        <button
+          type="button"
+          onClick={onApprove}
+          className="mt-2 rounded-lg bg-teal-800 px-2 py-1 text-xs text-white"
+        >
+          Утвердить этот вариант
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -428,8 +439,8 @@ export function StageWorkspace({
     }
   }
 
-  async function approveSelected() {
-    if (!selectedOutput.length) {
+  async function approveSelected(names = selectedOutput) {
+    if (!names.length) {
       setMessage("Выберите файлы в output");
       return;
     }
@@ -438,7 +449,7 @@ export function StageWorkspace({
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filenames: selectedOutput, from: "output" }),
+        body: JSON.stringify({ filenames: names, from: "output" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не утверждено");
@@ -728,6 +739,7 @@ export function StageWorkspace({
                     selected={selectedOutput.includes(file.name)}
                     onSelect={() => toggleOutput(file.name)}
                     onOpen={() => openImage(detail.output, file)}
+                    onApprove={() => approveSelected([file.name])}
                   />
                 ))
               ) : (
@@ -737,7 +749,8 @@ export function StageWorkspace({
           </div>
           {detail.stageId === "characters" ? (
             <p className="mt-4 text-xs text-stone-500">
-              Для персонажей в approve может быть несколько файлов. Имена:{" "}
+              Отметьте имя файла в output и нажмите «Утвердить выбранные». Для персонажа файл
+              встанет как{" "}
               <code>{"{character}_" + detail.shotId + ".png"}</code>
               {detail.expectedCharacters.length
                 ? ` · ожидаются: ${detail.expectedCharacters.join(", ")}`

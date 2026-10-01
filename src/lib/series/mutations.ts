@@ -7,6 +7,12 @@ import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
 
+function characterApproveName(filename: string, shotId: string): string {
+  const parsed = path.parse(path.basename(filename));
+  const character = parsed.name.split("_")[0];
+  return `${character}_${shotId}${parsed.ext.toLowerCase()}`;
+}
+
 function uniqueTarget(dir: string, filename: string): string {
   const parsed = path.parse(filename);
   let candidate = filename;
@@ -85,12 +91,20 @@ export function approveFiles(options: {
     const safeName = path.basename(name);
     const source = path.join(fromDir, safeName);
     if (!fs.existsSync(source)) {
-      throw new Error(`Файл не найден: ${safeName}`);
+      throw new Error(`Файл не найден в output: ${safeName}`);
     }
     const targetName =
       options.stageId === "characters"
-        ? safeName
+        ? characterApproveName(safeName, shotId)
         : safeName;
+    if (options.stageId === "characters") {
+      const character = targetName.split("_")[0]?.toLowerCase();
+      for (const existing of fs.readdirSync(approveDir)) {
+        if (existing.split("_")[0]?.toLowerCase() === character && existing !== targetName) {
+          fs.unlinkSync(path.join(approveDir, existing));
+        }
+      }
+    }
     const target = path.join(approveDir, targetName);
     fs.copyFileSync(source, target);
     saved.push(targetName);

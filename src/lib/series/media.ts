@@ -21,11 +21,12 @@ export function listMediaFiles(absoluteDir: string): MediaFile[] {
     .map((entry) => {
       const absolute = path.join(absoluteDir, entry.name);
       const relativePath = toPosix(path.relative(seriesRoot, absolute));
+      const version = Math.floor(fs.statSync(absolute).mtimeMs);
       return {
         name: entry.name,
         relativePath,
         kind: mediaKind(entry.name),
-        url: `/api/media/${relativePath}`,
+        url: `/api/media/${relativePath}?v=${version}`,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
