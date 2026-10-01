@@ -2,60 +2,84 @@
 
 Оригинал на русском. Для модели: `playbooks/workflows/characters_comfy.en.md`.
 
-Граф: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`.
+Два прохода. Одежду меняет edit Qwen Image 2.1. Позу собирает `playbooks/workflows/comfy/character_pose_outfit_qwen.json`: image 1 = одна фигура в одежде кадра, image 2 = скелет, image 3 = лицо. На teaser s07 это дало утверждённые `approve/katya_s07.png` и `approve/lena_s07.png`.
 
-Берёт одежду из картинки 1, скелет позы из картинки 2 и лицо из картинки 3. Это гипотеза из `playbooks/stages/characters.md`: граф на шотах ещё не прогонялся. Сначала проверка на 1–2 шотах.
+JSON графа не редактировать. В очередь подставляются имена файлов, текст и seed. `update_comfyui.bat` не запускать. ComfyUI: `http://127.0.0.1:8188`.
 
-Запуск из Frameboard нет. Файл открывается в ComfyUI вручную.
+## Команда
 
-## Куда смотреть в графе
+Эту секцию выполняет агент Cursor и агент Claude, когда этап кадра — `characters`. Бумаги `prompt.md` недостаточно. Прогон идёт, пока у каждого персонажа кадра нет подходящего `approve/{name}_{shotId}.png`.
 
-| Что | Нода | Примечание |
-| --- | --- | --- |
-| Модель Qwen Edit | UNETLoader | В файле имя 2511 как заглушка, выбрать свою 2.1 |
-| Text encoder | CLIPLoader, type `qwen_image` | `qwen_2.5_vl_7b_fp8_scaled` или энкодер своего 2.1 |
-| VAE | VAELoader | `qwen_image_vae` |
-| Lightning 4-step LoRA | LoraLoaderModelOnly | Версия под свою модель, сила 1.0 |
-| Скелет | DWPreprocessor | Пакет `comfyui_controlnet_aux` через Manager. Модели DWPose качаются при первом запуске |
+Один персонаж за проход. Имена персонажей в текст генерации не писать. Старые файлы в `output/` и `approve/` не удалять.
 
-ComfyUI закреплён на коммите `097365b`. `update_comfyui.bat` не запускать. Через Manager ставится только набор нод `controlnet_aux`.
+### База
 
-Граф собран на стандартных нодах Qwen Image Edit (`TextEncodeQwenImageEditPlus`, входы image1–3). Если в рабочем Qwen 2.1 другие загрузчики или другая нода энкодера, заменить их здесь и подключить те же три картинки.
+Искать `full_body.png`, `portrait.png`, `side.png` в `data/characters/{Name}/`. Если имени нет, взять существующий png этой папки. Не брать `_old/` и файлы с `Copy` в имени. Нет своей картинки — остановиться и написать имя недостающего файла, человека не выдумывать.
 
-## Входы
+Трёхпанельный лист не кропать в лицо и не подавать как образец позы. Для позы — правая панель, одна фигура в полный рост.
 
-Качество сильнее всего зависит от образа: всё, чего на нём не видно, модель придумает.
+### Правка одежды
 
-| Вход в Comfy | Файл серии | Требования |
-| --- | --- | --- |
-| 1. ОБРАЗ | `shots/{shotId}/characters/refs/{name}_outfit.png` | Полный рост, прямо, светлый фон, обувь и сумка целиком, одежда не развевается |
-| 2. ОБРАЗЕЦ ПОЗЫ | `shots/{shotId}/characters/refs/{name}_pose.png` | Видны все конечности. Формат картинки = формат результата. Одежда с неё не берётся |
-| 3. ЛИЦО | кроп из `data/characters/{name}/portrait.png` или `side.png` | Для мелкой фигуры — от лба до подбородка. Ракурс как у позы |
+Холст как у картинки 1: `ComfySwitchNode.switch` = false, латент со слота энкодера. Шаги, cfg, sampler и LoRA не менять.
 
-Лишний слой на образе (куртка, которой в кадре нет) снимается отдельным edit-проходом. Шаблон — в `playbooks/models/qwen_image.md`. В граф идёт уже исправленный образ.
+| Нода | Значение |
+| --- | --- |
+| UNETLoader | `qwen_image_2.1_int8_convrot.safetensors`, weight_dtype `default` |
+| CLIPLoader | `qwen3vl_8b_int8_convrot.safetensors`, type `qwen_image` |
+| VAELoader | `qwen_image_2.1_vae_bf16.safetensors` |
+| LoraLoaderModelOnly | `qwen2.1\lenovo_qwen21.safetensors`, сила 0.6 |
+| QwenImage21Cache | device `auto`, dtype `default` |
+| TextEncodeQwenImage21 | negative пустой, resolution 1024, `images.image_1` = исходник. В тексте есть `<image1>` |
+| KSampler | 25, cfg 1, euler, simple, denoise 1 |
 
-## Запуск
+Результат — `refs/{name}_outfit.png`: одна фигура, стоит, светлый фон, обувь целиком, одежда не развевается.
 
-1. Открыть JSON и выбрать свои файлы модели, энкодера, VAE и Lightning LoRA.
-2. Загрузить три картинки в ноды «1. ОБРАЗ», «2. ОБРАЗЕЦ ПОЗЫ», «3. ЛИЦО».
-3. Первый прогон — только скелет. В ноде «Проверь скелет» должны быть все руки и ноги. Потерянную конечность лечить заменой образца позы.
-4. В ноде «PROMPT» поменять короткую позу после двоеточия и кадрирование (`Full body`, `Waist-up`, `From behind`). Одежду и внешность не описывать, отрицаний не писать.
-5. KSampler не трогать: 4 шага, cfg 1.0, euler / simple, seed случайный. 2–4 прогона.
-6. Сверить с образом: слои одежды, обувь, сумка, лицо.
-7. SaveImage пишет в `ComfyUI/output/frameboard/`. Лучший файл скопировать в `shots/{shotId}/characters/output/`, затем утвердить как `approve/{name}_{shotId}.png`.
+Если под новым верхом виден низ базы, второй проход той же фигуры описывает нужный низ и ту же обувь. Пример, который сработал: зелёный сарафан продолжается юбкой ниже колен поверх жёлтой водолазки, серые туфли остаются. Фразы «без брюк» нет.
 
-Нода NEGATIVE при cfg 1.0 на результат не влияет.
+Если стоп нет из-за обрезки, холст выше исходника: `EmptyLatentImage`, стороны кратны 32, switch true. Промпт продлевает вниз ту же фигуру: голова у верхнего края, обе стопы и простая плоская обувь целиком, уже надетая одежда и волосы остаются. Это не новый человек.
+
+### Скелет
+
+`refs/{name}_pose.png` — та же одна фигура. DWPreprocessor: hand, body и face = enable, resolution 1024, bbox `yolox_l.onnx`, pose `dw-ll_ucoco_384_bs5.torchscript.pt`, scale_stick disable.
+
+На превью должны быть обе руки, кисти, обе ноги и обе стопы. Стоп нет — вернуться к продлению кадра. Сборку не запускать.
+
+### Сборка
+
+Файл графа не переписывать. В API подставить установленные модели. Имя UNET bf16 из JSON на этой машине отсутствует.
+
+| Нода | Значение |
+| --- | --- |
+| UNETLoader | `qwen_image_edit_2511_fp8mixed.safetensors`, weight_dtype `default` |
+| CLIPLoader | `qwen_2.5_vl_7b_fp8_scaled.safetensors`, type `qwen_image`, device `default` |
+| VAELoader | `qwen_image_vae.safetensors` |
+| LoraLoaderModelOnly | `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors`, сила 1.0 |
+| ModelSamplingAuraFlow | shift 3.1 |
+| CFGNorm | 1.0 |
+| ImageScaleToTotalPixels | lanczos, megapixels 1.0, `resolution_steps` 1 |
+| VAEEncode | пиксели масштабированного скелета, не фото одежды |
+| KSampler | seed числом, 4 шага, cfg 1, euler, simple, denoise 1 |
+| NEGATIVE | текст из графа не заменять. При cfg 1 он не действует |
+
+`resolution_steps` обязателен у установленной ноды. Без него очередь отвечает 400 на нодах масштаба. Строку `randomize` в KSampler не слать: это виджет интерфейса, не вход API.
+
+image 1 = `refs/{name}_outfit.png`. image 2 = `refs/{name}_pose.png`. image 3 = `refs/{name}_face.png`.
+
+Промпт сборки одежду и внешность не описывает. Шаблон — в `playbooks/models/qwen_image.md`. Поза в тексте совпадает со скелетом, а не с действием кадра, если для этого действия нет своей пластины. Два прогона, новые seed. Лучший файл в `output/`. В `approve/{name}_{shotId}.png` класть только если слои, обувь и волосы совпали с образом.
+
+Очередь: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
+
+`status.json` этапа ставить в `done`, когда approve есть у каждого персонажа кадра. Итог прогона дописать в `run_log.md`. `llm_notes.md` — только рекомендация пользователя, её журналом не затирать. Перед заменой `prompt.md` предыдущий текст остаётся в `prompt_history.json`.
 
 ## Если что-то не так
 
 | Симптом | Что делать |
 | --- | --- |
-| DWPreprocessor красная или поля перепутаны | hand/body/face = enable, resolution 1024, bbox `yolox_l.onnx`, pose `dw-ll_ucoco_384_bs5.torchscript.pt` |
-| Ошибка на TextEncodeQwenImageEditPlus | В этой версии 2.1 другая нода энкодера. Взять её из рабочего графа и подключить те же три картинки |
-| Персонаж стоит как на образе, поза не принимается | Скелет в edit не держится. Тот же скелет подать как control_image в Qwen 2.1 Fun ControlNet. Отдельного графа пока нет |
-| На картинке цветные линии скелета | В промпт добавить `Image 2 is only a pose guide.` |
+| 400, `resolution_steps` missing на ImageScaleToTotalPixels | Поставить 1 и повторить ту же очередь |
+| На скелете нет стоп | Продлить тот же кадр вниз. Сборку не запускать |
+| Под сарафаном или платьем видны брюки базы | Второй edit: описать юбку и ту же обувь |
+| На сборке несколько людей или сетка | image 1 и image 2 были листом. Подать одну фигуру |
+| Цветные линии скелета на картинке | В промпт добавить `Image 2 is only a pose guide.` |
 | Лишняя одежда или каблуки | Чинить образ: обувь и все слои должны быть чётко видны |
-| Лицо не похоже | Портрет в ракурсе позы (`side.png` для профиля) или тесный кроп |
-| Лицо не нужно (спиной) | Удалить связи к image3 в обоих энкодерах и фразу про image 3 |
-
-Итог теста записать в `llm_notes.md` кадра. Подтверждённое на 2–3 шотах переносится в «Проверено» в `playbooks/stages/characters.md`.
+| Лицо не похоже | Портрет в ракурсе позы. С листа лицо не вырезать |
+| Персонаж стоит как на образе и игнорирует позу | Скелет в этом графе на s07 держался. Другую позу давать новой пластиной, не абзацем про одежду |

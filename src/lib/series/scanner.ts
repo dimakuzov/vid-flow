@@ -6,6 +6,8 @@ import {
   type StageId,
 } from "./constants";
 import { listMediaFiles, readTextIfExists } from "./media";
+import { syncPromptHistory } from "./prompt-history";
+import { readShotWatch } from "./shot-watch";
 import { readFormatRequest } from "./format-request";
 import {
   ensureDataScaffold,
@@ -221,12 +223,15 @@ export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
       llmNotes: readTextIfExists(path.join(dir, "llm_notes.md")),
       refs: readTextIfExists(path.join(dir, "refs.md")),
       workflow: readTextIfExists(path.join(dir, "workflow.md")),
+      runLog: readTextIfExists(path.join(dir, "run_log.md")),
     },
+    promptHistory: syncPromptHistory(shotId, stageId),
     refs: listMediaFiles(path.join(dir, "refs")),
     output: listMediaFiles(path.join(dir, "output")),
     approve: listMediaFiles(path.join(dir, "approve")),
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(getSeriesRoot(), dir)),
     agentRequest: readAgentRequestSummary(shotId, stageId),
+    watch: readShotWatch(shotId),
   };
 }

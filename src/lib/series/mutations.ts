@@ -3,6 +3,7 @@ import path from "path";
 import type { StageId } from "./constants";
 import { listMediaFiles } from "./media";
 import { assertSafeSegment, ensureStageDirs, shotDir, shotsDir, stageDir } from "./paths";
+import { syncPromptHistory } from "./prompt-history";
 import { writeStatusFile } from "./status";
 
 function uniqueTarget(dir: string, filename: string): string {
@@ -115,6 +116,9 @@ export function updateStageDocs(options: {
   const shotId = assertSafeSegment(options.shotId, "shot");
   const dir = stageDir(shotId, options.stageId);
   fs.mkdirSync(dir, { recursive: true });
+  if (typeof options.prompt === "string") {
+    syncPromptHistory(shotId, options.stageId);
+  }
   const mapping: Array<[string | undefined, string]> = [
     [options.prompt, "prompt.md"],
     [options.llmNotes, "llm_notes.md"],
@@ -125,6 +129,9 @@ export function updateStageDocs(options: {
     if (typeof value === "string") {
       fs.writeFileSync(path.join(dir, filename), value, "utf8");
     }
+  }
+  if (typeof options.prompt === "string") {
+    syncPromptHistory(shotId, options.stageId);
   }
 }
 

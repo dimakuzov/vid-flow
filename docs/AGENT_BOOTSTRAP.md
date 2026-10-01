@@ -16,7 +16,7 @@
 - Папки этапа: `refs/`, `output/`, `approve/`
 - Документы этапа: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
 - `workflow.md` — необязательная заметка на кадр. Можно оставить пустым. Выбор графа там не задаётся.
-- `llm_notes.md` — сообщение пользователя агенту («Рекомендация для LLM»). Само по себе агенту не отправляется. Кнопка «Отправить агенту» пишет `agent_request.md` и строку в `agent_inbox.md` эпизода.
+- `llm_notes.md` — новая рекомендация пользователя к текущему промпту. Журнал прогона туда не пишется, он лежит в `run_log.md`. Кнопка «Отправить агенту» пишет `agent_request.md` и строку в `agent_inbox.md` эпизода. Предыдущие тексты промпта — в `prompt_history.json`, их можно вернуть с этапа.
 
 ## Сырой сценарий
 Если во входящих есть `format-scenario` со статусом `pending`:
@@ -49,7 +49,7 @@ Shot-персонаж и shot-локация собираются из общи�
 
 Перед заполнением этапа прочитай playbook:
 
-- персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`
+- персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`. Прогон — раздел «Команда» в workflow, его выполняют и Cursor, и Claude
 - локация: `playbooks/stages/location.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
 - первый кадр: `playbooks/stages/first_frame.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 

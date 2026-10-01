@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/stages/characters.md`.
 
 Shot-specific character: the outfit and pose of this shot. Face and body come from the base asset, not from the prompt text.
 
-The “outfit + pose skeleton + face” assembly is a **hypothesis**. It is not confirmed on 2–3 shots yet. Rules marked “verified” already work. Do not break them.
+Assembly of one figure in the shot outfit, a skeleton with every limb, and a face is verified on teaser s07. The next run is done by the agent, using the Command section in `playbooks/workflows/characters_comfy.en.md`. Do not break the rules below.
 
 ## Depends on the identity library
 
@@ -17,7 +17,9 @@ data/characters/{name}/
   full_body.png    # full body, light background
 ```
 
-The shot variant is built from that library into `data/episodes/{episodeId}/shots/{shotId}/characters/`. Do not mix old pictures from subfolders into the pass. One character, one outfit image per pass.
+The shot variant is built from that library into `data/episodes/{episodeId}/shots/{shotId}/characters/`. If a canonical name is missing, use an existing png in that character folder: the sheet, or `body.png` / `portret.png`. Skip `_old/` and files with `Copy` in the name. Do not invent a person who has no picture. Do not mix old pictures from subfolders into the pass.
+
+Do not crop a face out of a three-panel sheet, and do not use that sheet as the pose sample. DWPose will see several bodies. The pose sample is one full-body figure, the right panel. Assembly image 1 is also one figure, already wearing the shot outfit.
 
 `portrait` / `side` are only the “face” role, in the same angle as the pose. If the figure is small in frame, put a tight crop in `refs/`: forehead to chin, as little hair as possible.
 
@@ -52,11 +54,13 @@ No more than two characters per pass, or the surroundings drift.
 ## Order
 
 1. Take one source image from `data/characters/{name}/`.
-2. Build the shot outfit sheet and fix hidden parts in a separate edit pass.
-3. Extract a skeleton from `{name}_pose.png` (DWPose). The skeleton has no clothes and no face, so nothing can leak from the pose image.
-4. Assemble with `playbooks/workflows/comfy/character_pose_outfit_qwen.json`. Hypothesis: image 1 = outfit, image 2 = skeleton, image 3 = face.
-5. Compare the result to the outfit sheet: the same number of clothing layers, the same shoes, the same bag, a similar face. Fix the error in the source image, not with a ban in the prompt.
-6. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`.
+2. Make the shot outfit in a separate Qwen Image 2.1 edit. The pose graph does not change clothes. Do not change the pose on that pass.
+3. If the base lower garment still shows under the new clothes, replace it in a second edit. Write what is worn. Do not write “no trousers”.
+4. If the feet are missing because the frame is cropped, extend the same figure downward before the skeleton. Do not assemble without both feet.
+5. Extract the skeleton from `{name}_pose.png`. The preview shows both arms, both hands, both legs, and both feet.
+6. Assemble with `playbooks/workflows/comfy/character_pose_outfit_qwen.json`: image 1 = one outfit figure, image 2 = skeleton, image 3 = face.
+7. Compare the result to the outfit sheet: the same layers, the same shoes, the same hair, a similar face. Fix the error in the source image, not with a ban in the prompt.
+8. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `status.json` to `done` only when every character in the shot has that file.
 
 Prompt and parameters: `playbooks/models/qwen_image.en.md`. How to run the graph: `playbooks/workflows/characters_comfy.en.md`.
 
@@ -71,6 +75,9 @@ Prompt and parameters: `playbooks/models/qwen_image.en.md`. How to run the graph
 - A separate face crop when the figure is small.
 - Fix the source image. Do not patch the prompt.
 - The shot outfit is stored as its own approved file and is the reference for video and the final render.
+- On teaser s07 the assembly kept the pose, the face, and the layers when image 1 was one figure after the edit and the skeleton showed both feet.
+- The base grey trousers under the sarafan went away in a second edit that described the skirt covering the legs. The ban “no trousers” was not used.
+- A frame cropped at the hips was extended downward with the same edit and a taller canvas. The skeleton then showed both feet.
 
 ## Failed
 
@@ -82,15 +89,13 @@ Combining a pose from one frame and clothing from another image in a single pass
 | image 1 = desired outfit, pose written out from a sample image | A cloak appeared that is not on image 1 | A phrase about a blowing coat overrode the image |
 | Same, without the cloak, banned in the negative | Not confirmed | At cfg 1.0 the negative has no effect |
 
-Removing an outer layer with a prompt (“jacket + skirt → one dress”, with an explicit description of the hidden bodice) is also not confirmed.
+Removing visible base trousers by writing “no trousers” in the assembly prompt does not work. The assembly pass does not change clothes. A separate edit that describes the skirt worked on teaser s07.
 
-## Hypothesis
+## Locked by the run
 
-Clothing comes only from the outfit sheet. Pose comes from a skeleton, with no clothing and no face. Qwen Image Edit from 2509 is described as understanding keypoint maps; for Qwen 2.1 this still has to be tested.
+Clothing comes only from the outfit sheet. Pose comes from a skeleton, with no clothing and no face. On teaser s07 the skeleton held in `character_pose_outfit_qwen.json` at 4 steps and cfg 1. ControlNet was not needed.
 
-If the skeleton does not hold in a normal edit, feed the same skeleton as `control_image` in a Qwen 2.1 Fun ControlNet graph. That graph does not exist here yet.
-
-Prompt templates are in the model playbook. The template texts are also a hypothesis: they follow the verified rules, but they are not locked in on real shots.
+Prompt templates are in the model playbook. The assembly text does not name clothes. The outfit-edit text names only the layer that changes, and it keeps the face, hair, pose, and shoes.
 
 ## Do not
 
@@ -103,4 +108,4 @@ Prompt templates are in the model playbook. The template texts are also a hypoth
 
 ## Where to write the test result
 
-In this shot’s `llm_notes.md`: what worked and what broke. If the hypothesis holds on 2–3 shots, move it to “Verified” in this playbook.
+Write the run result in `run_log.md`. Leave `llm_notes.md` as the user's recommendation for the current prompt. Do not roll back settings that are already locked because a new shot is different.

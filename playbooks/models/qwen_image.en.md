@@ -21,7 +21,7 @@ Lightning 4-step LoRA is on, strength 1.0.
 
 At cfg 1.0 the negative does not affect the result. Extra clothes and heels are removed by clean inputs, not by a ban list. The negative node stays in the graph for cfg above 1. With the Lightning LoRA, raising cfg usually damages the image.
 
-Loaders in the graph are placeholders for Qwen 2.1: UNET, CLIP (`type: qwen_image`), VAE `qwen_image_vae`, and the Lightning LoRA that matches the checkpoint. Filenames inside the JSON are not canonical.
+These parameters are for the pose assembly. The outfit edit is a different pass: 25 steps, cfg 1, euler / simple, LoRA `qwen2.1\lenovo_qwen21.safetensors` at strength 0.6. Filenames and the required `resolution_steps` field are in the Command section of `playbooks/workflows/characters_comfy.en.md`. Names inside the assembly JSON are not canonical: the bf16 UNET in that file is not on disk.
 
 ## Prompt structure
 
@@ -29,27 +29,39 @@ Loaders in the graph are placeholders for Qwen 2.1: UNET, CLIP (`type: qwen_imag
 2. Pose and motion, short, as a hint to the skeleton.
 3. Framing and light.
 
-Do not describe appearance or clothing in text. The images set them. The positive prompt has no negations. Write only what should be there.
+In the assembly prompt, do not describe appearance or clothing in text. The images set them. In the outfit-edit prompt, name only the layer that changes. The positive prompt has no negations. Write only what should be there.
 
 For a man, change `woman` to `man`. If the face is not needed (seen from behind), remove the image 3 sentence and disconnect image3 on both encoders.
 
 ## Templates
 
-The texts follow the verified rules. The texts themselves are still a hypothesis.
+The assembly text is locked on teaser s07. It does not name clothes. The sentence “wearing exactly the outfit” was not used: it describes clothes in text again.
 
 Pose from a skeleton (assembly step):
 
 ```text
 Image 1 is the woman with her complete outfit. Image 2 is a pose skeleton. Image 3 is her face.
 
-The woman from image 1, wearing exactly the outfit from image 1 with every garment, the shoes and the bag, takes the exact pose of the skeleton in image 2: [short pose, for example: running fast to the right, side profile, mid-stride]. Her face is the face from image 3.
+The woman from image 1 takes the exact pose of the skeleton in image 2: standing straight, arms at her sides. Her face is the face from image 3.
 
-[Full body / Waist-up / From behind]. Plain light grey studio background, soft even light. Photorealistic.
+Full body. Plain light grey studio background, soft even light. Photorealistic.
+```
+
+The outfit edit names only the layer that changes and keeps the rest. The text contains `<image1>`. Do not change the pose:
+
+```text
+Change the lower garment in <image1>. The green sarafan continues as one skirt from the shoulder straps down below the knees, over the yellow turtleneck. The same grey shoes stay fully visible. The necklace stays on the neck. Her face, pinned-up hair, standing pose, framing, lighting and plain light background stay exactly as in <image1>.
+```
+
+Extend a cropped frame downward. The canvas is taller than the source. It is the same figure:
+
+```text
+Extend <image1> downward into a full-length standing view. The head stays near the top of the frame. Both feet and plain flat shoes are fully visible at the bottom, with a margin of the plain light background under the shoes. Her face, hair, and standing pose stay as in <image1>. Plain light background.
 ```
 
 If the skeleton lines are visible in the result, add: `Image 2 is only a pose guide.`
 
-Outfit-sheet fix, remove an outer layer (example: a jacket over a dress). Do not change the pose on this step. Describe the hidden part explicitly:
+Removing an outer layer with one sentence has not been checked on a shot. The old example below is not a substitute for the edit in the Command section:
 
 ```text
 The woman in image 1 now wears only the brown dress: the skirt part stays exactly the same, and the upper part continues in the same brown fabric — a simple fitted bodice, long sleeves, a round neckline. One continuous dress from shoulders to below the knees.

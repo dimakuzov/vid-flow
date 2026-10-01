@@ -88,7 +88,7 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
   switch (stageId) {
     case "characters":
-      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/characters/{name}/ (portrait, side, full_body).\nВ этом кадре задай одежду и позу. В промпте не описывай внешность и одежду текстом.\nПравила: playbooks/stages/characters.md`;
+      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/characters/{name}/ (portrait, side, full_body; если имени нет — существующий png этой папки).\nВ этом кадре задай одежду и позу. В промпте сборки не описывай внешность и одежду текстом.\nПрогон, не останавливаясь на тексте: playbooks/workflows/characters_comfy.md, раздел «Команда».\nПравила: playbooks/stages/characters.md`;
     case "location":
       return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
     case "first_frame":
@@ -119,7 +119,7 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
 function defaultWorkflow(stageId: StageId): string {
   const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: поза, кадрирование, какие входы взяты. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/character_pose_outfit_qwen.json\n`;
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет отдельный edit. Сборку делает болванка. Команда и настройки нод: playbooks/workflows/characters_comfy.md, раздел «Команда». Сам JSON графа не редактируется.\n\nБолванка сборки: playbooks/workflows/comfy/character_pose_outfit_qwen.json\n`;
   }
   if (stageId === "location") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;

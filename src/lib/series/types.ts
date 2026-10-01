@@ -58,7 +58,9 @@ export interface StageDetail {
     llmNotes: string;
     refs: string;
     workflow: string;
+    runLog: string;
   };
+  promptHistory: { id: string; savedAt: string; prompt: string }[];
   refs: MediaFile[];
   output: MediaFile[];
   approve: MediaFile[];
@@ -69,6 +71,11 @@ export interface StageDetail {
     createdAt: string;
     refsChangedByUser: boolean;
   } | null;
+  watch: {
+    stopped: boolean;
+    stoppedAt: string | null;
+    videoDone: boolean;
+  };
 }
 
 export interface BootstrapShotDraft {
