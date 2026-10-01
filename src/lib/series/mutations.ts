@@ -4,7 +4,8 @@ import type { StageId } from "./constants";
 import { listMediaFiles } from "./media";
 import { assertSafeSegment, ensureStageDirs, shotDir, shotsDir, stageDir } from "./paths";
 import { syncPromptHistory } from "./prompt-history";
-import { writeStatusFile } from "./status";
+import { readShotMeta } from "./shot-meta";
+import { readStatusFile, writeStatusFile } from "./status";
 
 function uniqueTarget(dir: string, filename: string): string {
   const parsed = path.parse(filename);
@@ -97,6 +98,41 @@ export function approveFiles(options: {
 
   writeStatusFile(shotId, options.stageId, { status: "approved" });
   return saved;
+}
+
+export function removeApprovedFile(shotId: string, stageId: StageId, filename: string): string {
+  const safeShot = assertSafeSegment(shotId, "shot");
+  const safeName = path.basename(filename);
+  if (!safeName || safeName !== filename || safeName === "." || safeName === "..") {
+    throw new Error("Некорректное имя файла");
+  }
+  const approveDir = path.join(stageDir(safeShot, stageId), "approve");
+  const target = path.join(approveDir, safeName);
+  if (!target.startsWith(approveDir + path.sep)) {
+    throw new Error("Некорректное имя файла");
+  }
+  if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    throw new Error(`Файл не найден: ${safeName}`);
+  }
+  fs.unlinkSync(target);
+
+  const remaining = listMediaFiles(approveDir);
+  const output = listMediaFiles(path.join(stageDir(safeShot, stageId), "output"));
+  const names = stageId === "characters" ? readShotMeta(safeShot).characters : [];
+  const stillApproved =
+    stageId === "characters"
+      ? names.length
+        ? names.every((name) =>
+            remaining.some((file) =>
+              file.name.toLowerCase().startsWith(`${name}_${safeShot}`.toLowerCase()),
+            ),
+          )
+        : remaining.length > 0
+      : remaining.length > 0;
+  if (!stillApproved && readStatusFile(safeShot, stageId).status === "approved") {
+    writeStatusFile(safeShot, stageId, { status: output.length ? "review" : "prep" });
+  }
+  return safeName;
 }
 
 export function setWaiting(shotId: string, stageId: StageId): void {

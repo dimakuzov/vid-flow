@@ -164,12 +164,14 @@ function MediaCard({
   selected,
   onSelect,
   onOpen,
+  onRemove,
   caption,
 }: {
   file: MediaFile;
   selected?: boolean;
   onSelect?: () => void;
   onOpen?: () => void;
+  onRemove?: () => void;
   caption?: string;
 }) {
   return (
@@ -217,9 +219,16 @@ function MediaCard({
           {file.name}
         </button>
       ) : (
-        <div className="mt-2 truncate text-xs text-stone-600">
-          {caption ? `${caption} · ` : ""}
-          {file.name}
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-600">
+          <span className="truncate">
+            {caption ? `${caption} · ` : ""}
+            {file.name}
+          </span>
+          {onRemove ? (
+            <button type="button" onClick={onRemove} className="shrink-0 text-stone-500 underline">
+              Убрать
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -396,6 +405,27 @@ export function StageWorkspace({
       }
     };
     input.click();
+  }
+
+  async function removeApproved(filename: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось убрать");
+      setMessage(`${filename} убран из approve`);
+      if (data.stage) setDetail(data.stage);
+      else await reload();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function approveSelected() {
@@ -676,6 +706,7 @@ export function StageWorkspace({
                     key={file.relativePath}
                     file={file}
                     onOpen={() => openImage(detail.approve, file)}
+                    onRemove={busy ? undefined : () => removeApproved(file.name)}
                   />
                 ))
               ) : (

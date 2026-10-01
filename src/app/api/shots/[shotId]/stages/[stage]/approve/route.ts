@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { STAGES, type StageId } from "@/lib/series/constants";
-import { approveFiles } from "@/lib/series/mutations";
+import { approveFiles, removeApprovedFile } from "@/lib/series/mutations";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -37,6 +37,30 @@ export async function POST(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ошибка утверждения";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ shotId: string; stage: string }> },
+) {
+  try {
+    const { shotId, stage } = await context.params;
+    if (!STAGES.includes(stage as StageId)) {
+      return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
+    }
+    const body = (await request.json()) as { filename?: string };
+    if (!body.filename) {
+      return NextResponse.json({ error: "Не выбран файл" }, { status: 400 });
+    }
+    const removed = removeApprovedFile(shotId, stage as StageId, body.filename);
+    return NextResponse.json({
+      removed,
+      stage: getStageDetail(shotId, stage as StageId),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось убрать файл";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
