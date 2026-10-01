@@ -4,6 +4,8 @@
 
 ## Контекст
 - Общие базы: `data/characters/{name}/`, `data/locations/{locationId}/`
+- Общие референсы сериала: `data/references/`. Это не `refs/` кадра
+- Документы сценариев: `data/scenarios/`. Рабочий текст текущей серии по-прежнему `data/episodes/{episodeId}/scenario.md`
 - Эпизоды: `data/episodes/{episodeId}/`
 - Текущий эпизод: `data/current_episode.txt`
 - Сырой сценарий: `data/episodes/{episodeId}/scenario_raw.md`

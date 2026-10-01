@@ -19,7 +19,7 @@ npm run dev
 
 Открой [http://127.0.0.1:3456](http://127.0.0.1:3456).
 
-Один сериал на репозиторий. Общие персонажи и локации лежат в `data/characters` и `data/locations`. Эпизоды — в `data/episodes/<имя>/`. Текущий эпизод записан в `data/current_episode.txt`.  
+Один сериал на репозиторий. Общие папки: `data/characters`, `data/locations`, `data/references`, `data/scenarios`. Серии — в `data/episodes/<имя>/`. Текущая серия записана в `data/current_episode.txt`.  
 Глобальные playbooks — в `playbooks/`.
 
 Другая папка данных или конкретный эпизод:
@@ -47,6 +47,8 @@ data/
   current_episode.txt
   characters/          # база: {name}/portrait.png, side.png, full_body.png
   locations/           # база: {locationId}/ — общий вид
+  references/          # общие референсы сериала
+  scenarios/           # документы сценариев
   episodes/
     e01/
       episode.md

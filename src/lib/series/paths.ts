@@ -24,6 +24,14 @@ export function getLocationsRoot(): string {
   return path.join(getDataRoot(), "locations");
 }
 
+export function getReferencesRoot(): string {
+  return path.join(getDataRoot(), "references");
+}
+
+export function getScenariosRoot(): string {
+  return path.join(getDataRoot(), "scenarios");
+}
+
 export function getEpisodesRoot(): string {
   return path.join(getDataRoot(), "episodes");
 }
@@ -33,7 +41,14 @@ export function normalizeEpisodeId(raw: string): string {
   if (!/^[a-z0-9][a-z0-9_-]{0,48}$/.test(id)) {
     throw new Error("Имя эпизода: латиница, цифры, _ и -. Например e01");
   }
-  if (id === "characters" || id === "locations" || id === "episodes" || id === "series") {
+  if (
+    id === "characters" ||
+    id === "locations" ||
+    id === "references" ||
+    id === "scenarios" ||
+    id === "episodes" ||
+    id === "series"
+  ) {
     throw new Error("Это имя занято служебной папкой");
   }
   return id;
@@ -144,12 +159,14 @@ export function ensureDataScaffold(): void {
   migrateLegacySeriesLayout();
   fs.mkdirSync(getCharactersRoot(), { recursive: true });
   fs.mkdirSync(getLocationsRoot(), { recursive: true });
+  fs.mkdirSync(getReferencesRoot(), { recursive: true });
+  fs.mkdirSync(getScenariosRoot(), { recursive: true });
   fs.mkdirSync(getEpisodesRoot(), { recursive: true });
   const show = path.join(getDataRoot(), "show.md");
   if (!fs.existsSync(show)) {
     fs.writeFileSync(
       show,
-      "# Сериал\n\nОдин сериал. Общие персонажи и локации лежат рядом с папками эпизодов.\n",
+      "# Сериал\n\nОдин сериал. Общие персонажи, локации, референсы и документы сценариев лежат рядом с папками серий.\n",
       "utf8",
     );
   }

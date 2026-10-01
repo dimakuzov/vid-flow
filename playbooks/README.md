@@ -13,6 +13,8 @@
 
 - `data/characters/{name}/` — portrait, side, full body
 - `data/locations/{locationId}/` — общий вид локации
+- `data/references/` — общие референсы сериала, не refs кадра
+- `data/scenarios/` — документы сценариев, не рабочий `scenario.md` серии
 
 Shot-этапы `characters` и `location` собирают вариант кадра из этих баз. Контракт этапа тот же: `refs/`, `output/`, `approve/` и пять документов.
 

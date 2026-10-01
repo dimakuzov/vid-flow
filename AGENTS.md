@@ -3,7 +3,8 @@
 This repo is a local-first board for structuring video generation.
 
 ## Important paths
-- One series for the whole project. Shared libraries: `data/characters/{name}/`, `data/locations/{locationId}/`
+- One series for the whole project. Shared libraries: `data/characters/{name}/`, `data/locations/{locationId}/`, `data/references/` (shared pictures), `data/scenarios/` (scenario documents)
+- `data/scenarios/` is the document library. The board still reads the working cut from `data/episodes/{episodeId}/scenario.md`
 - Episodes: `data/episodes/{episodeId}/`. Current episode id: `data/current_episode.txt`
 - `DATA_ROOT` overrides the `data/` directory. `SERIES_ROOT` overrides the current episode directory
 - Shot variants stay in `data/episodes/{episodeId}/shots/sXX/` and are built from those libraries
