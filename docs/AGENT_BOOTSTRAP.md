@@ -1,23 +1,47 @@
-# Команда агенту: собрать структуру серии
+# Команда агенту: эпизод и структура кадров
 
-Агент (Cursor / Claude) может создать всю файловую структуру без UI.
+Один сериал на репозиторий. Агент работает с файлами, доска сама агента не запускает.
 
 ## Контекст
-- Корень серии по умолчанию: `data/series`
+- Общие базы: `data/characters/{name}/`, `data/locations/{locationId}/`
+- Эпизоды: `data/episodes/{episodeId}/`
+- Текущий эпизод: `data/current_episode.txt`
+- Сырой сценарий: `data/episodes/{episodeId}/scenario_raw.md`
+- Размеченный сценарий: `data/episodes/{episodeId}/scenario.md`
+- Входящие: `data/episodes/{episodeId}/agent_inbox.md`
 - Глобальные playbooks: `playbooks/`
 - Этапы каждого shot: `characters`, `location`, `first_frame`, `video_preview`, `final_render`
 - Папки этапа: `refs/`, `output/`, `approve/`
 - Документы этапа: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
 - `workflow.md` — необязательная заметка на кадр. Можно оставить пустым. Выбор графа там не задаётся.
-- `llm_notes.md` — сообщение пользователя агенту («Рекомендация для LLM»). Само по себе агенту не отправляется. Кнопка «Отправить агенту» пишет `agent_request.md` и строку в `data/series/agent_inbox.md`.
+- `llm_notes.md` — сообщение пользователя агенту («Рекомендация для LLM»). Само по себе агенту не отправляется. Кнопка «Отправить агенту» пишет `agent_request.md` и строку в `agent_inbox.md` эпизода.
+
+## Сырой сценарий
+Если во входящих есть `format-scenario` со статусом `pending`:
+
+1. Прочитай `format_request.md` и `scenario_raw.md` текущего эпизода.
+2. Запиши `scenario.md` блоками кадров. Сюжет не выдумывай.
+3. Папки `shots/` не создавай.
+4. Поставь `"status": "done"` в `format_request.json`.
+
+Формат:
+
+```md
+# Название эпизода
+
+## s01 Название кадра
+- characters: lena, mark
+- location: night_cafe
+Текст действия.
+```
 
 ## Базы identity
 Shot-персонаж и shot-локация собираются из общих баз, а не с нуля:
 
-- `data/series/characters/{name}/` — `portrait.png`, `side.png`, `full_body.png`
-- `data/series/locations/{locationId}/` — `view.png` и `description.txt`
+- `data/characters/{name}/` — `portrait.png`, `side.png`, `full_body.png`
+- `data/locations/{locationId}/` — `view.png` и `description.txt`
 
-Имя персонажа и локации — как в `scenario.md`. Эти папки не заменяют этапы `shots/sXX/characters` и `shots/sXX/location`.
+Имя персонажа и локации — как в `scenario.md` эпизода. Эти папки не заменяют этапы `data/episodes/{episodeId}/shots/sXX/characters` и `.../location`.
 
 Утверждённый персонаж кадра: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Отдельной папки `env/` нет.
 
@@ -27,24 +51,16 @@ Shot-персонаж и shot-локация собираются из общи�
 - локация: `playbooks/stages/location.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
 - первый кадр: `playbooks/stages/first_frame.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 
-## Вход
-Прочитай `data/series/scenario.md` (весь сценарий серии).
+## Собрать папки кадров
+Это отдельный шаг после разметки. Прочитай `scenario.md` текущего эпизода.
 
-Формат shot-блоков:
-
-```md
-## s01 Название кадра
-- characters: lena, mark
-- location: night_cafe
-Текст действия.
-```
-
-## Действие
 1. Распарси все shots (`s01`, `s02`, ...).
-2. Для каждого shot создай `data/series/shots/{shotId}/shot.md`.
+2. Для каждого shot создай `data/episodes/{episodeId}/shots/{shotId}/shot.md`.
 3. Для каждого этапа создай папки `refs`, `output`, `approve` и документы этапа.
 4. Не затирай существующие файлы в `output/` и `approve/` без явного подтверждения пользователя.
 5. Имена approved-персонажей: `{character}_{shotId}.ext`.
+
+Кнопка «Создать выбранные» делает то же самое скриптом внутри доски. Агента она не вызывает. Если в тексте нет заголовков `## s01`, скрипт папки не создаёт.
 
 ## Альтернатива через API приложения
 Если dev-server запущен:
@@ -52,7 +68,7 @@ Shot-персонаж и shot-локация собираются из общи�
 ```bash
 curl -X POST http://127.0.0.1:3456/api/series/bootstrap \
   -H 'content-type: application/json' \
-  -d '{"shotIds":["s01","s02","s03"]}'
+  -d '{"episodeId":"e01","shotIds":["s01","s02","s03"]}'
 ```
 
-Или через UI: блок «Импорт сценария» на главной.
+Или через UI: блок «Эпизод и сценарий» на главной.

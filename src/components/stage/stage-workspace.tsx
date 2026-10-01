@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StageId } from "@/lib/series/constants";
@@ -82,6 +82,7 @@ export function StageWorkspace({
   initialDetail: StageDetail;
 }) {
   const [detail, setDetail] = useState<StageDetail>(initialDetail);
+  const [seenDetail, setSeenDetail] = useState(initialDetail);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,7 +113,8 @@ export function StageWorkspace({
     });
   }, [shotId, stageId]);
 
-  useEffect(() => {
+  if (seenDetail !== initialDetail) {
+    setSeenDetail(initialDetail);
     setDetail(initialDetail);
     setDocs({
       prompt: initialDetail.docs.prompt || "",
@@ -120,7 +122,7 @@ export function StageWorkspace({
       refs: initialDetail.docs.refs || "",
       workflow: initialDetail.docs.workflow || "",
     });
-  }, [initialDetail]);
+  }
 
   async function sendToAgent() {
     setBusy(true);
@@ -352,9 +354,10 @@ export function StageWorkspace({
             </div>
             <p className="text-xs leading-5 text-stone-500">
               Кнопка кладёт сообщение и список изменений в{" "}
-              <code>data/series/agent_inbox.md</code>. Если референсы загружены вручную,
+              <code>agent_inbox.md</code> текущего эпизода. Если референсы загружены вручную,
               агент оставляет их и переписывает промпт. Если нет — может собрать референсы
-              заново.
+              заново. Агент сам не стартует: его нужно попросить в Cursor, в папке этого
+              репозитория.
             </p>
             {detail.agentRequest?.status === "pending" ? (
               <p className="text-xs leading-5 text-stone-500">

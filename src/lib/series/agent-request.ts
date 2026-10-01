@@ -4,7 +4,7 @@ import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { updateStageDocs } from "./mutations";
-import { assertSafeSegment, getSeriesRoot, stageDir } from "./paths";
+import { agentInboxRelative, assertSafeSegment, getSeriesRoot, stageDir } from "./paths";
 
 const TOUCH_FILE = "agent_touch.json";
 const BASELINE_FILE = "agent_baseline.json";
@@ -170,6 +170,24 @@ When the pass is done:
 `;
 }
 
+function readPendingFormatRequest(
+  root: string,
+): { episodeId: string; createdAt: string } | null {
+  const file = path.join(root, "format_request.json");
+  if (!fs.existsSync(file)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      status?: string;
+      episodeId?: string;
+      createdAt?: string;
+    };
+    if (data.status !== "pending" || !data.episodeId) return null;
+    return { episodeId: data.episodeId, createdAt: data.createdAt || "" };
+  } catch {
+    return null;
+  }
+}
+
 function listShotIds(root: string): string[] {
   const dir = path.join(root, "shots");
   if (!fs.existsSync(dir)) return [];
@@ -214,6 +232,19 @@ export function rebuildAgentInbox(): void {
   ];
   let pending = 0;
 
+  const formatRequest = readPendingFormatRequest(root);
+  if (formatRequest) {
+    pending += 1;
+    lines.push("## format-scenario");
+    lines.push(`- эпизод: ${formatRequest.episodeId}`);
+    lines.push(`- время: ${formatRequest.createdAt}`);
+    lines.push("- сырой текст: scenario_raw.md");
+    lines.push("- записать разметку в: scenario.md");
+    lines.push("- папки shots не создавать");
+    lines.push("- задание: format_request.md");
+    lines.push("");
+  }
+
   for (const shotId of listShotIds(root)) {
     for (const stageId of STAGES) {
       const request = readAgentRequest(shotId, stageId);
@@ -233,6 +264,11 @@ export function rebuildAgentInbox(): void {
 
   if (!pending) {
     lines.push("Пусто.");
+    lines.push("");
+  }
+
+  if (pending) {
+    lines.push(`Файл входящих: ${agentInboxRelative(formatRequest?.episodeId)}.`);
     lines.push("");
   }
 

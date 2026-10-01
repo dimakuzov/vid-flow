@@ -32,8 +32,13 @@ export interface SeriesSummary {
   title: string;
   description: string;
   root: string;
+  episodeId: string | null;
+  episodeTitle: string;
+  episodes: string[];
   shots: ShotSummary[];
   scenarioExists: boolean;
+  hasRawScenario: boolean;
+  formatRequestStatus: "pending" | "done" | null;
 }
 
 export interface StageDetail {

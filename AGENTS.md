@@ -3,9 +3,10 @@
 This repo is a local-first board for structuring video generation.
 
 ## Important paths
-- Series root: `data/series` (override with `SERIES_ROOT`)
-- Identity libraries: `data/series/characters/{name}/`, `data/series/locations/{locationId}/`
-- Shot variants stay in `data/series/shots/sXX/` and are built from those libraries
+- One series for the whole project. Shared libraries: `data/characters/{name}/`, `data/locations/{locationId}/`
+- Episodes: `data/episodes/{episodeId}/`. Current episode id: `data/current_episode.txt`
+- `DATA_ROOT` overrides the `data/` directory. `SERIES_ROOT` overrides the current episode directory
+- Shot variants stay in `data/episodes/{episodeId}/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
 - Character Comfy graph: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
 - Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
@@ -13,11 +14,14 @@ This repo is a local-first board for structuring video generation.
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
 
 ## First useful agent task
-Read `data/series/scenario.md` and materialize shot/stage folders.
-Prefer calling `POST /api/series/bootstrap` when the app is running, or create files directly using the contract in `docs/AGENT_BOOTSTRAP.md`.
+Read `data/current_episode.txt`, then `data/episodes/{episodeId}/agent_inbox.md`.
+
+If the inbox has `format-scenario` pending, read `format_request.md` and `scenario_raw.md`. Write the shot-block format into `scenario.md`. Do not create `shots/` folders. Then set `"status": "done"` in `format_request.json`.
+
+Create shot folders only when the user asks, from an already formatted `scenario.md`. Prefer `POST /api/series/bootstrap` when the app is running, or follow `docs/AGENT_BOOTSTRAP.md`.
 
 ## User feedback
-Before other stage work, read `data/series/agent_inbox.md`. Each pending item points at `shots/{shotId}/{stage}/agent_request.md`.
+Before other stage work, read `data/episodes/{episodeId}/agent_inbox.md`. Each pending stage item points at `shots/{shotId}/{stage}/agent_request.md`.
 
 - Rewrite that stage's `prompt.md` from the user message.
 - Rebuild refs only when `refsChangedByUser` is false and the message means the references are wrong. When it is true, leave `refs/` untouched.

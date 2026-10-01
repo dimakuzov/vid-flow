@@ -3,9 +3,11 @@ import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import {
-  ensureSeriesScaffold,
+  ensureEpisode,
   ensureStageDirs,
   getSeriesRoot,
+  readCurrentEpisodeId,
+  resolveEpisodeRoot,
   stageDir,
 } from "./paths";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
@@ -86,9 +88,9 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
   switch (stageId) {
     case "characters":
-      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/series/characters/{name}/ (portrait, side, full_body).\nВ этом кадре задай одежду и позу. В промпте не описывай внешность и одежду текстом.\nПравила: playbooks/stages/characters.md`;
+      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/characters/{name}/ (portrait, side, full_body).\nВ этом кадре задай одежду и позу. В промпте не описывай внешность и одежду текстом.\nПравила: playbooks/stages/characters.md`;
     case "location":
-      return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/series/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
+      return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
     case "first_frame":
       return `Собери первый кадр: объедини approved локацию и персонажей для ${shot.id}.\nДействие: ${shot.summary || shot.title}`;
     case "video_preview":
@@ -101,11 +103,11 @@ function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
 function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   if (stageId === "characters") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nБаза: data/series/characters/{name}/ — portrait.png, side.png, full_body.png.\nПерсонажи кадра: ${names}.\nВ refs/ этого кадра: {name}_outfit.png, {name}_pose.png, {name}_face.png.\nСм. playbooks/stages/characters.md.\n`;
+    return `# Refs\n\nБаза: data/characters/{name}/ — portrait.png, side.png, full_body.png.\nПерсонажи кадра: ${names}.\nВ refs/ этого кадра: {name}_outfit.png, {name}_pose.png, {name}_face.png.\nСм. playbooks/stages/characters.md.\n`;
   }
   if (stageId === "location") {
     const location = shot.location || "{locationId}";
-    return `# Refs\n\nБаза: data/series/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
+    return `# Refs\n\nБаза: data/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
   }
   if (stageId === "first_frame") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
@@ -148,32 +150,43 @@ export function applyBootstrap(options: {
   scenario?: string;
   shotIds?: string[];
   overwriteDocs?: boolean;
+  episodeId?: string;
 }): { created: string[]; updated: string[]; skipped: string[] } {
-  const root = getSeriesRoot();
-  ensureSeriesScaffold(root);
+  const episodeKey = options.episodeId?.trim() || readCurrentEpisodeId();
+  if (!episodeKey) throw new Error("Укажи имя эпизода, например e01");
 
-  const scenarioPath = path.join(root, "scenario.md");
   const scenario =
-    options.scenario ??
-    (fs.existsSync(scenarioPath) ? fs.readFileSync(scenarioPath, "utf8") : "");
+    options.scenario ?? readScenarioFile(resolveEpisodeRoot(episodeKey));
   if (!scenario.trim()) {
-    throw new Error("scenario.md пуст — нечего импортировать");
-  }
-
-  if (options.scenario) {
-    writeText(scenarioPath, options.scenario);
+    throw new Error("Размеченный сценарий пуст — нечего импортировать");
   }
 
   const preview = parseScenario(scenario);
-  writeText(
-    path.join(root, "series.md"),
-    `# ${preview.seriesTitle}\n\nСерия кадров для локальной генерации видео.\n`,
-  );
+  if (!preview.shots.length) {
+    throw new Error(
+      "В тексте нет кадров вида «## s01 Название». «Создать выбранные» — скрипт, он не вызывает агента и не размечает сырой сценарий. Вставь сырой текст в верхнее поле и нажми «Отправить на разметку».",
+    );
+  }
 
   const selected = new Set(
     (options.shotIds?.length ? options.shotIds : preview.shots.map((s) => s.id)).map(
       (id) => id.toLowerCase(),
     ),
+  );
+  const matched = preview.shots.filter((shot) => selected.has(shot.id.toLowerCase()));
+  if (!matched.length) {
+    throw new Error(
+      "Ни один выбранный кадр не найден в тексте. Нажми «Предпросмотр» ещё раз. Снятая галка не удаляет кадр из таблицы, она только не даёт создать его сейчас.",
+    );
+  }
+
+  const episodeId = ensureEpisode(episodeKey);
+  const root = getSeriesRoot();
+  const scenarioPath = path.join(root, "scenario.md");
+  writeText(scenarioPath, scenario.endsWith("\n") ? scenario : `${scenario}\n`);
+  writeText(
+    path.join(root, "episode.md"),
+    `# ${preview.seriesTitle}\n\nЭпизод ${episodeId}.\n`,
   );
 
   const created: string[] = [];
@@ -214,7 +227,16 @@ export function applyBootstrap(options: {
   return { created, updated, skipped };
 }
 
-export function readScenarioText(): string {
-  const scenarioPath = path.join(getSeriesRoot(), "scenario.md");
+function readScenarioFile(root: string): string {
+  const scenarioPath = path.join(root, "scenario.md");
   return fs.existsSync(scenarioPath) ? fs.readFileSync(scenarioPath, "utf8") : "";
+}
+
+export function readScenarioText(): string {
+  return readScenarioFile(getSeriesRoot());
+}
+
+export function readRawScenarioText(): string {
+  const rawPath = path.join(getSeriesRoot(), "scenario_raw.md");
+  return fs.existsSync(rawPath) ? fs.readFileSync(rawPath, "utf8") : "";
 }

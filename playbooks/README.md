@@ -11,8 +11,8 @@
 
 Базы identity серии (не playbooks):
 
-- `data/series/characters/{name}/` — portrait, side, full body
-- `data/series/locations/{locationId}/` — общий вид локации
+- `data/characters/{name}/` — portrait, side, full body
+- `data/locations/{locationId}/` — общий вид локации
 
 Shot-этапы `characters` и `location` собирают вариант кадра из этих баз. Контракт этапа тот же: `refs/`, `output/`, `approve/` и пять документов.
 

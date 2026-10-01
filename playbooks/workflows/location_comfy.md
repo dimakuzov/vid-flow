@@ -4,7 +4,7 @@
 
 Граф: `playbooks/workflows/comfy/location_views_multiple_angles.json`. Это формат API ComfyUI. Файл открывается перетаскиванием в окно ComfyUI.
 
-Задача прохода A: из `data/series/locations/{locationId}/view.png` получить четыре вертикальных вида 9:16 под конкретный кадр. Как писать тексты: `playbooks/models/qwen_location.md`.
+Задача прохода A: из `data/locations/{locationId}/view.png` получить четыре вертикальных вида 9:16 под конкретный кадр. Как писать тексты: `playbooks/models/qwen_location.md`.
 
 Frameboard граф не запускает.
 

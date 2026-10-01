@@ -9,12 +9,12 @@ Shot-вариант локации без персонажей. Общий ви�
 ## Зависимость от базы
 
 ```text
-data/series/locations/{locationId}/
+data/locations/{locationId}/
   view.png          # общий вид, один исходник на локацию
   description.txt   # предметы, цвета и материалы, которые реально есть на view.png
 ```
 
-`{locationId}` — имя из `scenario.md` (`night_cafe`, `street_rain`). В один проход берётся один `view.png`. Старые варианты в подпапках базы не подмешивать.
+`{locationId}` — имя из `scenario.md` эпизода (`night_cafe`, `street_rain`). Кадр лежит в `data/episodes/{episodeId}/shots/{shotId}/location/`. В один проход берётся один `view.png`. Старые варианты в подпапках базы не подмешивать.
 
 Дополнительные фото предметов (остановка, фонарь) лежат в той же папке и попадают в `refs/` кадра только когда правка их использует.
 

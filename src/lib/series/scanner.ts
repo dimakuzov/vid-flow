@@ -6,10 +6,16 @@ import {
   type StageId,
 } from "./constants";
 import { listMediaFiles, readTextIfExists } from "./media";
+import { readFormatRequest } from "./format-request";
 import {
+  ensureDataScaffold,
   ensureSeriesScaffold,
+  episodeDir,
+  getDataRoot,
   getPlaybooksRoot,
   getSeriesRoot,
+  listEpisodeIds,
+  readCurrentEpisodeId,
   stageDir,
   shotsDir,
   toPosix,
@@ -74,11 +80,42 @@ export function listShotIds(seriesRoot = getSeriesRoot()): string[] {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+function readShow(): { title: string; description: string } {
+  return parseSeriesMarkdown(readTextIfExists(path.join(getDataRoot(), "show.md")));
+}
+
+function emptySeries(episodes: string[]): SeriesSummary {
+  const show = readShow();
+  return {
+    id: "series",
+    title: show.title,
+    description: show.description,
+    root: getDataRoot(),
+    episodeId: null,
+    episodeTitle: "",
+    episodes,
+    shots: [],
+    scenarioExists: false,
+    hasRawScenario: false,
+    formatRequestStatus: null,
+  };
+}
+
 export function scanSeries(): SeriesSummary {
-  const root = getSeriesRoot();
+  ensureDataScaffold();
+  const episodes = listEpisodeIds();
+  const episodeId = readCurrentEpisodeId();
+  if (!episodeId) return emptySeries(episodes);
+
+  const root = process.env.SERIES_ROOT ? getSeriesRoot() : episodeDir(episodeId);
   ensureSeriesScaffold(root);
-  const seriesMd = readTextIfExists(path.join(root, "series.md"));
-  const { title, description } = parseSeriesMarkdown(seriesMd);
+  const show = readShow();
+  const episodeMd = readTextIfExists(path.join(root, "episode.md"));
+  const legacySeriesMd = readTextIfExists(path.join(root, "series.md"));
+  const episodeTitle = parseSeriesMarkdown(episodeMd || legacySeriesMd).title;
+  const formatRequest = readFormatRequest(root);
+  const raw = readTextIfExists(path.join(root, "scenario_raw.md"));
+  const scenario = readTextIfExists(path.join(root, "scenario.md"));
   const shots: ShotSummary[] = listShotIds(root).map((shotId) => {
     const meta = readShotMeta(shotId);
     const stages = Object.fromEntries(
@@ -94,13 +131,19 @@ export function scanSeries(): SeriesSummary {
   });
 
   return {
-    id: path.basename(root),
-    title,
-    description,
+    id: episodeId,
+    title: show.title,
+    description: show.description,
     root,
+    episodeId,
+    episodeTitle: episodeTitle === "Серия" && !episodeMd.trim() && !legacySeriesMd.trim()
+      ? episodeId
+      : episodeTitle,
+    episodes,
     shots,
-    scenarioExists: fs.existsSync(path.join(root, "scenario.md")) &&
-      readTextIfExists(path.join(root, "scenario.md")).trim().length > 0,
+    scenarioExists: scenario.trim().length > 0,
+    hasRawScenario: raw.trim().length > 0,
+    formatRequestStatus: formatRequest?.status ?? null,
   };
 }
 

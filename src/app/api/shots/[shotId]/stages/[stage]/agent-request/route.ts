@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { STAGES, type StageId } from "@/lib/series/constants";
 import { submitAgentRequest } from "@/lib/series/agent-request";
+import { agentInboxRelative } from "@/lib/series/paths";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -35,7 +36,7 @@ export async function POST(
       : "Референсы вручную не менялись, агент может собрать их заново вместе с промптом.";
 
     return NextResponse.json({
-      message: `Запрос лежит в data/series/agent_inbox.md. ${refsLine}`,
+      message: `Запрос лежит в ${agentInboxRelative()}. ${refsLine}`,
       refsChangedByUser: submitted.refsChangedByUser,
       stage: getStageDetail(shotId, stage as StageId),
     });

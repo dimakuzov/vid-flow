@@ -11,13 +11,13 @@ The “outfit + pose skeleton + face” assembly is a **hypothesis**. It is not 
 The character canon lives outside the shot:
 
 ```text
-data/series/characters/{name}/
+data/characters/{name}/
   portrait.png     # front face (source notes: portret.png)
   side.png         # profile face (portret_side.png)
   full_body.png    # full body, light background
 ```
 
-The shot variant is built from that library into `shots/{shotId}/characters/`. Do not mix old pictures from subfolders into the pass. One character, one outfit image per pass.
+The shot variant is built from that library into `data/episodes/{episodeId}/shots/{shotId}/characters/`. Do not mix old pictures from subfolders into the pass. One character, one outfit image per pass.
 
 `portrait` / `side` are only the “face” role, in the same angle as the pose. If the figure is small in frame, put a tight crop in `refs/`: forehead to chin, as little hair as possible.
 
@@ -51,7 +51,7 @@ No more than two characters per pass, or the surroundings drift.
 
 ## Order
 
-1. Take one source image from `data/series/characters/{name}/`.
+1. Take one source image from `data/characters/{name}/`.
 2. Build the shot outfit sheet and fix hidden parts in a separate edit pass.
 3. Extract a skeleton from `{name}_pose.png` (DWPose). The skeleton has no clothes and no face, so nothing can leak from the pose image.
 4. Assemble with `playbooks/workflows/comfy/character_pose_outfit_qwen.json`. Hypothesis: image 1 = outfit, image 2 = skeleton, image 3 = face.

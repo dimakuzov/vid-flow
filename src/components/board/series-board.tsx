@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
@@ -10,19 +10,22 @@ import { StageCell } from "./stage-cell";
 export function SeriesBoard({
   initialSeries,
   initialScenario,
+  initialRawScenario,
   initialPreview,
 }: {
   initialSeries: SeriesSummary;
   initialScenario: string;
+  initialRawScenario: string;
   initialPreview: BootstrapPreview;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [series, setSeries] = useState(initialSeries);
-
-  useEffect(() => {
+  const [seenSeries, setSeenSeries] = useState(initialSeries);
+  if (seenSeries !== initialSeries) {
+    setSeenSeries(initialSeries);
     setSeries(initialSeries);
-  }, [initialSeries]);
+  }
 
   function reload() {
     startTransition(async () => {
@@ -52,16 +55,26 @@ export function SeriesBoard({
           <p className="mt-4 max-w-2xl text-base text-stone-700">
             {series.description}
           </p>
+          <p className="mt-3 text-sm text-stone-700">
+            {series.episodeId
+              ? `Эпизод ${series.episodeId}${series.episodeTitle && series.episodeTitle !== series.episodeId ? ` · ${series.episodeTitle}` : ""}`
+              : "Эпизод ещё не открыт"}
+          </p>
           <p className="mt-3 text-xs text-stone-500">
-            Корень серии:{" "}
+            Папка эпизода:{" "}
             <code className="rounded bg-white/70 px-1.5 py-0.5">{series.root}</code>
           </p>
         </div>
       </header>
 
       <BootstrapPanel
+        key={`${initialSeries.episodeId ?? ""}::${initialRawScenario}::${initialScenario}`}
+        initialEpisodeId={series.episodeId ?? initialSeries.episodeId}
+        episodes={series.episodes}
         initialScenario={initialScenario}
+        initialRawScenario={initialRawScenario}
         initialPreview={initialPreview}
+        formatRequestStatus={series.formatRequestStatus}
         onImported={reload}
       />
 
@@ -81,9 +94,9 @@ export function SeriesBoard({
 
         {series.shots.length === 0 ? (
           <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
-            Кадров пока нет. Вставьте сценарий выше и нажмите «Создать выбранные»,
-            либо попросите агента собрать структуру из{" "}
-            <code>data/series/scenario.md</code>.
+            Кадров пока нет. Сырой текст отправь на разметку агенту. Когда в поле
+            размеченного сценария появятся блоки <code>## s01</code>, нажми
+            «Предпросмотр» и «Создать выбранные» — папки соберёт скрипт доски.
           </p>
         ) : (
           <div className="overflow-x-auto">

@@ -30,7 +30,7 @@ The outfit sheet decides quality more than anything else. The model invents what
 | --- | --- | --- |
 | 1. Outfit | `shots/{shotId}/characters/refs/{name}_outfit.png` | Full body, standing straight, light background, shoes and bag fully visible, clothes not blowing |
 | 2. Pose sample | `shots/{shotId}/characters/refs/{name}_pose.png` | Every limb visible. Image aspect matches the output. Clothing is not taken from this image |
-| 3. Face | Crop of `data/series/characters/{name}/portrait.png` or `side.png` | For a small figure, forehead to chin. Same angle as the pose |
+| 3. Face | Crop of `data/characters/{name}/portrait.png` or `side.png` | For a small figure, forehead to chin. Same angle as the pose |
 
 An extra layer on the outfit sheet (a jacket that is not in the shot) is removed in a separate edit pass. Template: `playbooks/models/qwen_image.en.md`. The graph receives the corrected sheet.
 
