@@ -43,7 +43,7 @@ While this chat is open, check the current episode every 20 seconds.
 
 If the inbox item is `characters`, the paperwork above is not the result. Run ComfyUI with the command in `playbooks/workflows/characters_comfy.md` (English: `playbooks/workflows/characters_comfy.en.md`). Claude follows the same section.
 
-ComfyUI is at `http://127.0.0.1:8188`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. Set the stage `status.json` to `done` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message.
+ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. Set the stage `status.json` to `done` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message.
 
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation
@@ -51,7 +51,7 @@ ComfyUI is at `http://127.0.0.1:8188`. Do not edit the graph JSON. Do not run `u
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 
 ## Задача для любого LLM
-«Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.
+«Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188/` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.
 
 ## Agent mail
 Cloud and local agents share this git branch, not the `data/` folder. Branch: `cursor/episode-folders-7482`.

@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/workflows/characters_co
 
 Two passes. A Qwen Image 2.1 edit changes the clothes. `playbooks/workflows/comfy/character_pose_outfit_qwen.json` assembles the pose: image 1 = one figure in the shot outfit, image 2 = the skeleton, image 3 = the face. On teaser s07 this produced `approve/katya_s07.png` and `approve/lena_s07.png`.
 
-Do not edit the graph JSON. Inject filenames, prompt text, and the seed into the queue. Do not run `update_comfyui.bat`. ComfyUI is at `http://127.0.0.1:8188`.
+Do not edit the graph JSON. Inject filenames, prompt text, and the seed into the queue. Do not run `update_comfyui.bat`. ComfyUI is at `http://127.0.0.1:8188/`.
 
 ## Command
 

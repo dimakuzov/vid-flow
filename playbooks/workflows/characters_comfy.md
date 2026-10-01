@@ -4,7 +4,7 @@
 
 Два прохода. Одежду меняет edit Qwen Image 2.1. Позу собирает `playbooks/workflows/comfy/character_pose_outfit_qwen.json`: image 1 = одна фигура в одежде кадра, image 2 = скелет, image 3 = лицо. На teaser s07 это дало утверждённые `approve/katya_s07.png` и `approve/lena_s07.png`.
 
-JSON графа не редактировать. В очередь подставляются имена файлов, текст и seed. `update_comfyui.bat` не запускать. ComfyUI: `http://127.0.0.1:8188`.
+JSON графа не редактировать. В очередь подставляются имена файлов, текст и seed. `update_comfyui.bat` не запускать. ComfyUI: `http://127.0.0.1:8188/`.
 
 ## Команда
 
@@ -67,7 +67,7 @@ image 1 = `refs/{name}_outfit.png`. image 2 = `refs/{name}_pose.png`. image 3 = 
 
 Промпт сборки одежду и внешность не описывает. Шаблон — в `playbooks/models/qwen_image.md`. Поза в тексте совпадает со скелетом, а не с действием кадра, если для этого действия нет своей пластины. Два прогона, новые seed. Лучший файл в `output/`. В `approve/{name}_{shotId}.png` класть только если слои, обувь и волосы совпали с образом.
 
-Очередь: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
+Очередь только на `http://127.0.0.1:8188/`: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
 
 `status.json` этапа ставить в `done`, когда approve есть у каждого персонажа кадра. Итог прогона дописать в `run_log.md`. `llm_notes.md` — только рекомендация пользователя, её журналом не затирать. Перед заменой `prompt.md` предыдущий текст остаётся в `prompt_history.json`.
 
