@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
@@ -18,8 +17,7 @@ export function SeriesBoard({
   initialRawScenario: string;
   initialPreview: BootstrapPreview;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [series, setSeries] = useState(initialSeries);
   const [seenSeries, setSeenSeries] = useState(initialSeries);
   const [newSeriesId, setNewSeriesId] = useState("");
@@ -50,17 +48,27 @@ export function SeriesBoard({
   }
 
   function reload() {
-    startTransition(async () => {
-      try {
-        const res = await fetch("/api/series", { cache: "no-store" });
-        const data = await res.json();
+    setPending(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch("/api/series", { cache: "no-store", signal: controller.signal })
+      .then(async (res) => {
+        const data = (await res.json()) as SeriesSummary & { error?: string };
         if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
+        if (!data.episodeId && series.episodeId) {
+          setHeaderMessage("Серия на месте. Доска не успела прочитать папку, обнови ещё раз.");
+          return;
+        }
         setSeries(data);
-        router.refresh();
-      } catch {
-        router.refresh();
-      }
-    });
+        setHeaderMessage("");
+      })
+      .catch(() => {
+        setHeaderMessage("Доска не обновилась. Серия не сброшена.");
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        setPending(false);
+      });
   }
 
   return (

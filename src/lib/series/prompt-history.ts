@@ -53,9 +53,15 @@ function versionId(): string {
 export function syncPromptHistory(shotId: string, stageId: StageId): PromptVersion[] {
   const dir = stageDir(assertSafeSegment(shotId, "shot"), stageId);
   const promptFile = path.join(dir, "prompt.md");
-  const prompt = fs.existsSync(promptFile) ? fs.readFileSync(promptFile, "utf8") : "";
   const file = historyPath(shotId, stageId);
   const store = readStore(file);
+  let prompt = "";
+  try {
+    prompt = fs.readFileSync(promptFile, "utf8");
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    if (!missing) return store.versions;
+  }
   if (!fs.existsSync(file)) {
     writeStore(file, { current: prompt, versions: [] });
     return [];

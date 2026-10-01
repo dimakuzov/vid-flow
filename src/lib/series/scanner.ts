@@ -132,19 +132,24 @@ export function scanSeries(): SeriesSummary {
   const formatRequest = readFormatRequest(root);
   const raw = readTextIfExists(path.join(root, "scenario_raw.md"));
   const scenario = readTextIfExists(path.join(root, "scenario.md"));
-  const shots: ShotSummary[] = listShotIds(root).map((shotId) => {
-    const meta = readShotMeta(shotId);
-    const stages = Object.fromEntries(
-      STAGES.map((stageId) => [stageId, buildStageSummary(shotId, stageId, meta.characters)]),
-    ) as Record<StageId, StageSummary>;
-    return {
-      id: shotId,
-      title: meta.title,
-      characters: meta.characters,
-      location: meta.location,
-      stages,
-    };
-  });
+  const shots: ShotSummary[] = [];
+  for (const shotId of listShotIds(root)) {
+    try {
+      const meta = readShotMeta(shotId);
+      const stages = Object.fromEntries(
+        STAGES.map((stageId) => [stageId, buildStageSummary(shotId, stageId, meta.characters)]),
+      ) as Record<StageId, StageSummary>;
+      shots.push({
+        id: shotId,
+        title: meta.title,
+        characters: meta.characters,
+        location: meta.location,
+        stages,
+      });
+    } catch {
+      // A file in this shot is still being written. Keep the rest of the series.
+    }
+  }
 
   return {
     id: episodeId,
