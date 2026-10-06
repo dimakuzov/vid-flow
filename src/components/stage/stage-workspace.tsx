@@ -1,583 +1,212 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import type { StageId } from "@/lib/series/constants";
-import type { MediaFile, StageDetail } from "@/lib/series/types";
+import { useCallback, useState } from "react";
 import { StatusPill } from "@/components/board/status-pill";
+import { Button } from "@/components/ui/button";
+import type { MediaFile, StageDetail } from "@/lib/series/types";
+import { AgentPanel } from "./agent-panel";
+import { useAgentProviders } from "./agent-provider";
+import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
+import { DocFieldLabel, DocTextarea } from "./doc-field";
+import { ImageLightbox } from "./image-lightbox";
+import { OutputPanel } from "./output-panel";
+import { PromptHistory } from "./prompt-history";
+import { RefFiles, usedRefNames } from "./ref-files";
+import { StageStatusBar } from "./stage-status-bar";
+import { useStageDetail, type DocField } from "./use-stage-detail";
+import { SuggestedWorkflow, WorkflowMenu } from "./workflow-menu";
 
-function subjectKey(filename: string, shotId: string): string {
-  const base = filename.replace(/\.[^.]+$/, "");
-  const shotSuffix = `_${shotId}`;
-  if (base.endsWith(shotSuffix)) return base.slice(0, -shotSuffix.length);
-  const cut = base.indexOf("_");
-  return cut === -1 ? base : base.slice(0, cut);
-}
+const PROMPT_PLACEHOLDER = "Текст для модели, на английском. Пусто — отправьте рекомендацию агенту.";
 
-function refRole(filename: string): string {
-  const base = filename.replace(/\.[^.]+$/, "");
-  if (base.endsWith("_outfit")) return "образ";
-  if (base.endsWith("_pose")) return "поза";
-  if (base.endsWith("_face")) return "лицо";
-  return "файл";
-}
+type Viewer = { files: MediaFile[]; index: number; runContext: boolean };
 
-function usedRefNames(
-  refs: MediaFile[],
-  output: MediaFile[],
-  selectedOutput: string[],
-  shotId: string,
-): string[] {
-  const picked = selectedOutput.length
-    ? output.filter((file) => selectedOutput.includes(file.name))
-    : output;
-  const subjects = new Set(picked.map((file) => subjectKey(file.name, shotId)));
-  return refs
-    .filter((file) => subjects.has(subjectKey(file.name, shotId)))
-    .map((file) => file.name);
-}
+export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }) {
+  const stage = useStageDetail(initialDetail);
+  const { detail, fields, docs, stageApi } = stage;
+  const { episodeId, shotId, stageId } = detail;
+  const shotApi = shotApiPath(episodeId, shotId);
 
-function RefFiles({
-  files,
-  selectedName,
-  usedNames,
-  onSelect,
-  onOpen,
-}: {
-  files: MediaFile[];
-  selectedName: string | null;
-  usedNames: string[];
-  onSelect: (name: string) => void;
-  onOpen: (file: MediaFile) => void;
-}) {
-  const selected = files.find((file) => file.name === selectedName) ?? null;
-  const used = new Set(usedNames);
-
-  if (!files.length) {
-    return <p className="text-sm text-stone-500">В refs/ пока нет файлов.</p>;
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs leading-5 text-stone-500">
-        {selected
-          ? `${refRole(selected.name)} · ${selected.name}. Картинка открывается на весь экран.`
-          : usedNames.length
-            ? `Использованы: ${usedNames.join(", ")}.`
-            : "Имя под картинкой выделяет файл. Сама картинка открывается на весь экран."}
-      </p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {files.map((file) => (
-          <MediaCard
-            key={file.relativePath}
-            file={file}
-            selected={file.name === selectedName}
-            onSelect={() => onSelect(file.name)}
-            onOpen={() => onOpen(file)}
-            caption={`${refRole(file.name)}${used.has(file.name) ? " · использован" : ""}`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DocFieldLabel({
-  children,
-  optional,
-  note,
-}: {
-  children: ReactNode;
-  optional?: boolean;
-  note?: string;
-}) {
-  const hint = [note, optional ? "необязательно" : ""].filter(Boolean).join(" · ");
-  return (
-    <label className="flex flex-wrap items-baseline gap-x-2 text-xs font-medium text-stone-600">
-      <span>{children}</span>
-      {hint ? <span className="font-normal text-stone-400">{hint}</span> : null}
-    </label>
-  );
-}
-
-function ImageLightbox({
-  files,
-  index,
-  onClose,
-  onIndex,
-}: {
-  files: MediaFile[];
-  index: number;
-  onClose: () => void;
-  onIndex: (next: number) => void;
-}) {
-  const file = files[index];
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-      if (event.key === "ArrowRight") onIndex(Math.min(files.length - 1, index + 1));
-      if (event.key === "ArrowLeft") onIndex(Math.max(0, index - 1));
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [files.length, index, onClose, onIndex]);
-
-  if (!file) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black"
-      role="dialog"
-      aria-modal="true"
-      aria-label={file.name}
-      onClick={onClose}
-    >
-      <img
-        src={file.url}
-        alt={file.name}
-        className="max-h-full max-w-full object-contain"
-        onClick={(event) => event.stopPropagation()}
-      />
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/60 px-4 py-3 text-sm text-white">
-        <span className="truncate">{file.name}</span>
-        <span className="shrink-0 text-white/70">
-          {index + 1} / {files.length}
-        </span>
-      </div>
-      <button
-        type="button"
-        className="absolute top-4 right-4 rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
-        onClick={onClose}
-      >
-        Закрыть
-      </button>
-    </div>
-  );
-}
-
-function MediaCard({
-  file,
-  selected,
-  onSelect,
-  onOpen,
-  onRemove,
-  caption,
-  onApprove,
-}: {
-  file: MediaFile;
-  selected?: boolean;
-  onSelect?: () => void;
-  onOpen?: () => void;
-  onRemove?: () => void;
-  caption?: string;
-  onApprove?: () => void;
-}) {
-  return (
-    <div
-      className={`w-full rounded-xl border p-2 text-left ${
-        selected ? "border-teal-700 bg-teal-50" : "border-stone-200 bg-white"
-      }`}
-    >
-      {file.kind === "image" ? (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="block w-full cursor-zoom-in"
-          aria-label={`Открыть ${file.name} на весь экран`}
-        >
-          <Image
-            src={file.url}
-            alt={file.name}
-            width={640}
-            height={960}
-            unoptimized
-            className="max-h-96 w-full rounded-lg bg-stone-100 object-contain"
-          />
-        </button>
-      ) : file.kind === "video" ? (
-        <video
-          src={file.url}
-          className="aspect-video w-full rounded-lg bg-black object-contain"
-          controls
-          preload="metadata"
-        />
-      ) : (
-        <div className="flex aspect-video items-center justify-center rounded-lg bg-stone-100 text-sm text-stone-500">
-          {file.name}
-        </div>
-      )}
-      {onSelect ? (
-        <button
-          type="button"
-          onClick={onSelect}
-          className="mt-2 w-full truncate text-left text-xs text-stone-600"
-        >
-          {selected ? "Выбрано · " : ""}
-          {caption ? `${caption} · ` : ""}
-          {file.name}
-        </button>
-      ) : (
-        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-600">
-          <span className="truncate">
-            {caption ? `${caption} · ` : ""}
-            {file.name}
-          </span>
-          {onRemove ? (
-            <button type="button" onClick={onRemove} className="shrink-0 text-stone-500 underline">
-              Убрать
-            </button>
-          ) : null}
-        </div>
-      )}
-      {onApprove ? (
-        <button
-          type="button"
-          onClick={onApprove}
-          className="mt-2 rounded-lg bg-teal-800 px-2 py-1 text-xs text-white"
-        >
-          Утвердить этот вариант
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-export function StageWorkspace({
-  shotId,
-  stageId,
-  initialDetail,
-}: {
-  shotId: string;
-  stageId: StageId;
-  initialDetail: StageDetail;
-}) {
-  const [detail, setDetail] = useState<StageDetail>(initialDetail);
-  const shotApi = `/api/episodes/${initialDetail.episodeId}/shots/${shotId}`;
-  const stageApi = `${shotApi}/stages/${stageId}`;
-  const [seenDetail, setSeenDetail] = useState(initialDetail);
-  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedOutput, setSelectedOutput] = useState<string[]>([]);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
-  const [viewer, setViewer] = useState<{ files: MediaFile[]; index: number } | null>(null);
-  const [videoWorkflow, setVideoWorkflow] = useState<"i2v" | "flf">("i2v");
-  const [docs, setDocs] = useState({
-    prompt: initialDetail.docs.prompt || "",
-    llmNotes: initialDetail.docs.llmNotes || "",
-    refs: initialDetail.docs.refs || "",
-    workflow: initialDetail.docs.workflow || "",
-  });
+  const [viewer, setViewer] = useState<Viewer | null>(null);
 
-  function openImage(files: MediaFile[], file: MediaFile) {
+  const agentMode = detail.workflows.some((item) => item.available) ? "text" : "agent";
+  const agent = useAgentProviders(agentMode);
+  const stageBusy = detail.state.busy;
+  const canRun = detail.workflows.length > 0;
+
+  /** Действие кнопки: блокирует кнопки, показывает результат или ошибку. */
+  async function act(work: () => Promise<string | void>) {
+    setBusy(true);
+    setMessage("");
+    try {
+      const text = await work();
+      if (text) setMessage(text);
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openImage(files: MediaFile[], file: MediaFile, runContext: boolean) {
     const images = files.filter((item) => item.kind === "image");
     const index = images.findIndex((item) => item.relativePath === file.relativePath);
-    if (index >= 0) setViewer({ files: images, index });
+    if (index >= 0) setViewer({ files: images, index, runContext });
   }
 
-  const reload = useCallback(async () => {
-    setError("");
-    const res = await fetch(`${stageApi}`, {
-      cache: "no-store",
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Не удалось открыть этап");
-      return;
-    }
-    setDetail(data);
-    setDocs({
-      prompt: data.docs.prompt || "",
-      llmNotes: data.docs.llmNotes || "",
-      refs: data.docs.refs || "",
-      workflow: data.docs.workflow || "",
-    });
-  }, [shotId, stageId]);
+  const closeViewer = useCallback(() => setViewer(null), []);
+  const moveViewer = useCallback(
+    (index: number) => setViewer((current) => (current ? { ...current, index } : current)),
+    [],
+  );
 
-  const docsRef = useRef(docs);
-  docsRef.current = docs;
-  const detailRef = useRef(detail);
-  detailRef.current = detail;
-
-  useEffect(() => {
-    let stopped = false;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      fetch(`${stageApi}`, { cache: "no-store" })
-        .then(async (res) => {
-          const data = (await res.json()) as StageDetail & { error?: string };
-          if (!res.ok || stopped) return;
-          const typed = docsRef.current;
-          const shown = detailRef.current.docs;
-          const nextDocs = {
-            prompt: typed.prompt === (shown.prompt || "") ? data.docs.prompt || "" : typed.prompt,
-            llmNotes:
-              typed.llmNotes === (shown.llmNotes || "") ? data.docs.llmNotes || "" : typed.llmNotes,
-            refs: typed.refs === (shown.refs || "") ? data.docs.refs || "" : typed.refs,
-            workflow:
-              typed.workflow === (shown.workflow || "") ? data.docs.workflow || "" : typed.workflow,
-          };
-          setDetail(data);
-          if (
-            nextDocs.prompt !== typed.prompt ||
-            nextDocs.llmNotes !== typed.llmNotes ||
-            nextDocs.refs !== typed.refs ||
-            nextDocs.workflow !== typed.workflow
-          ) {
-            setDocs(nextDocs);
-          }
-        })
-        .catch(() => {
-          // The folder will be read again on the next tick.
-        });
-    }, 4000);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [shotId, stageId]);
-
-  if (seenDetail !== initialDetail) {
-    const previousDocs = seenDetail.docs;
-    const typed = docsRef.current;
-    setSeenDetail(initialDetail);
-    setDetail(initialDetail);
-    setDocs({
-      prompt:
-        typed.prompt === (previousDocs.prompt || "")
-          ? initialDetail.docs.prompt || ""
-          : typed.prompt,
-      llmNotes:
-        typed.llmNotes === (previousDocs.llmNotes || "")
-          ? initialDetail.docs.llmNotes || ""
-          : typed.llmNotes,
-      refs: typed.refs === (previousDocs.refs || "") ? initialDetail.docs.refs || "" : typed.refs,
-      workflow:
-        typed.workflow === (previousDocs.workflow || "")
-          ? initialDetail.docs.workflow || ""
-          : typed.workflow,
+  /** Сохранить поля на диск. В модель идёт prompt.md с диска, поэтому перед запуском — тоже. */
+  async function saveDocs(): Promise<StageDetail> {
+    const saved = await requestJson<StageDetail>(stageApi, {
+      method: "PATCH",
+      body: docs,
+      fallbackError: "Не удалось сохранить",
     });
+    stage.reset(saved);
+    return saved;
   }
 
-  async function sendToAgent() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${stageApi}/agent-request`, {
+  const sendToAgent = () =>
+    act(async () => {
+      const data = await requestJson<{ message: string; stage: StageDetail }>(
+        `${stageApi}/agent-request`,
+        {
+          method: "POST",
+          body: {
+            message: docs.llmNotes,
+            prompt: docs.prompt,
+            refs: docs.refs,
+            workflow: docs.workflow,
+            ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
+            ...(agent.selected ? { provider: agent.selected } : {}),
+          },
+          fallbackError: "Не отправлено",
+        },
+      );
+      stage.reset(data.stage);
+      return data.message;
+    });
+
+  const runStage = () =>
+    act(async () => {
+      await saveDocs();
+      const data = await requestJson<{ message: string; stage?: StageDetail }>(`${stageApi}/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: docs.llmNotes,
-          prompt: docs.prompt,
-          refs: docs.refs,
-          workflow: docs.workflow,
-          videoWorkflow,
-        }),
+        body: detail.workflow ? { runWorkflow: detail.workflow } : {},
+        fallbackError: "Не запущено",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не отправлено");
-      setDetail(data.stage);
-      setDocs({
-        prompt: data.stage.docs.prompt || "",
-        llmNotes: data.stage.docs.llmNotes || "",
-        refs: data.stage.docs.refs || "",
-        workflow: data.stage.docs.workflow || "",
-      });
-      setMessage(data.message);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function applyDetail(data: StageDetail) {
-    setDetail(data);
-    setDocs({
-      prompt: data.docs.prompt || "",
-      llmNotes: data.docs.llmNotes || "",
-      refs: data.docs.refs || "",
-      workflow: data.docs.workflow || "",
+      if (data.stage) stage.merge(data.stage);
+      else await stage.reload();
+      return data.message;
     });
-  }
 
-  async function restorePrompt(versionId: string) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${stageApi}/prompt-history`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionId }),
+  const chooseWorkflow = (workflowId: string) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { runWorkflow: workflowId },
+        fallbackError: "Не удалось выбрать воркфлоу",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось вернуть промпт");
-      applyDetail(data);
-      setMessage("Промпт возвращён. Текущий текст сохранён в списке версий.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+      stage.merge(data);
+    });
 
-  async function upload(target: "refs" | "output", approveAfter = false) {
+  const cancelStage = () =>
+    act(async () => {
+      const data = await requestJson<{ message: string; stage?: StageDetail }>(
+        `${stageApi}/cancel`,
+        { method: "POST", fallbackError: "Не удалось отменить" },
+      );
+      if (data.stage) stage.merge(data.stage);
+      return data.message;
+    });
+
+  const restorePrompt = (versionId: string) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(`${stageApi}/prompt-history`, {
+        method: "POST",
+        body: { versionId },
+        fallbackError: "Не удалось вернуть промпт",
+      });
+      stage.reset(data);
+      return "Промпт возвращён. Текущий текст сохранён в списке версий.";
+    });
+
+  function upload(target: "refs" | "output", approveAfter = false) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*,video/*";
-    input.onchange = async () => {
+    input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      setBusy(true);
-      setMessage("");
-      try {
+      void act(async () => {
         const form = new FormData();
         form.set("file", file);
         form.set("target", target);
         form.set("approveAfter", approveAfter ? "true" : "false");
-        const res = await fetch(`${stageApi}/upload`, {
-          method: "POST",
-          body: form,
-        });
+        const res = await fetch(`${stageApi}/upload`, { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
-        setMessage(`Файл сохранён в проект: ${data.savedAs}`);
-        await reload();
-      } catch (err) {
-        setMessage(err instanceof Error ? err.message : "Ошибка");
-      } finally {
-        setBusy(false);
-      }
+        await stage.reload();
+        return `Файл сохранён в проект: ${data.savedAs}`;
+      });
     };
     input.click();
   }
 
-  async function removeApproved(filename: string) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${stageApi}/approve`, {
+  const removeApproved = (filename: string) =>
+    act(async () => {
+      const data = await requestJson<{ stage?: StageDetail }>(`${stageApi}/approve`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename }),
+        body: { filename },
+        fallbackError: "Не удалось убрать",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось убрать");
-      setMessage(`${filename} убран из approve`);
-      if (data.stage) setDetail(data.stage);
-      else await reload();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+      if (data.stage) stage.merge(data.stage);
+      else await stage.reload();
+      return `${filename} убран из approve`;
+    });
 
-  async function approveSelected(names = selectedOutput) {
+  const approveSelected = (names = selectedOutput) => {
     if (!names.length) {
       setMessage("Выберите файлы в output");
       return;
     }
-    setBusy(true);
-    try {
-      const res = await fetch(`${stageApi}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filenames: names, from: "output" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не утверждено");
-      const approved = data.approved.join(", ");
-      setMessage(
-        stageId === "characters" && data.stage?.status !== "approved"
-          ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
-          : `Утверждено: ${approved}`,
+    void act(async () => {
+      const data = await requestJson<{ approved: string[]; stage?: StageDetail }>(
+        `${stageApi}/approve`,
+        { method: "POST", body: { filenames: names, from: "output" }, fallbackError: "Не утверждено" },
       );
       setSelectedOutput([]);
-      await reload();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+      await stage.reload();
+      const approved = data.approved.join(", ");
+      return stageId === "characters" && data.stage?.status !== "approved"
+        ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
+        : `Утверждено: ${approved}`;
+    });
+  };
 
-  async function setWatch(stopped: boolean) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${shotApi}/watch`, {
+  const setWatch = (stopped: boolean) =>
+    act(async () => {
+      const data = await requestJson<StageDetail["watch"]>(`${shotApi}/watch`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stopped }),
+        body: { stopped },
+        fallbackError: "Не удалось закрыть кадр",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось закрыть кадр");
-      setDetail((current) => ({ ...current, watch: data }));
-      setMessage(
-        data.videoDone
-          ? "У кадра уже есть утверждённое видео. Агент его не берёт."
-          : stopped
-            ? "Кадр закрыт. Агент больше не принимает рекомендации по нему."
-            : "Агент снова смотрит этот кадр.",
-      );
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function cancelStage() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${stageApi}/cancel`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось отменить");
-      if (data.stage) setDetail(data.stage);
-      setMessage(data.message);
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runStage() {
-    setBusy(true);
-    try {
-      // Сначала сохранить то, что сейчас в полях: в модель идёт prompt.md с диска.
-      const saved = await fetch(`${stageApi}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(docs),
-      });
-      if (!saved.ok) {
-        const data = await saved.json();
-        throw new Error(data.error || "Не удалось сохранить промпт");
-      }
-      const res = await fetch(`${stageApi}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          stageId === "video_preview" || stageId === "final_render" ? { workflow: videoWorkflow } : {},
-        ),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не запущено");
-      setMessage(data.message);
-      await reload();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
+      await stage.reload();
+      return data.videoDone
+        ? "У кадра уже есть утверждённое видео. Агент его не берёт."
+        : stopped
+          ? "Кадр закрыт. Агент больше не принимает рекомендации по нему."
+          : "Агент снова смотрит этот кадр.";
+    });
 
   function toggleOutput(name: string) {
     setSelectedOutput((prev) =>
@@ -585,42 +214,34 @@ export function StageWorkspace({
     );
   }
 
-  const stageBusy = detail.state.busy;
-
-  if (error) {
+  function docField(field: DocField, options: { readOnly?: boolean; placeholder?: string; className?: string }) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <p className="text-red-700">{error}</p>
-        <Link href="/" className="mt-4 inline-block text-teal-800 underline">
-          Назад к таблице
-        </Link>
-      </div>
+      <DocTextarea
+        id={`doc-${field}`}
+        field={fields[field]}
+        disk={detail.docs[field] || ""}
+        onChange={(value) => stage.edit(field, value)}
+        onPull={() => stage.pull(field)}
+        onKeep={() => stage.keep(field)}
+        {...options}
+      />
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6">
+    <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link href="/" className="text-sm text-teal-800 hover:underline">
-            ← Таблица
+        <div className="min-w-0">
+          <Link href={episodePagePath(episodeId)} className="text-sm text-teal-800 hover:underline">
+            ← Таблица {episodeId}
           </Link>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-stone-950">
-            {detail.shotId} · {detail.stageLabel}
+            {shotId} · {detail.stageLabel}
           </h1>
           <p className="mt-1 text-sm text-stone-600">{detail.shotTitle}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <StatusPill status={detail.status} />
-            {detail.state.phase !== "idle" && detail.state.since ? (
-              <span className="text-xs text-stone-500" suppressHydrationWarning>
-                с{" "}
-                {new Date(detail.state.since).toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            ) : null}
-            <code className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
+            <code className="break-all rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
               {detail.relativeDir}
             </code>
           </div>
@@ -632,35 +253,9 @@ export function StageWorkspace({
           <Button variant="outline" disabled={busy} onClick={() => upload("output")}>
             Загрузить output
           </Button>
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() => upload("output", true)}
-          >
+          <Button variant="outline" disabled={busy} onClick={() => upload("output", true)}>
             Загрузить и утвердить
           </Button>
-          {stageId === "video_preview" || stageId === "final_render" ? (
-            <label className="grid gap-1 text-xs text-stone-600">
-              Воркфлоу
-              <select
-                value={videoWorkflow}
-                onChange={(event) => setVideoWorkflow(event.target.value === "flf" ? "flf" : "i2v")}
-                className="h-8 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900"
-              >
-                <option value="i2v">Wan i2v — из первого кадра</option>
-                <option value="flf">Wan FLF — первый и последний кадр</option>
-              </select>
-            </label>
-          ) : null}
-          {stageBusy ? (
-            <Button variant="destructive" disabled={busy} onClick={cancelStage}>
-              Отменить
-            </Button>
-          ) : (
-            <Button disabled={busy} onClick={runStage}>
-              Запустить
-            </Button>
-          )}
           <Button
             variant="outline"
             disabled={busy || detail.watch.videoDone}
@@ -678,91 +273,75 @@ export function StageWorkspace({
         </div>
       </div>
 
-      {message ? <p className="text-sm text-stone-600">{message}</p> : null}
+      <StageStatusBar detail={detail} disabled={busy} onCancel={cancelStage} />
 
-      {detail.state.phase !== "idle" ? (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            detail.state.phase === "error"
-              ? "border-red-300 bg-red-50 text-red-900"
-              : "border-sky-300 bg-sky-50 text-sky-950"
-          }`}
-        >
-          <span>
-            {detail.state.phase === "agent"
-              ? "Агент обрабатывает рекомендацию. Когда он закончит, доска сама поставит прогон в очередь."
-              : detail.state.phase === "queued"
-                ? `Ожидает очереди ComfyUI${detail.state.jobId ? ` · ${detail.state.jobId}` : ""}. Если ComfyUI выключен, задание уйдёт, когда он запустится.`
-                : detail.state.phase === "running"
-                  ? "Генерация в ComfyUI. Файлы появятся в output/."
-                  : detail.state.error}
-          </span>
-          {detail.state.phase === "error" ? (
-            <Button variant="outline" disabled={busy} onClick={cancelStage}>
-              Сбросить ошибку
+      {canRun ? (
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white/90 px-4 py-3">
+          <div className="w-full min-w-0 sm:w-auto sm:min-w-80 sm:flex-1">
+            <WorkflowMenu
+              id="run-workflow"
+              workflows={detail.workflows}
+              selected={detail.workflow}
+              disabled={busy || stageBusy}
+              onSelect={chooseWorkflow}
+            />
+          </div>
+          {!stageBusy ? (
+            <Button disabled={busy} onClick={runStage}>
+              Запустить
             </Button>
           ) : null}
+          <div className="w-full">
+            <SuggestedWorkflow
+              workflows={detail.workflows}
+              selected={detail.workflow}
+              suggested={detail.agentRequest?.suggestedWorkflow}
+              disabled={busy || stageBusy}
+              onSwitch={chooseWorkflow}
+            />
+          </div>
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-stone-200 bg-white/90 p-4">
+      {message ? <p className="text-sm text-stone-600">{message}</p> : null}
+
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
             Input
           </h2>
           <div className="mt-4 space-y-3">
-            <DocFieldLabel note="этот текст уходит в модель">Prompt</DocFieldLabel>
-            <Textarea
-              value={docs.prompt}
-              readOnly={stageBusy}
-              onChange={(e) => setDocs((d) => ({ ...d, prompt: e.target.value }))}
-              className="min-h-28"
+            {detail.shotSummary.trim() ? (
+              <div className="rounded-lg bg-stone-50 px-3 py-2">
+                <div className="text-xs font-medium text-stone-600">Действие кадра</div>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{detail.shotSummary}</p>
+              </div>
+            ) : null}
+            <DocFieldLabel htmlFor="doc-prompt" note="этот текст уходит в модель">
+              Prompt
+            </DocFieldLabel>
+            {docField("prompt", {
+              readOnly: stageBusy,
+              placeholder: PROMPT_PLACEHOLDER,
+              className: "min-h-28",
+            })}
+            <PromptHistory
+              versions={detail.promptHistory}
+              disabled={busy}
+              onRestore={restorePrompt}
             />
-            {detail.promptHistory.length ? (
-              <ul className="space-y-2">
-                {detail.promptHistory.map((version) => (
-                  <li
-                    key={version.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-stone-400">
-                        {version.savedAt.slice(0, 16).replace("T", " ")}
-                      </div>
-                      <div className="truncate text-xs text-stone-600">
-                        {version.prompt.trim().split("\n")[0] || "(пустой промпт)"}
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => restorePrompt(version.id)}
-                    >
-                      Вернуть
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-stone-500">
-                Это текущий промпт. Следующая сохранённая правка оставит его в списке, и его
-                можно будет вернуть.
-              </p>
-            )}
-            <DocFieldLabel note="для агента · очищается после отправки">
+            <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · очищается после отправки">
               Рекомендация
             </DocFieldLabel>
-            <Textarea
-              value={docs.llmNotes}
-              readOnly={stageBusy}
-              onChange={(e) => setDocs((d) => ({ ...d, llmNotes: e.target.value }))}
-              className="min-h-24"
-              placeholder="Что изменить в текущем промпте."
-            />
+            {docField("llmNotes", {
+              readOnly: stageBusy,
+              placeholder: "Что изменить в текущем промпте.",
+              className: "min-h-24",
+            })}
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
                 <summary className="cursor-pointer">Журнал прогона</summary>
-                <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-stone-50 p-3 text-xs text-stone-600">
+                <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-stone-50 p-3 text-xs text-stone-600">
                   {detail.docs.runLog}
                 </pre>
               </details>
@@ -773,50 +352,41 @@ export function StageWorkspace({
               selectedName={selectedRef}
               usedNames={usedRefNames(detail.refs, detail.output, selectedOutput, shotId)}
               onSelect={(name) => setSelectedRef((current) => (current === name ? null : name))}
-              onOpen={(file) => openImage(detail.refs, file)}
+              onOpen={(file) => openImage(detail.refs, file, false)}
             />
             <details className="text-xs text-stone-500">
               <summary className="cursor-pointer">Заметка refs.md</summary>
-              <Textarea
-                value={docs.refs}
-                onChange={(e) => setDocs((d) => ({ ...d, refs: e.target.value }))}
-                className="mt-2 min-h-24 font-mono text-xs"
-              />
+              <div className="mt-2">
+                {docField("refs", { className: "min-h-24 font-mono text-xs" })}
+              </div>
             </details>
-            <DocFieldLabel optional note="заметка на этот кадр">
+            <DocFieldLabel htmlFor="doc-workflow" optional note="заметка на этот кадр">
               Workflow.md
             </DocFieldLabel>
-            <Textarea
-              value={docs.workflow}
-              onChange={(e) => setDocs((d) => ({ ...d, workflow: e.target.value }))}
-              className="min-h-24 font-mono text-xs"
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button disabled={busy || stageBusy} onClick={sendToAgent}>
-                Отправить агенту
+            {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
+            {stage.dirty ? (
+              <Button variant="outline" disabled={busy} onClick={() => act(async () => {
+                await saveDocs();
+                return "Сохранено.";
+              })}>
+                Сохранить поля
               </Button>
-            </div>
-            <p className="text-xs leading-5 text-stone-500">
-              Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле.
-              Пока агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап
-              в Comfy. На персонажах прогон ставит агент. «Закончить кадр» останавливает проверку входящих. Она также
-              останавливается, когда в final_render есть утверждённое видео.
-            </p>
-            {detail.agentRequest ? (
-              <p className="text-xs leading-5 text-stone-500">
-                {detail.agentRequest.status === "done" ? "Последний запрос агент закончил. " : null}
-                {detail.agentRequest.status === "cancelled" ? "Последний запрос отменён. " : null}
-                {detail.agentRequest.refsChangedByUser
-                  ? "Референсы менялись вручную."
-                  : "Референсы вручную не менялись."}
-              </p>
             ) : null}
+            <AgentPanel
+              detail={detail}
+              disabled={busy}
+              mode={agentMode}
+              providers={agent.providers}
+              provider={agent.selected}
+              onChooseProvider={agent.choose}
+              onSend={sendToAgent}
+            />
           </div>
 
           {detail.playbooks.length ? (
             <div className="mt-6">
               <h3 className="text-sm font-medium text-stone-800">Playbooks</h3>
-              <ul className="mt-2 space-y-1 text-xs text-stone-600">
+              <ul className="mt-2 space-y-1 text-xs break-all text-stone-600">
                 {detail.playbooks.map((item) => (
                   <li key={item}>
                     <code>{item}</code>
@@ -826,77 +396,29 @@ export function StageWorkspace({
             </div>
           ) : (
             <p className="mt-6 text-xs text-stone-500">
-              Глобальные playbooks пока не добавлены — положишь их в /playbooks, и
-              они появятся здесь.
+              Глобальные playbooks пока не добавлены — положишь их в /playbooks, и они появятся
+              здесь.
             </p>
           )}
         </section>
 
-        <section className="rounded-2xl border border-stone-200 bg-white/90 p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
-            Output
-          </h2>
-          <div className="mt-4">
-            <h3 className="text-sm font-medium text-stone-800">approve/</h3>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {detail.approve.length ? (
-                detail.approve.map((file) => (
-                  <MediaCard
-                    key={file.relativePath}
-                    file={file}
-                    onOpen={() => openImage(detail.approve, file)}
-                    onRemove={busy ? undefined : () => removeApproved(file.name)}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-stone-500">Ещё ничего не утверждено</p>
-              )}
-            </div>
-          </div>
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-stone-800">output/</h3>
-            <p className="mt-1 text-xs text-stone-500">
-              Имя файла выделяет вариант. Слева остаются референсы этого персонажа.
-            </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {detail.output.length ? (
-                detail.output.map((file) => (
-                  <MediaCard
-                    key={file.relativePath}
-                    file={file}
-                    selected={selectedOutput.includes(file.name)}
-                    onSelect={() => toggleOutput(file.name)}
-                    onOpen={() => openImage(detail.output, file)}
-                    onApprove={() => approveSelected([file.name])}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-stone-500">Вариантов пока нет</p>
-              )}
-            </div>
-          </div>
-          {detail.stageId === "characters" ? (
-            <p className="mt-4 text-xs text-stone-500">
-              Отметьте имя файла в output и нажмите «Утвердить выбранные». Для персонажа файл
-              встанет как{" "}
-              <code>{"{character}_" + detail.shotId + ".png"}</code>
-              {detail.expectedCharacters.length
-                ? ` · ожидаются: ${detail.expectedCharacters.join(", ")}`
-                : ""}
-            </p>
-          ) : (
-            <p className="mt-4 text-xs text-stone-500">
-              В approve для этого этапа хранится один выбранный файл.
-            </p>
-          )}
-        </section>
+        <OutputPanel
+          detail={detail}
+          disabled={busy}
+          selectedOutput={selectedOutput}
+          onToggle={toggleOutput}
+          onOpen={(files, file) => openImage(files, file, true)}
+          onApprove={approveSelected}
+          onRemoveApproved={removeApproved}
+        />
       </div>
       {viewer ? (
         <ImageLightbox
           files={viewer.files}
           index={viewer.index}
-          onClose={() => setViewer(null)}
-          onIndex={(index) => setViewer((current) => (current ? { ...current, index } : current))}
+          onClose={closeViewer}
+          onIndex={moveViewer}
+          showRunContext={viewer.runContext}
         />
       ) : null}
     </div>
