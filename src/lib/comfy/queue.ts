@@ -1,27 +1,20 @@
 import fs from "fs";
 import path from "path";
 import {
+  cancelComfyPrompt,
   downloadComfyImage,
   listHistoryImages,
   readComfyHistory,
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
-import type { StageId } from "../series/constants";
+import { registerLoop } from "../background";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
-import { readStatusFile, writeStatusFile } from "../series/status";
 
-export interface ComfyJob {
-  id: string;
-  status: "pending" | "running" | "done" | "error";
-  prompt: Record<string, { class_type: string; inputs: Record<string, unknown> }>;
-  uploads?: { path: string; filename?: string }[];
-  saveTo: string;
-  promptId?: string;
-  files?: string[];
-  error?: string;
-  updatedAt?: string;
-}
+import type { ComfyJob } from "../contracts/comfy-job";
+
+// Схема задания — docs/contracts/comfy-job.md.
+export type { ComfyJob };
 
 const running = new Set<string>();
 const HISTORY_TIMEOUT_MS = 15 * 60 * 1000;
@@ -130,7 +123,14 @@ export function enqueueComfyJob(job: ComfyJob): ComfyJob {
   if (!job.prompt || typeof job.prompt !== "object") throw new Error("prompt обязателен");
   resolveSaveDir(job.saveTo);
   for (const upload of job.uploads || []) resolveReadable(upload.path);
-  const next: ComfyJob = { ...job, status: "pending", error: undefined, files: undefined, promptId: undefined };
+  const next: ComfyJob = {
+    ...job,
+    status: "pending",
+    queuedAt: job.queuedAt || new Date().toISOString(),
+    error: undefined,
+    files: undefined,
+    promptId: undefined,
+  };
   writeJob(next);
   return next;
 }
@@ -159,7 +159,14 @@ async function submitJob(job: ComfyJob): Promise<void> {
     const filename = upload.filename || path.basename(source);
     await uploadComfyImage(fs.readFileSync(source), filename);
   }
-  job.promptId = await submitComfyPrompt(job.prompt);
+  if (cancelledMeanwhile(job.id)) return;
+  const promptId = await submitComfyPrompt(job.prompt);
+  // «Отменить» могли нажать, пока шёл запрос: не затираем cancelled и снимаем prompt из ComfyUI.
+  if (cancelledMeanwhile(job.id)) {
+    await cancelComfyPrompt(promptId);
+    return;
+  }
+  job.promptId = promptId;
   job.status = "running";
   job.error = undefined;
   writeJob(job);
@@ -185,31 +192,40 @@ async function finishJob(job: ComfyJob): Promise<void> {
     saved.push(name);
   }
   if (!saved.length) throw new Error("ComfyUI не вернул файлов");
+  if (cancelledMeanwhile(job.id)) return;
   job.status = "done";
   job.files = saved;
   job.error = undefined;
   writeJob(job);
-  markStageReview(job.saveTo);
+  // Статус этапа отдельно не пишем: stage_state.json ссылается на это задание по id,
+  // а «На проверке» выводится из файлов в output/.
 }
 
-function markStageReview(saveTo: string): void {
-  const match = saveTo
-    .replace(/\\/g, "/")
-    .match(/shots\/(s\d+)\/(characters|location|first_frame|video_preview|final_render)\/output\/?$/i);
-  if (!match) return;
-  const shotId = match[1].toLowerCase();
-  const stageId = match[2].toLowerCase() as StageId;
+function cancelledMeanwhile(id: string): boolean {
   try {
-    const stored = readStatusFile(shotId, stageId);
-    if (stored.status === "approved") return;
-    writeStatusFile(shotId, stageId, {
-      status: "review",
-      expectedCharacters: stored.expectedCharacters,
-      notes: stored.notes,
-    });
+    return readComfyJob(id)?.status === "cancelled";
   } catch {
-    // The pictures are already in output/. The table reads that folder on its own.
+    return false;
   }
+}
+
+/** Задание могли отменить, пока цикл держал его старую копию. */
+function stillSame(job: ComfyJob): boolean {
+  try {
+    const fresh = readComfyJob(job.id);
+    return !!fresh && fresh.status === job.status;
+  } catch {
+    return false;
+  }
+}
+
+export async function cancelComfyJob(id: string): Promise<void> {
+  const job = readComfyJob(id);
+  if (!job || job.status === "done" || job.status === "error" || job.status === "cancelled") return;
+  if (job.promptId) await cancelComfyPrompt(job.promptId);
+  job.status = "cancelled";
+  job.error = undefined;
+  writeJob(job);
 }
 
 function failJob(job: ComfyJob, error: unknown): void {
@@ -231,6 +247,10 @@ export async function drainComfyQueue(): Promise<void> {
     for (const job of jobs) {
       const needsSubmit = job.status === "pending" || (job.status === "running" && !job.promptId);
       if (!needsSubmit || offline || running.has(job.id) || !claimJob(job.id)) continue;
+      if (!stillSame(job)) {
+        releaseJob(job.id);
+        continue;
+      }
       running.add(job.id);
       job.status = "running";
       job.error = undefined;
@@ -238,7 +258,9 @@ export async function drainComfyQueue(): Promise<void> {
         writeJob(job);
         await submitJob(job);
       } catch (error) {
-        if (comfyOffline(error)) {
+        if (cancelledMeanwhile(job.id)) {
+          // Отменённое задание оставляем отменённым.
+        } else if (comfyOffline(error)) {
           offline = true;
           job.status = "pending";
           job.promptId = undefined;
@@ -259,11 +281,15 @@ export async function drainComfyQueue(): Promise<void> {
 
     for (const job of jobs) {
       if (job.status !== "running" || !job.promptId || running.has(job.id) || !claimJob(job.id)) continue;
+      if (!stillSame(job)) {
+        releaseJob(job.id);
+        continue;
+      }
       running.add(job.id);
       try {
         await finishJob(job);
       } catch (error) {
-        if (!comfyOffline(error)) failJob(job, error);
+        if (!comfyOffline(error) && !cancelledMeanwhile(job.id)) failJob(job, error);
       } finally {
         running.delete(job.id);
         releaseJob(job.id);
@@ -275,11 +301,5 @@ export async function drainComfyQueue(): Promise<void> {
 }
 
 export function startComfyQueue(): void {
-  const marker = globalThis as typeof globalThis & { __frameboardComfyQueue?: boolean };
-  if (marker.__frameboardComfyQueue) return;
-  marker.__frameboardComfyQueue = true;
-  setInterval(() => {
-    void drainComfyQueue();
-  }, 2000);
-  void drainComfyQueue();
+  registerLoop("comfy-queue", 2000, drainComfyQueue);
 }

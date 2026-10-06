@@ -151,7 +151,7 @@ export function SeriesBoard({
           </h2>
           <button
             type="button"
-            onClick={reload}
+            onClick={() => reload()}
             className="text-sm text-teal-800 underline-offset-4 hover:underline"
           >
             {pending ? "Обновление…" : "Обновить"}
@@ -209,6 +209,7 @@ export function SeriesBoard({
                     {STAGES.map((stageId) => (
                       <td key={stageId} className="align-top">
                         <StageCell
+                          episodeId={series.episodeId ?? ""}
                           shotId={shot.id}
                           stageId={stageId}
                           stage={shot.stages[stageId]}

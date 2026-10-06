@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { rebuildAgentInbox } from "./agent-request";
 import { writeText } from "./media";
-import { agentInboxRelative, ensureEpisode, episodeDir } from "./paths";
+import { agentInboxRelative, createEpisode, episodeRoot } from "./paths";
 
 export interface FormatRequest {
   status: "pending" | "done";
@@ -62,8 +62,8 @@ export function submitFormatRequest(episodeId: string, rawText: string): FormatR
   const text = rawText.trim();
   if (!text) throw new Error("Вставь сырой текст сценария");
 
-  const id = ensureEpisode(episodeId);
-  const root = episodeDir(id);
+  const id = createEpisode(episodeId);
+  const root = episodeRoot(id);
   const request: FormatRequest = {
     status: "pending",
     createdAt: new Date().toISOString(),
@@ -72,6 +72,6 @@ export function submitFormatRequest(episodeId: string, rawText: string): FormatR
   writeText(path.join(root, "scenario_raw.md"), `${text}\n`);
   writeText(requestJsonPath(root), JSON.stringify(request, null, 2) + "\n");
   writeText(path.join(root, "format_request.md"), renderFormatRequestMarkdown(request));
-  rebuildAgentInbox();
+  rebuildAgentInbox(id);
   return request;
 }

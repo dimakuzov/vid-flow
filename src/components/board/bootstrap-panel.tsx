@@ -129,7 +129,7 @@ export function BootstrapPanel({
     setMessage("");
     try {
       const res = removing
-        ? await fetch(`/api/shots/${id}`, { method: "DELETE" })
+        ? await fetch(`/api/episodes/${initialEpisodeId}/shots/${id}`, { method: "DELETE" })
         : await fetch("/api/series/bootstrap", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

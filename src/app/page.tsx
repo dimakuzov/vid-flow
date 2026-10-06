@@ -39,8 +39,8 @@ export default function HomePage() {
   let scenario = "";
   let rawScenario = "";
   try {
-    scenario = series.episodeId ? readScenarioText() : "";
-    rawScenario = series.episodeId ? readRawScenarioText() : "";
+    scenario = series.episodeId ? readScenarioText(series.episodeId) : "";
+    rawScenario = series.episodeId ? readRawScenarioText(series.episodeId) : "";
   } catch (error) {
     console.error(error);
     loadErrors.push(errorText(error));

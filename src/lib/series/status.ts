@@ -3,16 +3,21 @@ import path from "path";
 import type { StageId, StageStatus } from "./constants";
 import { listMediaFiles, readTextIfExists } from "./media";
 import { stageDir } from "./paths";
+import { readStageState } from "./stage-state";
 
+/**
+ * status.json хранит ожидаемых персонажей и заметку. Поле `status` в нём только
+ * информационное (последнее, что записала доска); статус клетки считает deriveStageStatus.
+ */
 export interface StatusFile {
-  status?: StageStatus;
+  status?: StageStatus | "done" | "waiting";
   expectedCharacters?: string[];
   updatedAt?: string;
   notes?: string;
 }
 
-export function readStatusFile(shotId: string, stageId: StageId): StatusFile {
-  const file = path.join(stageDir(shotId, stageId), "status.json");
+export function readStatusFile(episodeId: string, shotId: string, stageId: StageId): StatusFile {
+  const file = path.join(stageDir(episodeId, shotId, stageId), "status.json");
   const raw = readTextIfExists(file);
   if (!raw.trim()) return {};
   try {
@@ -23,11 +28,12 @@ export function readStatusFile(shotId: string, stageId: StageId): StatusFile {
 }
 
 export function writeStatusFile(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   data: StatusFile,
 ): void {
-  const file = path.join(stageDir(shotId, stageId), "status.json");
+  const file = path.join(stageDir(episodeId, shotId, stageId), "status.json");
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
@@ -47,14 +53,17 @@ export function expectedApproveCount(
 }
 
 export function deriveStageStatus(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   expectedCharacters: string[],
 ): StageStatus {
-  const stored = readStatusFile(shotId, stageId);
-  if (stored.status === "waiting") return "waiting";
+  const state = readStageState(episodeId, shotId, stageId);
+  if (state.phase !== "idle") return state.phase;
 
-  const dir = stageDir(shotId, stageId);
+  const stored = readStatusFile(episodeId, shotId, stageId);
+
+  const dir = stageDir(episodeId, shotId, stageId);
   const approve = listMediaFiles(path.join(dir, "approve"));
   const output = listMediaFiles(path.join(dir, "output"));
   const needed = expectedApproveCount(stageId, expectedCharacters);
@@ -84,8 +93,8 @@ export function deriveStageStatus(
   return "empty";
 }
 
-export function charactersApproved(shotId: string, characters: string[]): boolean {
-  const approve = listMediaFiles(path.join(stageDir(shotId, "characters"), "approve"));
+export function charactersApproved(episodeId: string, shotId: string, characters: string[]): boolean {
+  const approve = listMediaFiles(path.join(stageDir(episodeId, shotId, "characters"), "approve"));
   if (!characters.length) return approve.length > 0;
   return characters.every((name) =>
     approve.some((file) =>
@@ -94,6 +103,6 @@ export function charactersApproved(shotId: string, characters: string[]): boolea
   );
 }
 
-export function locationApproved(shotId: string): boolean {
-  return listMediaFiles(path.join(stageDir(shotId, "location"), "approve")).length >= 1;
+export function locationApproved(episodeId: string, shotId: string): boolean {
+  return listMediaFiles(path.join(stageDir(episodeId, shotId, "location"), "approve")).length >= 1;
 }

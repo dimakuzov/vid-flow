@@ -1,15 +1,23 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import type {
+  AgentProviderId,
+  AgentRequestFile,
+  AgentRequestStatus,
+  RefFingerprint,
+} from "../contracts/agent-request";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { updateStageDocs } from "./mutations";
 import { readShotMeta } from "./shot-meta";
+import { assertStageFree, writeStageState } from "./stage-state";
 import {
   agentInboxRelative,
   assertSafeSegment,
+  episodeRoot,
   getCharactersRoot,
-  getSeriesRoot,
+  listShotIds,
   stageDir,
 } from "./paths";
 
@@ -20,23 +28,22 @@ const REQUEST_MD = "agent_request.md";
 const LLM_TASK = "llm_task.md";
 const DISPATCH_FILE = "agent_dispatch.json";
 
-export type AgentComfyState = "wait" | "queued" | "error" | "agent";
-export type AgentVideoWorkflow = "i2v" | "flf";
+export type AgentComfyState = "wait" | "queued" | "error" | "agent" | "cancelled";
 
 export interface AgentDispatch {
   requestId: string;
   state: AgentComfyState;
-  videoWorkflow?: AgentVideoWorkflow;
+  /** id манифеста (или старое имя), с которым доска поставит прогон после done. Нет — выбор этапа. */
+  workflow?: string;
+  /** Старое поле: i2v / flf. Читается, если нет workflow. */
+  videoWorkflow?: string;
   jobId?: string;
   error?: string;
   updatedAt: string;
 }
 
-export interface RefFingerprint {
-  name: string;
-  sha256: string;
-  bytes: number;
-}
+// Схема запроса — docs/contracts/agent-request.md.
+export type { AgentRequestFile, RefFingerprint };
 
 export interface AgentBaseline {
   capturedAt: string;
@@ -46,45 +53,24 @@ export interface AgentBaseline {
   refs: RefFingerprint[];
 }
 
-export interface AgentRequestFile {
-  id: string;
-  shotId: string;
-  stageId: StageId;
-  createdAt: string;
-  status: "pending" | "done";
-  message: string;
-  refsChangedByUser: boolean;
-  changes: {
-    prompt: "changed" | "unchanged" | "no-baseline";
-    refsNote: "changed" | "unchanged" | "no-baseline";
-    workflowNote: "changed" | "unchanged" | "no-baseline";
-    refFilesAdded: string[];
-    refFilesRemoved: string[];
-    refFilesReplaced: string[];
-  };
-  current: {
-    prompt: string;
-    refsNote: string;
-    workflowNote: string;
-    refFiles: RefFingerprint[];
-  };
-}
-
 export interface AgentRequestSummary {
-  status: "pending" | "done";
+  status: AgentRequestStatus;
   createdAt: string;
   refsChangedByUser: boolean;
+  provider: AgentProviderId | null;
+  error: string | null;
+  suggestedWorkflow: string | null;
   comfy: AgentComfyState | null;
   comfyJobId: string | null;
   comfyError: string | null;
 }
 
-function touchPath(shotId: string, stageId: StageId): string {
-  return path.join(stageDir(shotId, stageId), TOUCH_FILE);
+function touchPath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), TOUCH_FILE);
 }
 
-function readTouch(shotId: string, stageId: StageId): boolean {
-  const file = touchPath(shotId, stageId);
+function readTouch(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const file = touchPath(episodeId, shotId, stageId);
   if (!fs.existsSync(file)) return false;
   try {
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as { refsTouchedByUser?: boolean };
@@ -94,8 +80,8 @@ function readTouch(shotId: string, stageId: StageId): boolean {
   }
 }
 
-function readBaseline(shotId: string, stageId: StageId): AgentBaseline | null {
-  const file = path.join(stageDir(shotId, stageId), BASELINE_FILE);
+function readBaseline(episodeId: string, shotId: string, stageId: StageId): AgentBaseline | null {
+  const file = path.join(stageDir(episodeId, shotId, stageId), BASELINE_FILE);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentBaseline;
@@ -104,8 +90,8 @@ function readBaseline(shotId: string, stageId: StageId): AgentBaseline | null {
   }
 }
 
-function fingerprintRefs(shotId: string, stageId: StageId): RefFingerprint[] {
-  const dir = path.join(stageDir(shotId, stageId), "refs");
+function fingerprintRefs(episodeId: string, shotId: string, stageId: StageId): RefFingerprint[] {
+  const dir = path.join(stageDir(episodeId, shotId, stageId), "refs");
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
@@ -139,13 +125,14 @@ function renderRequestMarkdown(request: AgentRequestFile, boardQueues: boolean):
     ? "refsChangedByUser is true. Leave every file in refs/ as it is. Rewrite prompt.md only."
     : "refsChangedByUser is false. Rewrite prompt.md. Rebuild reference images only if the user message means the current references are wrong.";
   const finish = boardQueues
-    ? "The board queues Comfy after this file is done. Rewrite prompt.md from the user message, then clear llm_notes.md. Do not queue Comfy. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json."
-    : "Run the stage playbook, including its Comfy pass. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json.";
+    ? "The board queues Comfy after this file is done. Rewrite prompt.md from the user message. prompt.md is the exact text that goes to the model. Do not queue Comfy. Do not edit llm_notes.md, status.json, stage_state.json or agent_dispatch.json: the board owns them. The last write is `\"status\": \"done\"` in this json."
+    : "Run the stage playbook, including its Comfy pass. Do not edit llm_notes.md, status.json, stage_state.json or agent_dispatch.json: the board owns them. The last write is `\"status\": \"done\"` in this json.";
 
   return `# Agent request
 
 The user sent this from «Рекомендация для LLM».
 
+- episode: ${request.episodeId}
 - shot: ${request.shotId}
 - stage: ${request.stageId}
 - at: ${request.createdAt}
@@ -217,19 +204,8 @@ function readPendingFormatRequest(
   }
 }
 
-function listShotIds(root: string): string[] {
-  const dir = path.join(root, "shots");
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => /^s\d+$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-}
-
-export function readAgentRequest(shotId: string, stageId: StageId): AgentRequestFile | null {
-  const file = path.join(stageDir(shotId, stageId), REQUEST_JSON);
+export function readAgentRequest(episodeId: string, shotId: string, stageId: StageId): AgentRequestFile | null {
+  const file = path.join(stageDir(episodeId, shotId, stageId), REQUEST_JSON);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentRequestFile;
@@ -239,24 +215,28 @@ export function readAgentRequest(shotId: string, stageId: StageId): AgentRequest
 }
 
 export function readAgentRequestSummary(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
 ): AgentRequestSummary | null {
-  const request = readAgentRequest(shotId, stageId);
+  const request = readAgentRequest(episodeId, shotId, stageId);
   if (!request) return null;
-  const dispatch = readAgentDispatch(shotId, stageId);
+  const dispatch = readAgentDispatch(episodeId, shotId, stageId);
   return {
     status: request.status,
     createdAt: request.createdAt,
     refsChangedByUser: request.refsChangedByUser,
+    provider: request.provider ?? null,
+    error: request.error ?? null,
+    suggestedWorkflow: request.suggestedWorkflow ?? null,
     comfy: dispatch?.state ?? null,
     comfyJobId: dispatch?.jobId ?? null,
     comfyError: dispatch?.error ?? null,
   };
 }
 
-export function rebuildAgentInbox(): void {
-  const root = getSeriesRoot();
+export function rebuildAgentInbox(episodeId: string): void {
+  const root = episodeRoot(episodeId);
   const lines = [
     "# Входящие агенту",
     "",
@@ -278,9 +258,9 @@ export function rebuildAgentInbox(): void {
     lines.push("");
   }
 
-  for (const shotId of listShotIds(root)) {
+  for (const shotId of listShotIds(episodeId)) {
     for (const stageId of STAGES) {
-      const request = readAgentRequest(shotId, stageId);
+      const request = readAgentRequest(episodeId, shotId, stageId);
       if (!request || request.status !== "pending") continue;
       pending += 1;
       const preview = request.message.trim().split(/\r?\n/)[0] || "(пусто)";
@@ -301,7 +281,7 @@ export function rebuildAgentInbox(): void {
   }
 
   if (pending) {
-    lines.push(`Файл входящих: ${agentInboxRelative(formatRequest?.episodeId)}.`);
+    lines.push(`Файл входящих: ${agentInboxRelative(episodeId)}.`);
     lines.push("");
   }
 
@@ -328,8 +308,8 @@ function bulletFiles(dir: string): string {
 }
 
 function renderLlmTask(request: AgentRequestFile, boardQueues: boolean): string {
-  const dir = stageDir(request.shotId, request.stageId);
-  const meta = readShotMeta(request.shotId);
+  const dir = stageDir(request.episodeId, request.shotId, request.stageId);
+  const meta = readShotMeta(request.episodeId, request.shotId);
   const characters = meta.characters.length ? meta.characters.join(", ") : "(в shot.md не указаны)";
   const libraries = meta.characters.length
     ? meta.characters
@@ -369,20 +349,20 @@ function renderLlmTask(request: AgentRequestFile, boardQueues: boolean): string 
 
 Прогон, не останавливаясь на тексте prompt.md: прочитай уже лежащий на диске файл \`playbooks/workflows/characters_comfy.md\`, раздел «Команда». Git pull для этого файла не делай. JSON графа не редактируй. \`update_comfyui.bat\` не запускай. Один персонаж за проход. Старые файлы в output/ и approve/ не удаляй. Скелет и граф character_pose_outfit_qwen.json не запускай, пока в сообщении пользователя нет явной просьбы взять конкретную позу с референса. Описание действия кадра такой просьбой не считается.
 
-Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь этап \`status.json\` в done и \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь. \`agent_dispatch.json\` не удаляй и не правь. Доска этот этап в Comfy не ставит.
+Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь. \`status.json\`, \`stage_state.json\`, \`llm_notes.md\` и \`agent_dispatch.json\` не трогай: их ведёт доска. Доска этот этап в Comfy не ставит.
 `
       : boardQueues
         ? `
 ## Что сделать
 
-Перепиши \`prompt.md\` по сообщению пользователя. Предыдущий промпт оставь в истории, если доска сама этого не сделала. Затем очисти \`llm_notes.md\`: рекомендация уже вошла в промпт. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь. В Comfy ничего не ставь.
+Перепиши \`prompt.md\` по сообщению пользователя. \`prompt.md\` — ровно тот текст, который уйдёт в модель. Историю промпта ведёт доска. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`llm_notes.md\`, \`status.json\`, \`stage_state.json\` и \`agent_dispatch.json\` не трогай: их ведёт доска. В Comfy ничего не ставь.
 
 Последней записью поставь \`"status": "done"\` в \`${REQUEST_JSON}\`. После этого доска сама отправит этап в Comfy.
 `
         : `
 ## Что сделать
 
-Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь.
+Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`llm_notes.md\`, \`status.json\`, \`stage_state.json\` и \`agent_dispatch.json\` не трогай: их ведёт доска. Когда закончишь, поставь \`"status": "done"\` в \`${REQUEST_JSON}\`.
 `;
 
   return `# Задача для LLM
@@ -424,12 +404,12 @@ ${libraries}
 ${charactersBlock}${firstFrameBlock}`;
 }
 
-function dispatchPath(shotId: string, stageId: StageId): string {
-  return path.join(stageDir(shotId, stageId), DISPATCH_FILE);
+function dispatchPath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), DISPATCH_FILE);
 }
 
-export function readAgentDispatch(shotId: string, stageId: StageId): AgentDispatch | null {
-  const file = dispatchPath(shotId, stageId);
+export function readAgentDispatch(episodeId: string, shotId: string, stageId: StageId): AgentDispatch | null {
+  const file = dispatchPath(episodeId, shotId, stageId);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentDispatch;
@@ -439,15 +419,16 @@ export function readAgentDispatch(shotId: string, stageId: StageId): AgentDispat
 }
 
 export function writeAgentDispatch(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   dispatch: AgentDispatch,
 ): void {
-  writeText(dispatchPath(shotId, stageId), JSON.stringify(dispatch, null, 2) + "\n");
+  writeText(dispatchPath(episodeId, shotId, stageId), JSON.stringify(dispatch, null, 2) + "\n");
 }
 
-function hasApprovedImage(shotId: string, stageId: StageId): boolean {
-  const dir = path.join(stageDir(shotId, stageId), "approve");
+function hasApprovedImage(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const dir = path.join(stageDir(episodeId, shotId, stageId), "approve");
   if (!fs.existsSync(dir)) return false;
   return fs.readdirSync(dir).some((name) => {
     if (!/\.(png|jpe?g|webp)$/i.test(name)) return false;
@@ -459,42 +440,45 @@ function hasApprovedImage(shotId: string, stageId: StageId): boolean {
   });
 }
 
-export function stageBoardQueues(shotId: string, stageId: StageId): boolean {
+export function stageBoardQueues(episodeId: string, shotId: string, stageId: StageId): boolean {
   if (stageId === "location" || stageId === "video_preview" || stageId === "final_render") {
     return true;
   }
   if (stageId === "first_frame") {
-    return hasApprovedImage(shotId, "location") && hasApprovedImage(shotId, "characters");
+    return hasApprovedImage(episodeId, shotId, "location") && hasApprovedImage(episodeId, shotId, "characters");
   }
   return false;
 }
 
-export function listSeriesShotIds(): string[] {
-  return listShotIds(getSeriesRoot());
-}
-
 export function submitAgentRequest(options: {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   message: string;
   prompt: string;
   refsNote: string;
   workflowNote: string;
-  videoWorkflow?: AgentVideoWorkflow;
+  /** id манифеста или старое имя (i2v, flf). Нет — выбор этапа. */
+  workflow?: string;
 }): AgentRequestFile {
+  const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
+  assertStageFree(episodeId, shotId, options.stageId);
   const typed = options.message.trim();
   const message = typed || "Сгенерируй по текущим документам этапа.";
 
-  const baseline = readBaseline(shotId, options.stageId);
-  const touched = readTouch(shotId, options.stageId);
-  const currentRefs = fingerprintRefs(shotId, options.stageId);
+  const baseline = readBaseline(episodeId, shotId, options.stageId);
+  const touched = readTouch(episodeId, shotId, options.stageId);
+  const currentRefs = fingerprintRefs(episodeId, shotId, options.stageId);
 
   updateStageDocs({
+    episodeId,
     shotId,
     stageId: options.stageId,
     prompt: options.prompt,
-    llmNotes: options.message,
+    // Рекомендация уходит в agent_request.json. Поле ввода очищается сразу,
+    // чтобы старая правка не попала ни агенту, ни в модель повторно.
+    llmNotes: "",
     refs: options.refsNote,
     workflow: options.workflowNote,
   });
@@ -513,6 +497,7 @@ export function submitAgentRequest(options: {
 
   const request: AgentRequestFile = {
     id: `${shotId}-${options.stageId}-${Date.now()}`,
+    episodeId,
     shotId,
     stageId: options.stageId,
     createdAt: new Date().toISOString(),
@@ -535,17 +520,44 @@ export function submitAgentRequest(options: {
     },
   };
 
-  const boardQueues = stageBoardQueues(shotId, options.stageId);
-  const dir = stageDir(shotId, options.stageId);
+  const boardQueues = stageBoardQueues(episodeId, shotId, options.stageId);
+  const dir = stageDir(episodeId, shotId, options.stageId);
   writeText(path.join(dir, REQUEST_JSON), JSON.stringify(request, null, 2) + "\n");
   writeText(path.join(dir, REQUEST_MD), renderRequestMarkdown(request, boardQueues));
   writeText(path.join(dir, LLM_TASK), renderLlmTask(request, boardQueues));
-  writeAgentDispatch(shotId, options.stageId, {
+  writeAgentDispatch(episodeId, shotId, options.stageId, {
     requestId: request.id,
     state: boardQueues ? "wait" : "agent",
-    videoWorkflow: options.videoWorkflow === "flf" ? "flf" : "i2v",
+    workflow: options.workflow || undefined,
     updatedAt: request.createdAt,
   });
-  rebuildAgentInbox();
+  writeStageState(episodeId, shotId, options.stageId, {
+    phase: "agent",
+    requestId: request.id,
+    agentRunsComfy: !boardQueues,
+    since: request.createdAt,
+  });
+  rebuildAgentInbox(episodeId);
   return request;
+}
+
+/** Отмечает запрос отменённым. Фазу этапа меняет вызывающий код. */
+export function cancelAgentRequest(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const request = readAgentRequest(episodeId, shotId, stageId);
+  if (!request || request.status !== "pending") return false;
+  const dir = stageDir(episodeId, shotId, stageId);
+  writeText(
+    path.join(dir, REQUEST_JSON),
+    JSON.stringify({ ...request, status: "cancelled" }, null, 2) + "\n",
+  );
+  const dispatch = readAgentDispatch(episodeId, shotId, stageId);
+  if (dispatch && dispatch.requestId === request.id) {
+    writeAgentDispatch(episodeId, shotId, stageId, {
+      ...dispatch,
+      state: "cancelled",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  rebuildAgentInbox(episodeId);
+  return true;
 }

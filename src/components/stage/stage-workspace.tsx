@@ -256,6 +256,8 @@ export function StageWorkspace({
   initialDetail: StageDetail;
 }) {
   const [detail, setDetail] = useState<StageDetail>(initialDetail);
+  const shotApi = `/api/episodes/${initialDetail.episodeId}/shots/${shotId}`;
+  const stageApi = `${shotApi}/stages/${stageId}`;
   const [seenDetail, setSeenDetail] = useState(initialDetail);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -279,7 +281,7 @@ export function StageWorkspace({
 
   const reload = useCallback(async () => {
     setError("");
-    const res = await fetch(`/api/shots/${shotId}/stages/${stageId}`, {
+    const res = await fetch(`${stageApi}`, {
       cache: "no-store",
     });
     const data = await res.json();
@@ -305,7 +307,7 @@ export function StageWorkspace({
     let stopped = false;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      fetch(`/api/shots/${shotId}/stages/${stageId}`, { cache: "no-store" })
+      fetch(`${stageApi}`, { cache: "no-store" })
         .then(async (res) => {
           const data = (await res.json()) as StageDetail & { error?: string };
           if (!res.ok || stopped) return;
@@ -365,7 +367,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/agent-request`, {
+      const res = await fetch(`${stageApi}/agent-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -407,7 +409,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/prompt-history`, {
+      const res = await fetch(`${stageApi}/prompt-history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ versionId }),
@@ -437,7 +439,7 @@ export function StageWorkspace({
         form.set("file", file);
         form.set("target", target);
         form.set("approveAfter", approveAfter ? "true" : "false");
-        const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/upload`, {
+        const res = await fetch(`${stageApi}/upload`, {
           method: "POST",
           body: form,
         });
@@ -458,7 +460,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`${stageApi}/approve`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename }),
@@ -482,7 +484,7 @@ export function StageWorkspace({
     }
     setBusy(true);
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`${stageApi}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filenames: names, from: "output" }),
@@ -508,7 +510,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/watch`, {
+      const res = await fetch(`${shotApi}/watch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stopped }),
@@ -530,10 +532,36 @@ export function StageWorkspace({
     }
   }
 
+  async function cancelStage() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(`${stageApi}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось отменить");
+      if (data.stage) setDetail(data.stage);
+      setMessage(data.message);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runStage() {
     setBusy(true);
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/run`, {
+      // Сначала сохранить то, что сейчас в полях: в модель идёт prompt.md с диска.
+      const saved = await fetch(`${stageApi}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(docs),
+      });
+      if (!saved.ok) {
+        const data = await saved.json();
+        throw new Error(data.error || "Не удалось сохранить промпт");
+      }
+      const res = await fetch(`${stageApi}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -556,6 +584,8 @@ export function StageWorkspace({
       prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name],
     );
   }
+
+  const stageBusy = detail.state.busy;
 
   if (error) {
     return (
@@ -581,6 +611,15 @@ export function StageWorkspace({
           <p className="mt-1 text-sm text-stone-600">{detail.shotTitle}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <StatusPill status={detail.status} />
+            {detail.state.phase !== "idle" && detail.state.since ? (
+              <span className="text-xs text-stone-500" suppressHydrationWarning>
+                с{" "}
+                {new Date(detail.state.since).toLocaleTimeString("ru-RU", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            ) : null}
             <code className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
               {detail.relativeDir}
             </code>
@@ -613,9 +652,15 @@ export function StageWorkspace({
               </select>
             </label>
           ) : null}
-          <Button disabled={busy} onClick={runStage}>
-            Запустить
-          </Button>
+          {stageBusy ? (
+            <Button variant="destructive" disabled={busy} onClick={cancelStage}>
+              Отменить
+            </Button>
+          ) : (
+            <Button disabled={busy} onClick={runStage}>
+              Запустить
+            </Button>
+          )}
           <Button
             variant="outline"
             disabled={busy || detail.watch.videoDone}
@@ -635,15 +680,41 @@ export function StageWorkspace({
 
       {message ? <p className="text-sm text-stone-600">{message}</p> : null}
 
+      {detail.state.phase !== "idle" ? (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+            detail.state.phase === "error"
+              ? "border-red-300 bg-red-50 text-red-900"
+              : "border-sky-300 bg-sky-50 text-sky-950"
+          }`}
+        >
+          <span>
+            {detail.state.phase === "agent"
+              ? "Агент обрабатывает рекомендацию. Когда он закончит, доска сама поставит прогон в очередь."
+              : detail.state.phase === "queued"
+                ? `Ожидает очереди ComfyUI${detail.state.jobId ? ` · ${detail.state.jobId}` : ""}. Если ComfyUI выключен, задание уйдёт, когда он запустится.`
+                : detail.state.phase === "running"
+                  ? "Генерация в ComfyUI. Файлы появятся в output/."
+                  : detail.state.error}
+          </span>
+          {detail.state.phase === "error" ? (
+            <Button variant="outline" disabled={busy} onClick={cancelStage}>
+              Сбросить ошибку
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-2xl border border-stone-200 bg-white/90 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
             Input
           </h2>
           <div className="mt-4 space-y-3">
-            <DocFieldLabel>Prompt</DocFieldLabel>
+            <DocFieldLabel note="этот текст уходит в модель">Prompt</DocFieldLabel>
             <Textarea
               value={docs.prompt}
+              readOnly={stageBusy}
               onChange={(e) => setDocs((d) => ({ ...d, prompt: e.target.value }))}
               className="min-h-28"
             />
@@ -678,11 +749,12 @@ export function StageWorkspace({
                 можно будет вернуть.
               </p>
             )}
-            <DocFieldLabel note="только новая правка">
+            <DocFieldLabel note="для агента · очищается после отправки">
               Рекомендация
             </DocFieldLabel>
             <Textarea
               value={docs.llmNotes}
+              readOnly={stageBusy}
               onChange={(e) => setDocs((d) => ({ ...d, llmNotes: e.target.value }))}
               className="min-h-24"
               placeholder="Что изменить в текущем промпте."
@@ -720,30 +792,20 @@ export function StageWorkspace({
               className="min-h-24 font-mono text-xs"
             />
             <div className="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={sendToAgent}>
+              <Button disabled={busy || stageBusy} onClick={sendToAgent}>
                 Отправить агенту
               </Button>
             </div>
             <p className="text-xs leading-5 text-stone-500">
-              Кнопка сохраняет prompt, рекомендацию, refs и workflow и отдаёт задание агенту.
-              Когда он дописывает промпт, доска сама ставит этап в Comfy. На персонажах прогон
-              ставит агент. «Закончить кадр» останавливает проверку входящих. Она также
+              Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле.
+              Пока агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап
+              в Comfy. На персонажах прогон ставит агент. «Закончить кадр» останавливает проверку входящих. Она также
               останавливается, когда в final_render есть утверждённое видео.
             </p>
             {detail.agentRequest ? (
               <p className="text-xs leading-5 text-stone-500">
-                {detail.agentRequest.status === "pending"
-                  ? `Ждёт агента с ${detail.agentRequest.createdAt}. `
-                  : "Агент закончил. "}
-                {detail.agentRequest.comfy === "wait"
-                  ? "Дальше доска сама поставит прогон в Comfy."
-                  : detail.agentRequest.comfy === "queued"
-                    ? `В очереди Comfy: ${detail.agentRequest.comfyJobId}.`
-                    : detail.agentRequest.comfy === "error"
-                      ? detail.agentRequest.comfyError
-                      : detail.agentRequest.comfy === "agent"
-                        ? "Прогон в Comfy ставит агент."
-                        : null}{" "}
+                {detail.agentRequest.status === "done" ? "Последний запрос агент закончил. " : null}
+                {detail.agentRequest.status === "cancelled" ? "Последний запрос отменён. " : null}
                 {detail.agentRequest.refsChangedByUser
                   ? "Референсы менялись вручную."
                   : "Референсы вручную не менялись."}

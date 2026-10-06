@@ -58,10 +58,6 @@ export function normalizeEpisodeId(raw: string): string {
   return id;
 }
 
-export function episodeDir(episodeId: string): string {
-  return path.join(getEpisodesRoot(), normalizeEpisodeId(episodeId));
-}
-
 export function readCurrentEpisodeId(): string | null {
   if (process.env.SERIES_ROOT) {
     return path.basename(path.resolve(process.env.SERIES_ROOT));
@@ -84,6 +80,13 @@ export function writeCurrentEpisodeId(episodeId: string): void {
 }
 
 export function listEpisodeIds(): string[] {
+  if (process.env.SERIES_ROOT) {
+    try {
+      return [normalizeEpisodeId(path.basename(path.resolve(process.env.SERIES_ROOT)))];
+    } catch {
+      return [];
+    }
+  }
   const dir = getEpisodesRoot();
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -108,10 +111,11 @@ export function dataRelative(...parts: string[]): string {
   return toPosix(relative);
 }
 
-export function agentInboxRelative(episodeId?: string | null): string {
-  const id = episodeId || readCurrentEpisodeId();
-  if (!id) return dataRelative("episodes", "<эпизод>", "agent_inbox.md");
-  return dataRelative("episodes", id, "agent_inbox.md");
+export function agentInboxRelative(episodeId: string): string {
+  const absolute = path.join(episodeRoot(episodeId), "agent_inbox.md");
+  const relative = path.relative(process.cwd(), absolute);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return toPosix(absolute);
+  return toPosix(relative);
 }
 
 function moveDirIfDestMissing(source: string, dest: string): void {
@@ -158,7 +162,11 @@ function migrateLegacySeriesLayout(): void {
   }
 }
 
-export function ensureDataScaffold(): void {
+/**
+ * Готовит папку данных: переносит старую раскладку `data/series/` и создаёт общие папки.
+ * Вызывается один раз при старте процесса (instrumentation, скрипты), а не при каждом чтении.
+ */
+export function prepareDataRoot(): void {
   fs.mkdirSync(getDataRoot(), { recursive: true });
   migrateLegacySeriesLayout();
   fs.mkdirSync(getCharactersRoot(), { recursive: true });
@@ -177,67 +185,79 @@ export function ensureDataScaffold(): void {
   }
 }
 
-export function getSeriesRoot(): string {
+/** Папка эпизода. `SERIES_ROOT` подменяет её для единственного эпизода. */
+export function episodeRoot(episodeId: string): string {
+  const id = normalizeEpisodeId(episodeId);
   if (process.env.SERIES_ROOT) return path.resolve(process.env.SERIES_ROOT);
+  return path.join(getEpisodesRoot(), id);
+}
+
+/** Эпизод по умолчанию для UI (`current_episode.txt`). Ошибка, если не выбран. */
+export function requireCurrentEpisodeId(): string {
   const id = readCurrentEpisodeId();
   if (!id) throw new Error("Эпизод не выбран");
-  return episodeDir(id);
+  return id;
 }
 
-export function resolveEpisodeRoot(episodeId: string): string {
-  if (process.env.SERIES_ROOT) return path.resolve(process.env.SERIES_ROOT);
-  return episodeDir(episodeId);
-}
-
-export function ensureEpisode(episodeId: string): string {
+/** Создаёт папку эпизода. Открытый эпизод (`current_episode.txt`) не меняет. */
+export function createEpisode(episodeId: string): string {
   const id = normalizeEpisodeId(episodeId);
-  ensureDataScaffold();
-  const root = resolveEpisodeRoot(id);
+  prepareDataRoot();
+  ensureEpisodeScaffold(id);
+  return id;
+}
+
+export function ensureEpisodeScaffold(episodeId: string): void {
+  const root = episodeRoot(episodeId);
   fs.mkdirSync(path.join(root, "shots"), { recursive: true });
   for (const file of ["episode.md", "scenario.md", "scenario_raw.md"]) {
     const full = path.join(root, file);
     if (!fs.existsSync(full)) fs.writeFileSync(full, "", "utf8");
   }
-  writeCurrentEpisodeId(id);
-  return id;
 }
 
-export function shotsDir(seriesRoot = getSeriesRoot()): string {
-  return path.join(seriesRoot, "shots");
+export function shotsDir(episodeId: string): string {
+  return path.join(episodeRoot(episodeId), "shots");
 }
 
-export function shotDir(shotId: string, seriesRoot = getSeriesRoot()): string {
-  return path.join(shotsDir(seriesRoot), shotId);
+export function shotDir(episodeId: string, shotId: string): string {
+  return path.join(shotsDir(episodeId), assertSafeSegment(shotId, "кадр"));
 }
 
-export function stageDir(
-  shotId: string,
-  stageId: StageId,
-  seriesRoot = getSeriesRoot(),
-): string {
-  return path.join(shotDir(shotId, seriesRoot), stageId);
+export function stageDir(episodeId: string, shotId: string, stageId: StageId): string {
+  if (!STAGES.includes(stageId)) throw new Error("Неизвестный этап");
+  return path.join(shotDir(episodeId, shotId), stageId);
 }
 
-export function ensureSeriesScaffold(seriesRoot = getSeriesRoot()): void {
-  fs.mkdirSync(seriesRoot, { recursive: true });
-  fs.mkdirSync(shotsDir(seriesRoot), { recursive: true });
-  for (const file of ["episode.md", "scenario.md", "scenario_raw.md"]) {
-    const full = path.join(seriesRoot, file);
-    if (!fs.existsSync(full)) fs.writeFileSync(full, "", "utf8");
-  }
-}
-
-export function ensureStageDirs(shotId: string, seriesRoot = getSeriesRoot()): void {
+export function ensureStageDirs(episodeId: string, shotId: string): void {
   for (const stage of STAGES) {
-    const dir = stageDir(shotId, stage, seriesRoot);
+    const dir = stageDir(episodeId, shotId, stage);
     fs.mkdirSync(path.join(dir, "refs"), { recursive: true });
     fs.mkdirSync(path.join(dir, "output"), { recursive: true });
     fs.mkdirSync(path.join(dir, "approve"), { recursive: true });
   }
 }
 
+export function listShotIds(episodeId: string): string[] {
+  const dir = shotsDir(episodeId);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => /^s\d+$/i.test(name))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
 export function toPosix(relativePath: string): string {
   return relativePath.split(path.sep).join("/");
+}
+
+/** true, если target лежит внутри root (с разделителем: `e010` не внутри `e01`). */
+export function isInside(root: string, target: string): boolean {
+  const base = path.resolve(root);
+  const resolved = path.resolve(target);
+  return resolved === base || resolved.startsWith(base + path.sep);
 }
 
 export function assertSafeSegment(value: string, label: string): string {

@@ -1,4 +1,7 @@
 import { applyBootstrap } from "../src/lib/series/bootstrap";
+import { prepareDataRoot } from "../src/lib/series/paths";
+
+prepareDataRoot();
 
 const result = applyBootstrap({
   overwriteDocs: true,

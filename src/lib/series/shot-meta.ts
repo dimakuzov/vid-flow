@@ -54,12 +54,12 @@ export function parseShotMarkdown(shotId: string, content: string): ShotMeta {
   return { id: shotId, title, summary, characters, location };
 }
 
-export function readShotMeta(shotId: string): ShotMeta {
-  const content = readTextIfExists(path.join(shotDir(shotId), "shot.md"));
+export function readShotMeta(episodeId: string, shotId: string): ShotMeta {
+  const content = readTextIfExists(path.join(shotDir(episodeId, shotId), "shot.md"));
   return parseShotMarkdown(shotId, content);
 }
 
-export function writeShotMeta(meta: ShotMeta): void {
+export function writeShotMeta(episodeId: string, meta: ShotMeta): void {
   const body = `# ${meta.title}
 
 - id: ${meta.id}
@@ -69,5 +69,5 @@ export function writeShotMeta(meta: ShotMeta): void {
 ## Summary
 ${meta.summary || "Описание кадра пока не задано."}
 `;
-  writeText(path.join(shotDir(meta.id), "shot.md"), body);
+  writeText(path.join(shotDir(episodeId, meta.id), "shot.md"), body);
 }

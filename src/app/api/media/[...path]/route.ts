@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
-import { getSeriesRoot } from "@/lib/series/paths";
+import { resolveMediaPath } from "@/lib/series/media";
 
 export const runtime = "nodejs";
 
@@ -19,25 +19,25 @@ const CONTENT_TYPES: Record<string, string> = {
   ".json": "application/json",
 };
 
+/**
+ * Файлы на чтение: `/api/media/episodes/<id>/...` и `/api/media/{characters,locations,references}/...`.
+ * Путь собирает `listMediaFiles` (lib/series/media.ts).
+ */
 export async function GET(
   _request: Request,
   context: { params: Promise<{ path: string[] }> },
 ) {
+  let absolute: string;
   try {
-    const parts = (await context.params).path || [];
-    if (parts.some((part) => part === ".." || part.includes("\0"))) {
-      return NextResponse.json({ error: "Некорректный путь" }, { status: 400 });
-    }
-
-    const root = getSeriesRoot();
-    const absolute = path.resolve(root, ...parts);
-    if (!absolute.startsWith(path.resolve(root))) {
-      return NextResponse.json({ error: "Доступ запрещён" }, { status: 403 });
-    }
+    absolute = resolveMediaPath((await context.params).path || []);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Некорректный путь";
+    return NextResponse.json({ error: message }, { status: 403 });
+  }
+  try {
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
       return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
     }
-
     const ext = path.extname(absolute).toLowerCase();
     const body = fs.readFileSync(absolute);
     return new NextResponse(body, {
