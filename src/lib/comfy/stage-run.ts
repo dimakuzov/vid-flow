@@ -113,16 +113,32 @@ function queueLocation(shotId: string): ComfyJob {
   });
 }
 
+function newestImage(dir: string): string | undefined {
+  const files = listImages(dir);
+  if (!files.length) return undefined;
+  return files
+    .map((file) => ({ file, mtime: fs.statSync(file).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)[0].file;
+}
+
+function firstFramePrompt(notes: string, characterCount: number): string {
+  const place =
+    characterCount > 1
+      ? "Place the person from image 2 and the person from image 3 into the location from image 1."
+      : "Place the person from image 2 into the location from image 1.";
+  const keep = "Keep the location from image 1 exactly as it is. Do not add any other people.";
+  const extra = notes.trim();
+  return extra ? `${place}\n${extra}\n${keep}` : `${place}\n${keep}`;
+}
+
 function queueFirstFrame(shotId: string): ComfyJob {
   const meta = readShotMeta(shotId);
   const stagePath = stageDir(shotId, "first_frame");
-  const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
   const notes = readTextIfExists(path.join(stagePath, "llm_notes.md"));
-  const text = generationText(promptMd, notes, meta.characters);
-  if (!text) throw new Error("Нет текста первого кадра. Напиши рекомендацию или prompt.md.");
+  const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
+  const extra = notes.trim() || generationText(promptMd, "", meta.characters) || "";
   const locationDir = stageDir(shotId, "location");
-  const locationImageFile =
-    listImages(path.join(locationDir, "approve"))[0] || listImages(path.join(locationDir, "output"))[0];
+  const locationImageFile = newestImage(path.join(locationDir, "approve"));
   if (!locationImageFile) throw new Error("Нет утверждённой локации для первого кадра.");
   const characters = listImages(path.join(stageDir(shotId, "characters"), "approve"));
   if (!characters.length) throw new Error("Нет утверждённых персонажей для первого кадра.");
@@ -140,7 +156,7 @@ function queueFirstFrame(shotId: string): ComfyJob {
     delete prompt["903"];
     delete prompt["488"].inputs["images.image_3"];
   }
-  prompt["477"].inputs.value = text;
+  prompt["477"].inputs.value = firstFramePrompt(extra, characters.length);
   prompt["485"].inputs.seed = newSeed();
   prompt["461"].inputs.filename_prefix = `frameboard/first_frame/${shotId}_ff`;
   return enqueueComfyJob({
@@ -152,17 +168,95 @@ function queueFirstFrame(shotId: string): ComfyJob {
   });
 }
 
-export function queueStageRun(shotId: string, stageId: StageId): { id: string; message: string } {
+export type VideoWorkflow = "i2v" | "flf";
+
+function stripNames(text: string, characters: string[]): string {
+  let next = text;
+  for (const name of [...characters].sort((a, b) => b.length - a.length)) {
+    if (!name) continue;
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    next = next.replace(new RegExp(`\\b${escaped}\\b`, "gi"), "the person");
+  }
+  return next.replace(/[ \t]{2,}/g, " ").trim();
+}
+
+function videoPrompt(raw: string, characters: string[]): string {
+  const body = stripNames(raw, characters);
+  const hasCamera = /\b(camera|shot|static|pan|dolly|zoom|трек|камер)\b/i.test(body);
+  const hasTail = /realistic, natural movement/i.test(body);
+  return [hasCamera ? "" : "Static shot, fixed camera.", body, hasTail ? "" : "Realistic, natural movement."]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function secondsInText(text: string): number | null {
+  const match = text.match(
+    /(\d+(?:[.,]\d+)?)\s*(?:секунд\w*|сек\.?|sec\b|s\b|с(?=\s|$|[.,]))/i,
+  );
+  if (!match) return null;
+  const seconds = Number(match[1].replace(",", "."));
+  if (!Number.isFinite(seconds) || seconds < 2 || seconds > 8) return null;
+  return seconds;
+}
+
+function queueVideo(
+  shotId: string,
+  workflow: VideoWorkflow,
+  stageId: "video_preview" | "final_render" = "video_preview",
+): ComfyJob {
+  const meta = readShotMeta(shotId);
+  const stagePath = stageDir(shotId, stageId);
+  const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
+  const notes = readTextIfExists(path.join(stagePath, "llm_notes.md"));
+  const spoken = generationText(promptMd, notes, meta.characters);
+  if (!spoken) throw new Error("Нет текста движения. Напиши рекомендацию или действие в prompt.md.");
+  const start = newestImage(path.join(stageDir(shotId, "first_frame"), "approve"));
+  if (!start) throw new Error("Нет утверждённого первого кадра.");
+  const prompt = loadApiGraph(
+    workflow === "flf" ? "wan22_flf_sketch_turbo_api.json" : "wan22_i2v_sketch_turbo_api.json",
+  );
+  const uploads: { path: string; filename: string }[] = [];
+  function bind(nodeId: string, file: string, filename: string) {
+    prompt[nodeId].inputs.image = filename;
+    uploads.push({ path: relativeToCwd(file), filename });
+  }
+  bind("97", start, `${shotId}_start${path.extname(start).toLowerCase() || ".png"}`);
+  if (workflow === "flf") {
+    const end = newestImage(path.join(stagePath, "refs"));
+    if (!end) throw new Error("Для FLF положи последний кадр в refs/ этого этапа.");
+    bind("98", end, `${shotId}_end${path.extname(end).toLowerCase() || ".png"}`);
+  }
+  const text = videoPrompt(spoken, meta.characters);
+  prompt["129:93"].inputs.text = text;
+  prompt["129:86"].inputs.noise_seed = newSeed();
+  const seconds = secondsInText(`${notes}\n${promptMd}`);
+  if (seconds != null) prompt["129:161"].inputs.value = seconds;
+  const folder = stageId === "final_render" ? "final" : "video";
+  prompt["108"].inputs.filename_prefix = `frameboard/${folder}/${shotId}_${workflow}`;
+  return enqueueComfyJob({
+    id: `${shotId}-${stageId}-${workflow}-${Date.now()}`,
+    status: "pending",
+    prompt,
+    uploads,
+    saveTo: relativeToCwd(path.join(stagePath, "output")),
+  });
+}
+
+export function queueStageRun(
+  shotId: string,
+  stageId: StageId,
+  options?: { videoWorkflow?: VideoWorkflow },
+): { id: string; message: string } {
   getSeriesRoot();
   let job: ComfyJob;
   if (stageId === "location") job = queueLocation(shotId);
   else if (stageId === "first_frame") job = queueFirstFrame(shotId);
-  else if (stageId === "characters") {
-    throw new Error(
-      "Граф одежды в API-формате не лежит в playbooks, поэтому кнопка не ставит его в Comfy. Граф позы отсюда не запускаю.",
-    );
+  else if (stageId === "video_preview" || stageId === "final_render") {
+    job = queueVideo(shotId, options?.videoWorkflow || "i2v", stageId);
   } else {
-    throw new Error("Для этого этапа в playbooks/workflows/comfy нет API-графа, в очередь Comfy ставить нечего.");
+    throw new Error(
+      "Граф одежды в API-формате не лежит в playbooks, поэтому доска не ставит его в Comfy. Прогон одежды делает агент по playbooks/workflows/characters_comfy.md. Граф позы отсюда не запускаю.",
+    );
   }
   if (readStatusFile(shotId, stageId).status === "waiting") {
     writeStatusFile(shotId, stageId, { status: "prep" });

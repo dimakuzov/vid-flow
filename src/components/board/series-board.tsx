@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
@@ -24,6 +24,9 @@ export function SeriesBoard({
   const [seenSeries, setSeenSeries] = useState(initialSeries);
   const [newSeriesId, setNewSeriesId] = useState("");
   const [headerMessage, setHeaderMessage] = useState("");
+  const episodeIdRef = useRef(series.episodeId);
+  const reloadInFlight = useRef(false);
+  episodeIdRef.current = series.episodeId;
   if (seenSeries !== initialSeries) {
     setSeenSeries(initialSeries);
     setSeries(initialSeries);
@@ -49,29 +52,43 @@ export function SeriesBoard({
     }
   }
 
-  function reload() {
-    setPending(true);
+  function reload(options?: { quiet?: boolean }) {
+    const quiet = options?.quiet ?? false;
+    if (quiet && reloadInFlight.current) return;
+    reloadInFlight.current = true;
+    if (!quiet) setPending(true);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     fetch("/api/series", { cache: "no-store", signal: controller.signal })
       .then(async (res) => {
         const data = (await res.json()) as SeriesSummary & { error?: string };
         if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
-        if (!data.episodeId && series.episodeId) {
-          setHeaderMessage("Серия на месте. Доска не успела прочитать папку, обнови ещё раз.");
+        if (!data.episodeId && episodeIdRef.current) {
+          if (!quiet) {
+            setHeaderMessage("Серия на месте. Доска не успела прочитать папку, обнови ещё раз.");
+          }
           return;
         }
         setSeries(data);
-        setHeaderMessage("");
+        if (!quiet) setHeaderMessage("");
       })
       .catch(() => {
-        setHeaderMessage("Доска не обновилась. Серия не сброшена.");
+        if (!quiet) setHeaderMessage("Доска не обновилась. Серия не сброшена.");
       })
       .finally(() => {
         clearTimeout(timer);
-        setPending(false);
+        reloadInFlight.current = false;
+        if (!quiet) setPending(false);
       });
   }
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      reload({ quiet: true });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">

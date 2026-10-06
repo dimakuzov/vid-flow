@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { StageId } from "@/lib/series/constants";
@@ -263,6 +263,7 @@ export function StageWorkspace({
   const [selectedOutput, setSelectedOutput] = useState<string[]>([]);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ files: MediaFile[]; index: number } | null>(null);
+  const [videoWorkflow, setVideoWorkflow] = useState<"i2v" | "flf">("i2v");
   const [docs, setDocs] = useState({
     prompt: initialDetail.docs.prompt || "",
     llmNotes: initialDetail.docs.llmNotes || "",
@@ -295,14 +296,68 @@ export function StageWorkspace({
     });
   }, [shotId, stageId]);
 
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  const detailRef = useRef(detail);
+  detailRef.current = detail;
+
+  useEffect(() => {
+    let stopped = false;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetch(`/api/shots/${shotId}/stages/${stageId}`, { cache: "no-store" })
+        .then(async (res) => {
+          const data = (await res.json()) as StageDetail & { error?: string };
+          if (!res.ok || stopped) return;
+          const typed = docsRef.current;
+          const shown = detailRef.current.docs;
+          const nextDocs = {
+            prompt: typed.prompt === (shown.prompt || "") ? data.docs.prompt || "" : typed.prompt,
+            llmNotes:
+              typed.llmNotes === (shown.llmNotes || "") ? data.docs.llmNotes || "" : typed.llmNotes,
+            refs: typed.refs === (shown.refs || "") ? data.docs.refs || "" : typed.refs,
+            workflow:
+              typed.workflow === (shown.workflow || "") ? data.docs.workflow || "" : typed.workflow,
+          };
+          setDetail(data);
+          if (
+            nextDocs.prompt !== typed.prompt ||
+            nextDocs.llmNotes !== typed.llmNotes ||
+            nextDocs.refs !== typed.refs ||
+            nextDocs.workflow !== typed.workflow
+          ) {
+            setDocs(nextDocs);
+          }
+        })
+        .catch(() => {
+          // The folder will be read again on the next tick.
+        });
+    }, 4000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [shotId, stageId]);
+
   if (seenDetail !== initialDetail) {
+    const previousDocs = seenDetail.docs;
+    const typed = docsRef.current;
     setSeenDetail(initialDetail);
     setDetail(initialDetail);
     setDocs({
-      prompt: initialDetail.docs.prompt || "",
-      llmNotes: initialDetail.docs.llmNotes || "",
-      refs: initialDetail.docs.refs || "",
-      workflow: initialDetail.docs.workflow || "",
+      prompt:
+        typed.prompt === (previousDocs.prompt || "")
+          ? initialDetail.docs.prompt || ""
+          : typed.prompt,
+      llmNotes:
+        typed.llmNotes === (previousDocs.llmNotes || "")
+          ? initialDetail.docs.llmNotes || ""
+          : typed.llmNotes,
+      refs: typed.refs === (previousDocs.refs || "") ? initialDetail.docs.refs || "" : typed.refs,
+      workflow:
+        typed.workflow === (previousDocs.workflow || "")
+          ? initialDetail.docs.workflow || ""
+          : typed.workflow,
     });
   }
 
@@ -318,6 +373,7 @@ export function StageWorkspace({
           prompt: docs.prompt,
           refs: docs.refs,
           workflow: docs.workflow,
+          videoWorkflow,
         }),
       });
       const data = await res.json();
@@ -360,26 +416,6 @@ export function StageWorkspace({
       if (!res.ok) throw new Error(data.error || "Не удалось вернуть промпт");
       applyDetail(data);
       setMessage("Промпт возвращён. Текущий текст сохранён в списке версий.");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveDocs() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(docs),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не сохранено");
-      setDetail(data);
-      setMessage("Документы этапа сохранены");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Ошибка");
     } finally {
@@ -499,6 +535,10 @@ export function StageWorkspace({
     try {
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/run`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          stageId === "video_preview" || stageId === "final_render" ? { workflow: videoWorkflow } : {},
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не запущено");
@@ -560,6 +600,19 @@ export function StageWorkspace({
           >
             Загрузить и утвердить
           </Button>
+          {stageId === "video_preview" || stageId === "final_render" ? (
+            <label className="grid gap-1 text-xs text-stone-600">
+              Воркфлоу
+              <select
+                value={videoWorkflow}
+                onChange={(event) => setVideoWorkflow(event.target.value === "flf" ? "flf" : "i2v")}
+                className="h-8 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900"
+              >
+                <option value="i2v">Wan i2v — из первого кадра</option>
+                <option value="flf">Wan FLF — первый и последний кадр</option>
+              </select>
+            </label>
+          ) : null}
           <Button disabled={busy} onClick={runStage}>
             Запустить
           </Button>
@@ -667,22 +720,30 @@ export function StageWorkspace({
               className="min-h-24 font-mono text-xs"
             />
             <div className="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={saveDocs}>
-                Сохранить документы
-              </Button>
-              <Button variant="secondary" disabled={busy} onClick={sendToAgent}>
+              <Button disabled={busy} onClick={sendToAgent}>
                 Отправить агенту
               </Button>
             </div>
             <p className="text-xs leading-5 text-stone-500">
-              «Отправить агенту» пишет llm_task.md в папку этапа. Фразу из ответа вставь
-              в Claude, Cursor или локальный Gemini. «Закончить кадр» останавливает
-              проверку входящих. Она также останавливается, когда в final_render есть
-              утверждённое видео.
+              Кнопка сохраняет prompt, рекомендацию, refs и workflow и отдаёт задание агенту.
+              Когда он дописывает промпт, доска сама ставит этап в Comfy. На персонажах прогон
+              ставит агент. «Закончить кадр» останавливает проверку входящих. Она также
+              останавливается, когда в final_render есть утверждённое видео.
             </p>
-            {detail.agentRequest?.status === "pending" ? (
+            {detail.agentRequest ? (
               <p className="text-xs leading-5 text-stone-500">
-                Ждёт агента с {detail.agentRequest.createdAt}.{" "}
+                {detail.agentRequest.status === "pending"
+                  ? `Ждёт агента с ${detail.agentRequest.createdAt}. `
+                  : "Агент закончил. "}
+                {detail.agentRequest.comfy === "wait"
+                  ? "Дальше доска сама поставит прогон в Comfy."
+                  : detail.agentRequest.comfy === "queued"
+                    ? `В очереди Comfy: ${detail.agentRequest.comfyJobId}.`
+                    : detail.agentRequest.comfy === "error"
+                      ? detail.agentRequest.comfyError
+                      : detail.agentRequest.comfy === "agent"
+                        ? "Прогон в Comfy ставит агент."
+                        : null}{" "}
                 {detail.agentRequest.refsChangedByUser
                   ? "Референсы менялись вручную."
                   : "Референсы вручную не менялись."}

@@ -71,6 +71,9 @@ export interface StageDetail {
     status: "pending" | "done";
     createdAt: string;
     refsChangedByUser: boolean;
+    comfy: "wait" | "queued" | "error" | "agent" | null;
+    comfyJobId: string | null;
+    comfyError: string | null;
   } | null;
   watch: {
     stopped: boolean;

@@ -7,7 +7,9 @@ import {
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
+import type { StageId } from "../series/constants";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
+import { readStatusFile, writeStatusFile } from "../series/status";
 
 export interface ComfyJob {
   id: string;
@@ -182,11 +184,32 @@ async function finishJob(job: ComfyJob): Promise<void> {
     fs.writeFileSync(path.join(saveDir, name), bytes);
     saved.push(name);
   }
-  if (!saved.length) throw new Error("ComfyUI не вернул картинок");
+  if (!saved.length) throw new Error("ComfyUI не вернул файлов");
   job.status = "done";
   job.files = saved;
   job.error = undefined;
   writeJob(job);
+  markStageReview(job.saveTo);
+}
+
+function markStageReview(saveTo: string): void {
+  const match = saveTo
+    .replace(/\\/g, "/")
+    .match(/shots\/(s\d+)\/(characters|location|first_frame|video_preview|final_render)\/output\/?$/i);
+  if (!match) return;
+  const shotId = match[1].toLowerCase();
+  const stageId = match[2].toLowerCase() as StageId;
+  try {
+    const stored = readStatusFile(shotId, stageId);
+    if (stored.status === "approved") return;
+    writeStatusFile(shotId, stageId, {
+      status: "review",
+      expectedCharacters: stored.expectedCharacters,
+      notes: stored.notes,
+    });
+  } catch {
+    // The pictures are already in output/. The table reads that folder on its own.
+  }
 }
 
 function failJob(job: ComfyJob, error: unknown): void {

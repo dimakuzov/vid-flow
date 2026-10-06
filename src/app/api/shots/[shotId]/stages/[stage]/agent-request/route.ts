@@ -1,8 +1,6 @@
-import path from "path";
 import { NextResponse } from "next/server";
 import { STAGES, type StageId } from "@/lib/series/constants";
-import { submitAgentRequest } from "@/lib/series/agent-request";
-import { stageDir } from "@/lib/series/paths";
+import { readAgentDispatch, submitAgentRequest } from "@/lib/series/agent-request";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -22,6 +20,7 @@ export async function POST(
       prompt?: string;
       refs?: string;
       workflow?: string;
+      videoWorkflow?: unknown;
     };
     const submitted = submitAgentRequest({
       shotId,
@@ -30,12 +29,15 @@ export async function POST(
       prompt: body.prompt || "",
       refsNote: body.refs || "",
       workflowNote: body.workflow || "",
+      videoWorkflow: body.videoWorkflow === "flf" ? "flf" : "i2v",
     });
-
-    const taskFile = path.join(stageDir(shotId, stage as StageId), "llm_task.md");
+    const dispatch = readAgentDispatch(shotId, stage as StageId);
 
     return NextResponse.json({
-      message: `Любому LLM одна фраза: прочитай ${taskFile} и выполни его до конца.`,
+      message:
+        dispatch?.state === "agent"
+          ? "Сохранено и отдано агенту. Он сам поставит прогон в Comfy, файлы появятся в output/."
+          : "Сохранено и отдано агенту. Когда он допишет промпт, доска сама поставит прогон в Comfy.",
       refsChangedByUser: submitted.refsChangedByUser,
       stage: getStageDetail(shotId, stage as StageId),
     });

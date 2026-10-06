@@ -5,7 +5,10 @@ export interface ComfyImageRef {
 }
 
 export interface ComfyHistory {
-  outputs?: Record<string, { images?: ComfyImageRef[] }>;
+  outputs?: Record<
+    string,
+    { images?: ComfyImageRef[]; gifs?: ComfyImageRef[]; videos?: ComfyImageRef[] }
+  >;
   status?: { status_str?: string; completed?: boolean };
 }
 
@@ -68,11 +71,13 @@ export async function waitComfyHistory(promptId: string, timeoutMs = 15 * 60 * 1
 }
 
 export function listHistoryImages(history: ComfyHistory): ComfyImageRef[] {
-  const images: ComfyImageRef[] = [];
+  const files: ComfyImageRef[] = [];
   for (const output of Object.values(history.outputs || {})) {
-    for (const image of output.images || []) images.push(image);
+    for (const group of [output.images, output.gifs, output.videos]) {
+      for (const file of group || []) files.push(file);
+    }
   }
-  return images;
+  return files;
 }
 
 export async function downloadComfyImage(image: ComfyImageRef): Promise<Buffer> {

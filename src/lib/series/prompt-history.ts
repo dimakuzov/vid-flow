@@ -66,7 +66,8 @@ export function syncPromptHistory(shotId: string, stageId: StageId): PromptVersi
     writeStore(file, { current: prompt, versions: [] });
     return [];
   }
-  if (store.current && store.current !== prompt) {
+  if (store.current === prompt) return store.versions;
+  if (store.current) {
     store.versions.unshift({
       id: versionId(),
       savedAt: new Date().toISOString(),

@@ -173,6 +173,10 @@ function playbooksForStage(stageId: StageId): string[] {
     candidates.push(path.join("models", "wan_video.md"));
     candidates.push(path.join("models", "minimax_video.md"));
   }
+  if (stageId === "video_preview") {
+    candidates.push(path.join("workflows", "comfy", "wan22_i2v_sketch_turbo_api.json"));
+    candidates.push(path.join("workflows", "comfy", "wan22_flf_sketch_turbo_api.json"));
+  }
   if (stageId === "characters") {
     candidates.push(path.join("models", "qwen_image.md"));
   }

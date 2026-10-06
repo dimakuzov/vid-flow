@@ -18,6 +18,19 @@ const BASELINE_FILE = "agent_baseline.json";
 const REQUEST_JSON = "agent_request.json";
 const REQUEST_MD = "agent_request.md";
 const LLM_TASK = "llm_task.md";
+const DISPATCH_FILE = "agent_dispatch.json";
+
+export type AgentComfyState = "wait" | "queued" | "error" | "agent";
+export type AgentVideoWorkflow = "i2v" | "flf";
+
+export interface AgentDispatch {
+  requestId: string;
+  state: AgentComfyState;
+  videoWorkflow?: AgentVideoWorkflow;
+  jobId?: string;
+  error?: string;
+  updatedAt: string;
+}
 
 export interface RefFingerprint {
   name: string;
@@ -61,6 +74,9 @@ export interface AgentRequestSummary {
   status: "pending" | "done";
   createdAt: string;
   refsChangedByUser: boolean;
+  comfy: AgentComfyState | null;
+  comfyJobId: string | null;
+  comfyError: string | null;
 }
 
 function touchPath(shotId: string, stageId: StageId): string {
@@ -118,10 +134,13 @@ function listNames(items: string[]): string {
   return items.length ? items.join(", ") : "(none)";
 }
 
-function renderRequestMarkdown(request: AgentRequestFile): string {
+function renderRequestMarkdown(request: AgentRequestFile, boardQueues: boolean): string {
   const refsRule = request.refsChangedByUser
     ? "refsChangedByUser is true. Leave every file in refs/ as it is. Rewrite prompt.md only."
     : "refsChangedByUser is false. Rewrite prompt.md. Rebuild reference images only if the user message means the current references are wrong.";
+  const finish = boardQueues
+    ? "The board queues Comfy after this file is done. Rewrite prompt.md from the user message, then clear llm_notes.md. Do not queue Comfy. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json."
+    : "Run the stage playbook, including its Comfy pass. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json.";
 
   return `# Agent request
 
@@ -169,6 +188,8 @@ ${
 ## What to do
 
 ${refsRule}
+
+${finish}
 
 When the pass is done:
 
@@ -223,10 +244,14 @@ export function readAgentRequestSummary(
 ): AgentRequestSummary | null {
   const request = readAgentRequest(shotId, stageId);
   if (!request) return null;
+  const dispatch = readAgentDispatch(shotId, stageId);
   return {
     status: request.status,
     createdAt: request.createdAt,
     refsChangedByUser: request.refsChangedByUser,
+    comfy: dispatch?.state ?? null,
+    comfyJobId: dispatch?.jobId ?? null,
+    comfyError: dispatch?.error ?? null,
   };
 }
 
@@ -302,7 +327,7 @@ function bulletFiles(dir: string): string {
   return names.length ? names.map((name) => `- ${name}`).join("\n") : "- (пусто)";
 }
 
-function renderLlmTask(request: AgentRequestFile): string {
+function renderLlmTask(request: AgentRequestFile, boardQueues: boolean): string {
   const dir = stageDir(request.shotId, request.stageId);
   const meta = readShotMeta(request.shotId);
   const characters = meta.characters.length ? meta.characters.join(", ") : "(в shot.md не указаны)";
@@ -316,15 +341,21 @@ function renderLlmTask(request: AgentRequestFile): string {
     : "(папки персонажей не перечислены, потому что в shot.md нет списка)";
 
   const firstFrameBlock =
-    request.stageId === "first_frame"
-      ? `
+    request.stageId !== "first_frame"
+      ? ""
+      : boardQueues
+        ? `
+## Первый кадр
+
+Утверждённые локация и персонажи уже лежат в папках кадра. Перепиши prompt.md по сообщению пользователя. Картинку не собирай и в Comfy не ставь: доска сама запустит граф сборки. JSON графа не редактируй.
+`
+        : `
 ## Первый кадр
 
 Предыдущие этапы не обязательны. Если в shot.md нет персонажей и нет локации, либо пользователь просит кадр сразу, не жди characters/approve и location/approve и не создавай эти этапы. Имя человека и название места, которых нет в сообщении, не выдумывай. Картинку собери по тексту кадра и файлам в refs/ этой папки. Результат положи в output/. В approve/ клади только выбранный файл.
 
-Если утверждённые персонажи и локация уже лежат в папках кадра, используй их. Команда графа сборки: playbooks/workflows/first_frame_comfy.md. JSON графа не редактируй.
-`
-      : "";
+Команда графа сборки, если утверждённые персонажи и локация уже есть: playbooks/workflows/first_frame_comfy.md. JSON графа не редактируй.
+`;
 
   const charactersBlock =
     request.stageId === "characters"
@@ -338,12 +369,20 @@ function renderLlmTask(request: AgentRequestFile): string {
 
 Прогон, не останавливаясь на тексте prompt.md: прочитай уже лежащий на диске файл \`playbooks/workflows/characters_comfy.md\`, раздел «Команда». Git pull для этого файла не делай. JSON графа не редактируй. \`update_comfyui.bat\` не запускай. Один персонаж за проход. Старые файлы в output/ и approve/ не удаляй. Скелет и граф character_pose_outfit_qwen.json не запускай, пока в сообщении пользователя нет явной просьбы взять конкретную позу с референса. Описание действия кадра такой просьбой не считается.
 
-Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь этап \`status.json\` в done и \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь.
+Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь этап \`status.json\` в done и \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь. \`agent_dispatch.json\` не удаляй и не правь. Доска этот этап в Comfy не ставит.
 `
-      : `
+      : boardQueues
+        ? `
 ## Что сделать
 
-Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить.
+Перепиши \`prompt.md\` по сообщению пользователя. Предыдущий промпт оставь в истории, если доска сама этого не сделала. Затем очисти \`llm_notes.md\`: рекомендация уже вошла в промпт. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь. В Comfy ничего не ставь.
+
+Последней записью поставь \`"status": "done"\` в \`${REQUEST_JSON}\`. После этого доска сама отправит этап в Comfy.
+`
+        : `
+## Что сделать
+
+Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь.
 `;
 
   return `# Задача для LLM
@@ -353,9 +392,13 @@ function renderLlmTask(request: AgentRequestFile): string {
 - Не делай git pull и не проси логин GitHub.
 - Работай только в этой папке: \`${dir}\`
 - Кадр ${request.shotId}, этап ${request.stageId}. Другие кадры не открывай.
-- ComfyUI на компьютере с доской: http://127.0.0.1:8188/
+${
+  boardQueues
+    ? "- В Comfy не ставь. Доска отправит этап сама, когда в agent_request.json будет status done."
+    : `- ComfyUI на компьютере с доской: http://127.0.0.1:8188/
 - Если эта оболочка не открывает адрес, запиши задание в data/comfy_queue/<id>.json и жди в нём status done. Формат — в playbooks/workflows/characters_comfy.md, раздел «Команда».
-- Команды запускай в локальной оболочке, которая читает эту папку. Если первая оболочка не открывает этот адрес, это удалённая машина: переключись на локальную оболочку компьютера с этой папкой и повтори. Не останавливайся и не проси заменить модель.
+- Команды запускай в локальной оболочке, которая читает эту папку. Если первая оболочка не открывает этот адрес, это удалённая машина: переключись на локальную оболочку компьютера с этой папкой и повтори. Не останавливайся и не проси заменить модель.`
+}
 
 ## Сообщение пользователя
 
@@ -381,6 +424,55 @@ ${libraries}
 ${charactersBlock}${firstFrameBlock}`;
 }
 
+function dispatchPath(shotId: string, stageId: StageId): string {
+  return path.join(stageDir(shotId, stageId), DISPATCH_FILE);
+}
+
+export function readAgentDispatch(shotId: string, stageId: StageId): AgentDispatch | null {
+  const file = dispatchPath(shotId, stageId);
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as AgentDispatch;
+  } catch {
+    return null;
+  }
+}
+
+export function writeAgentDispatch(
+  shotId: string,
+  stageId: StageId,
+  dispatch: AgentDispatch,
+): void {
+  writeText(dispatchPath(shotId, stageId), JSON.stringify(dispatch, null, 2) + "\n");
+}
+
+function hasApprovedImage(shotId: string, stageId: StageId): boolean {
+  const dir = path.join(stageDir(shotId, stageId), "approve");
+  if (!fs.existsSync(dir)) return false;
+  return fs.readdirSync(dir).some((name) => {
+    if (!/\.(png|jpe?g|webp)$/i.test(name)) return false;
+    try {
+      return fs.statSync(path.join(dir, name)).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+
+export function stageBoardQueues(shotId: string, stageId: StageId): boolean {
+  if (stageId === "location" || stageId === "video_preview" || stageId === "final_render") {
+    return true;
+  }
+  if (stageId === "first_frame") {
+    return hasApprovedImage(shotId, "location") && hasApprovedImage(shotId, "characters");
+  }
+  return false;
+}
+
+export function listSeriesShotIds(): string[] {
+  return listShotIds(getSeriesRoot());
+}
+
 export function submitAgentRequest(options: {
   shotId: string;
   stageId: StageId;
@@ -388,12 +480,11 @@ export function submitAgentRequest(options: {
   prompt: string;
   refsNote: string;
   workflowNote: string;
+  videoWorkflow?: AgentVideoWorkflow;
 }): AgentRequestFile {
   const shotId = assertSafeSegment(options.shotId, "shot");
-  const message = options.message.trim();
-  if (!message) {
-    throw new Error("Сначала напиши, что переделать");
-  }
+  const typed = options.message.trim();
+  const message = typed || "Сгенерируй по текущим документам этапа.";
 
   const baseline = readBaseline(shotId, options.stageId);
   const touched = readTouch(shotId, options.stageId);
@@ -444,10 +535,17 @@ export function submitAgentRequest(options: {
     },
   };
 
+  const boardQueues = stageBoardQueues(shotId, options.stageId);
   const dir = stageDir(shotId, options.stageId);
   writeText(path.join(dir, REQUEST_JSON), JSON.stringify(request, null, 2) + "\n");
-  writeText(path.join(dir, REQUEST_MD), renderRequestMarkdown(request));
-  writeText(path.join(dir, LLM_TASK), renderLlmTask(request));
+  writeText(path.join(dir, REQUEST_MD), renderRequestMarkdown(request, boardQueues));
+  writeText(path.join(dir, LLM_TASK), renderLlmTask(request, boardQueues));
+  writeAgentDispatch(shotId, options.stageId, {
+    requestId: request.id,
+    state: boardQueues ? "wait" : "agent",
+    videoWorkflow: options.videoWorkflow === "flf" ? "flf" : "i2v",
+    updatedAt: request.createdAt,
+  });
   rebuildAgentInbox();
   return request;
 }
