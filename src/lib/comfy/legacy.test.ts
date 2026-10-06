@@ -6,9 +6,20 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 
+// Сверка проверяет раннер, а не текущие плейбуки: графы берутся живые, а манифесты — снимок
+// из ветки contracts (fixtures/legacy-manifests), когда они повторяли старый stage-run.ts.
+// Бриф 4 потом перенёс обвязку текста в шаблоны prompt.md, живые манифесты от этого изменились.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frameboard-legacy-"));
 process.env.DATA_ROOT = tmp;
-process.env.PLAYBOOKS_ROOT = path.resolve(__dirname, "../../../playbooks");
+process.env.PLAYBOOKS_ROOT = path.join(tmp, "playbooks");
+{
+  const comfy = path.join(process.env.PLAYBOOKS_ROOT, "workflows", "comfy");
+  fs.cpSync(path.resolve(__dirname, "../../../playbooks"), process.env.PLAYBOOKS_ROOT, { recursive: true });
+  for (const name of fs.readdirSync(comfy).filter((file) => file.endsWith(".bind.json"))) {
+    fs.rmSync(path.join(comfy, name));
+  }
+  fs.cpSync(path.join(__dirname, "fixtures", "legacy-manifests"), comfy, { recursive: true });
+}
 process.env.COMFY_URL = "http://127.0.0.1:9";
 process.env.FRAMEBOARD_LOOPS = "off";
 delete process.env.SERIES_ROOT;
