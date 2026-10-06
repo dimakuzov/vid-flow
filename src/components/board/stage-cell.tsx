@@ -11,8 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { errorText, requestJson, stageApiPath, stagePagePath } from "@/components/stage/api";
+import { SuggestedWorkflow, WorkflowMenu } from "@/components/stage/workflow-menu";
 import { STATUS_LABELS, type StageId } from "@/lib/series/constants";
-import type { StageSummary } from "@/lib/series/types";
+import type { StageDetail, StageSummary } from "@/lib/series/types";
 import { StatusPill } from "./status-pill";
 
 interface StageCellProps {
@@ -29,25 +31,51 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
   const [message, setMessage] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadMode, setUploadMode] = useState<"output" | "approve">("output");
-  const [videoWorkflow, setVideoWorkflow] = useState<"i2v" | "flf">("i2v");
+  // В StageSummary нет вариантов воркфлоу: этап читается при открытии меню.
+  const [detail, setDetail] = useState<StageDetail | null>(null);
+  const stageApi = stageApiPath(episodeId, shotId, stageId);
+
+  function openMenu(next: boolean) {
+    setOpen(next);
+    if (!next) return;
+    setMessage("");
+    requestJson<StageDetail>(stageApi)
+      .then(setDetail)
+      .catch((error) => setMessage(errorText(error)));
+  }
+
+  async function chooseWorkflow(workflowId: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      setDetail(
+        await requestJson<StageDetail>(stageApi, {
+          method: "PATCH",
+          body: { runWorkflow: workflowId },
+          fallbackError: "Не удалось выбрать воркфлоу",
+        }),
+      );
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runAction() {
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/run`, {
+      const data = await requestJson<{ message?: string; stage?: StageDetail }>(`${stageApi}/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          stageId === "video_preview" || stageId === "final_render" ? { workflow: videoWorkflow } : {},
-        ),
+        body: detail?.workflow ? { runWorkflow: detail.workflow } : {},
+        fallbackError: "Не удалось запустить",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось запустить");
+      if (data.stage) setDetail(data.stage);
       setMessage(data.message || "Запущено");
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(errorText(error));
     } finally {
       setBusy(false);
     }
@@ -57,7 +85,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/cancel`, { method: "POST" });
+      const res = await fetch(`${stageApi}/cancel`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось отменить");
       setMessage(data.message || "Отменено");
@@ -78,7 +106,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
       form.set("file", file);
       form.set("target", "output");
       form.set("approveAfter", uploadMode === "approve" ? "true" : "false");
-      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/upload`, {
+      const res = await fetch(`${stageApi}/upload`, {
         method: "POST",
         body: form,
       });
@@ -116,7 +144,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     }
     setBusy(true);
     try {
-      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`${stageApi}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filenames, from: "output" }),
@@ -141,7 +169,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => openMenu(true)}
         className={`group flex h-full min-h-28 w-full flex-col gap-2 rounded-xl border p-3 text-left transition ${
           stage.busy
             ? "border-sky-400/60 bg-sky-50/70"
@@ -201,7 +229,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         )}
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={openMenu}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -235,23 +263,28 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
               Загрузить и утвердить
             </Button>
             <Link
-              href={`/shots/${shotId}/${stageId}`}
+              href={stagePagePath(episodeId, shotId, stageId)}
               className="inline-flex h-8 items-center justify-center rounded-lg bg-secondary px-2.5 text-sm font-medium text-secondary-foreground"
             >
               Редактировать
             </Link>
-            {stageId === "video_preview" || stageId === "final_render" ? (
-              <label className="grid gap-1 text-xs text-stone-600">
-                Воркфлоу
-                <select
-                  value={videoWorkflow}
-                  onChange={(event) => setVideoWorkflow(event.target.value === "flf" ? "flf" : "i2v")}
-                  className="h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900"
-                >
-                  <option value="i2v">Wan i2v — из первого кадра</option>
-                  <option value="flf">Wan FLF — первый и последний кадр</option>
-                </select>
-              </label>
+            {detail?.workflows.length ? (
+              <>
+                <WorkflowMenu
+                  id={`cell-workflow-${shotId}-${stageId}`}
+                  workflows={detail.workflows}
+                  selected={detail.workflow}
+                  disabled={busy || stage.busy}
+                  onSelect={chooseWorkflow}
+                />
+                <SuggestedWorkflow
+                  workflows={detail.workflows}
+                  selected={detail.workflow}
+                  suggested={detail.agentRequest?.suggestedWorkflow}
+                  disabled={busy || stage.busy}
+                  onSwitch={chooseWorkflow}
+                />
+              </>
             ) : null}
             {stage.busy ? (
               <>
@@ -262,8 +295,12 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
                   Отменить
                 </Button>
               </>
+            ) : detail && !detail.workflows.length ? (
+              <p className="text-xs text-stone-500">
+                Этот этап доска не запускает: прогон ставит агент («Редактировать» → «Отправить агенту»).
+              </p>
             ) : (
-              <Button disabled={busy} onClick={runAction}>
+              <Button disabled={busy || !detail} onClick={runAction}>
                 Запустить
               </Button>
             )}

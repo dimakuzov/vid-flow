@@ -20,3 +20,19 @@ export function statusTone(status: StageStatus): string {
       return "bg-stone-500/10 text-stone-600 border-stone-400/30";
   }
 }
+
+/** Полоса состояния на странице этапа (фаза из stage_state.json). */
+export function phaseTone(phase: "idle" | "agent" | "queued" | "running" | "error"): string {
+  switch (phase) {
+    case "agent":
+      return "border-violet-300 bg-violet-50 text-violet-950";
+    case "queued":
+      return "border-sky-300 bg-sky-50 text-sky-950";
+    case "running":
+      return "border-sky-400 bg-sky-100 text-sky-950";
+    case "error":
+      return "border-red-300 bg-red-50 text-red-950";
+    default:
+      return "border-stone-200 bg-white text-stone-700";
+  }
+}
