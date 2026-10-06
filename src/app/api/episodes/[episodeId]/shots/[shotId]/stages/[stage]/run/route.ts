@@ -5,19 +5,25 @@ import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
 
+/** Тело `{ runWorkflow?: string }` — id манифеста. Старое `{ workflow: "i2v" | "flf" }` тоже принимается. */
+async function requestedWorkflow(request: Request): Promise<string | undefined> {
+  let body: { runWorkflow?: unknown; workflow?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    // Пустое тело: выбор этапа (run_settings.json) или вариант по умолчанию.
+    return undefined;
+  }
+  const raw = body?.runWorkflow ?? body?.workflow;
+  if (raw == null || raw === "") return undefined;
+  if (typeof raw !== "string") throw new Error("runWorkflow должен быть строкой");
+  return raw;
+}
+
 export async function POST(request: Request, context: StageRouteContext) {
   try {
     const { episodeId, shotId, stageId } = parseStageParams(await context.params);
-    // runWorkflow — id манифеста; workflow — старое имя поля (i2v, flf). Нет — выбор этапа или вариант по умолчанию.
-    let workflow: string | undefined;
-    try {
-      const body = (await request.json()) as { runWorkflow?: unknown; workflow?: unknown };
-      const raw = body.runWorkflow ?? body.workflow;
-      if (typeof raw === "string") workflow = raw;
-    } catch {
-      workflow = undefined;
-    }
-
+    const workflow = await requestedWorkflow(request);
     const queued = queueStageRun(episodeId, shotId, stageId, { workflow });
     return NextResponse.json({
       message: queued.message,

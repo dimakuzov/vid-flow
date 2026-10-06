@@ -1,0 +1,340 @@
+{
+  "location из refs": {
+    "workflow": "location_views",
+    "changes": {
+      "25": {
+        "image": "view.png"
+      },
+      "100": {
+        "value": "Evening light over the old cafe, warm lamps on every table.\nSame place, no people."
+      },
+      "102": {
+        "seed": 0
+      },
+      "104": {
+        "filename_prefix": "frameboard/location/s01_v1_simple"
+      },
+      "110": {
+        "value": "Evening light over the old cafe, warm lamps on every table.\nSame place, no people."
+      },
+      "112": {
+        "seed": 0
+      },
+      "114": {
+        "filename_prefix": "frameboard/location/s01_v2_objects"
+      },
+      "120": {
+        "value": "Evening light over the old cafe, warm lamps on every table.\nSame place, no people."
+      },
+      "122": {
+        "seed": 0
+      },
+      "124": {
+        "filename_prefix": "frameboard/location/s01_v3_camera"
+      },
+      "130": {
+        "value": "Evening light over the old cafe, warm lamps on every table.\nSame place, no people."
+      },
+      "132": {
+        "seed": 0
+      },
+      "134": {
+        "filename_prefix": "frameboard/location/s01_v4_camera_objects"
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s01/location/refs/view.png",
+        "filename": "view.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s01/location/output"
+  },
+  "location из библиотеки, no people уже есть": {
+    "workflow": "location_views",
+    "changes": {
+      "25": {
+        "image": "park_wide.png"
+      },
+      "100": {
+        "value": "Empty park at dawn, no people, fog between the trees."
+      },
+      "102": {
+        "seed": 0
+      },
+      "104": {
+        "filename_prefix": "frameboard/location/s02_v1_simple"
+      },
+      "110": {
+        "value": "Empty park at dawn, no people, fog between the trees."
+      },
+      "112": {
+        "seed": 0
+      },
+      "114": {
+        "filename_prefix": "frameboard/location/s02_v2_objects"
+      },
+      "120": {
+        "value": "Empty park at dawn, no people, fog between the trees."
+      },
+      "122": {
+        "seed": 0
+      },
+      "124": {
+        "filename_prefix": "frameboard/location/s02_v3_camera"
+      },
+      "130": {
+        "value": "Empty park at dawn, no people, fog between the trees."
+      },
+      "132": {
+        "seed": 0
+      },
+      "134": {
+        "filename_prefix": "frameboard/location/s02_v4_camera_objects"
+      }
+    },
+    "uploads": [
+      {
+        "path": "locations/park/park_wide.png",
+        "filename": "park_wide.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s02/location/output"
+  },
+  "first_frame, один персонаж": {
+    "workflow": "first_frame_compositing",
+    "changes": {
+      "461": {
+        "filename_prefix": "frameboard/first_frame/s03_ff"
+      },
+      "470": {
+        "image": "cafe_s03.png"
+      },
+      "477": {
+        "value": "Place the person from image 2 into the location from image 1.\nShe stands by the window holding a cup.\nKeep the location from image 1 exactly as it is. Do not add any other people."
+      },
+      "488": {
+        "images.image_3": "$removed"
+      },
+      "902": {
+        "image": "katya_s03.png"
+      },
+      "903": null
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s03/location/approve/cafe_s03.png",
+        "filename": "cafe_s03.png"
+      },
+      {
+        "path": "episodes/t01/shots/s03/characters/approve/katya_s03.png",
+        "filename": "katya_s03.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s03/first_frame/output"
+  },
+  "first_frame, два персонажа": {
+    "workflow": "first_frame_compositing",
+    "changes": {
+      "461": {
+        "filename_prefix": "frameboard/first_frame/s04_ff"
+      },
+      "470": {
+        "image": "cafe_s04.png"
+      },
+      "477": {
+        "value": "Place the person from image 2 and the person from image 3 into the location from image 1.\nThey sit at the same table facing each other.\nKeep the location from image 1 exactly as it is. Do not add any other people."
+      },
+      "902": {
+        "image": "anna_s04.png"
+      },
+      "903": {
+        "image": "katya_s04.png"
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s04/location/approve/cafe_s04.png",
+        "filename": "cafe_s04.png"
+      },
+      {
+        "path": "episodes/t01/shots/s04/characters/approve/anna_s04.png",
+        "filename": "anna_s04.png"
+      },
+      {
+        "path": "episodes/t01/shots/s04/characters/approve/katya_s04.png",
+        "filename": "katya_s04.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s04/first_frame/output"
+  },
+  "first_frame, пустой prompt.md": {
+    "workflow": "first_frame_compositing",
+    "changes": {
+      "461": {
+        "filename_prefix": "frameboard/first_frame/s05_ff"
+      },
+      "470": {
+        "image": "cafe_s05.png"
+      },
+      "477": {
+        "value": "Place the person from image 2 into the location from image 1.\nKeep the location from image 1 exactly as it is. Do not add any other people."
+      },
+      "488": {
+        "images.image_3": "$removed"
+      },
+      "902": {
+        "image": "katya_s05.png"
+      },
+      "903": null
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s05/location/approve/cafe_s05.png",
+        "filename": "cafe_s05.png"
+      },
+      {
+        "path": "episodes/t01/shots/s05/characters/approve/katya_s05.png",
+        "filename": "katya_s05.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s05/first_frame/output"
+  },
+  "video i2v без камеры, 5 сек": {
+    "workflow": "video_i2v",
+    "changes": {
+      "97": {
+        "image": "s06_start.png"
+      },
+      "108": {
+        "filename_prefix": "frameboard/video/s06_i2v"
+      },
+      "129:93": {
+        "text": "Static shot, fixed camera. The person slowly turns her head toward the door, 5 сек Realistic, natural movement."
+      },
+      "129:86": {
+        "noise_seed": 0
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s06/first_frame/approve/ff_s06.png",
+        "filename": "s06_start.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s06/video_preview/output"
+  },
+  "video i2v с камерой и хвостом": {
+    "workflow": "video_i2v",
+    "changes": {
+      "97": {
+        "image": "s07_start.jpg"
+      },
+      "108": {
+        "filename_prefix": "frameboard/video/s07_i2v"
+      },
+      "129:93": {
+        "text": "Slow dolly in on the table. Realistic, natural movement."
+      },
+      "129:86": {
+        "noise_seed": 0
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s07/first_frame/approve/ff_s07.jpg",
+        "filename": "s07_start.jpg"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s07/video_preview/output"
+  },
+  "video flf": {
+    "workflow": "video_flf",
+    "changes": {
+      "97": {
+        "image": "s08_start.png"
+      },
+      "98": {
+        "image": "s08_end.png"
+      },
+      "108": {
+        "filename_prefix": "frameboard/video/s08_flf"
+      },
+      "129:93": {
+        "text": "Static shot, fixed camera. The person walks to the counter in 4s Realistic, natural movement."
+      },
+      "129:86": {
+        "noise_seed": 0
+      },
+      "129:161": {
+        "value": 4
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s08/first_frame/approve/ff_s08.png",
+        "filename": "s08_start.png"
+      },
+      {
+        "path": "episodes/t01/shots/s08/video_preview/refs/last.PNG",
+        "filename": "s08_end.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s08/video_preview/output"
+  },
+  "final i2v": {
+    "workflow": "final_i2v",
+    "changes": {
+      "97": {
+        "image": "s09_start.png"
+      },
+      "108": {
+        "filename_prefix": "frameboard/final/s09_i2v"
+      },
+      "129:93": {
+        "text": "Static shot, fixed camera. Steam rises from the cup. Realistic, natural movement."
+      },
+      "129:86": {
+        "noise_seed": 0
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s09/first_frame/approve/ff_s09.png",
+        "filename": "s09_start.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s09/final_render/output"
+  },
+  "final flf": {
+    "workflow": "final_flf",
+    "changes": {
+      "97": {
+        "image": "s10_start.png"
+      },
+      "98": {
+        "image": "s10_end.png"
+      },
+      "108": {
+        "filename_prefix": "frameboard/final/s10_flf"
+      },
+      "129:93": {
+        "text": "Static camera, the person sits down. Realistic, natural movement."
+      },
+      "129:86": {
+        "noise_seed": 0
+      }
+    },
+    "uploads": [
+      {
+        "path": "episodes/t01/shots/s10/first_frame/approve/ff_s10.png",
+        "filename": "s10_start.png"
+      },
+      {
+        "path": "episodes/t01/shots/s10/final_render/refs/end.png",
+        "filename": "s10_end.png"
+      }
+    ],
+    "saveTo": "episodes/t01/shots/s10/final_render/output"
+  }
+}
