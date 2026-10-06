@@ -3,9 +3,9 @@
   "id": "final_i2v",
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал от первого кадра (i2v, как превью)",
-  "description": "Пока тот же граф, что и превью. Решение по финалу — бриф 4.",
-  "playbook": "models/wan_video.md",
+  "label": "Финал от первого кадра (i2v)",
+  "description": "Финал пока = превью: тот же граф и настройки, файлы в frameboard/final/. См. stages/final_render.md.",
+  "playbook": "models/wan_video.en.md",
   "order": 10,
   "aliases": [
     "i2v"
@@ -52,24 +52,7 @@
         }
       ],
       "value": {
-        "input": "text",
-        "steps": [
-          {
-            "namesTo": "the person"
-          },
-          {
-            "ensure": "Static shot, fixed camera.",
-            "at": "start",
-            "unless": "\b(camera|shot|static|pan|dolly|zoom|трек|камер)\b",
-            "separator": " "
-          },
-          {
-            "ensure": "Realistic, natural movement.",
-            "at": "end",
-            "unless": "realistic, natural movement",
-            "separator": " "
-          }
-        ]
+        "input": "text"
       }
     },
     {
