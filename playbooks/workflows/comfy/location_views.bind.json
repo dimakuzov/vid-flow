@@ -56,15 +56,7 @@
         }
       ],
       "value": {
-        "input": "text",
-        "steps": [
-          {
-            "ensure": "Same place, no people.",
-            "at": "end",
-            "unless": "no people",
-            "separator": "\n"
-          }
-        ]
+        "input": "text"
       }
     },
     {

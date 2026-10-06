@@ -1,0 +1,125 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "first_frame_compositing",
+  "graph": "qwen21_character_compositing.json",
+  "stage": "first_frame",
+  "label": "Первый кадр: персонажи в локации",
+  "description": "Вписать утверждённых персонажей (1–2) в утверждённую локацию.",
+  "playbook": "models/qwen_first_frame.en.md",
+  "order": 10,
+  "inputs": {
+    "location": {
+      "kind": "image",
+      "from": "approve:location",
+      "pick": "newest",
+      "label": "Утверждённая локация"
+    },
+    "people": {
+      "kind": "image",
+      "from": "approve:characters",
+      "pick": "all",
+      "min": 1,
+      "max": 2,
+      "label": "Утверждённые персонажи"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": false,
+      "label": "prompt.md"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "470",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "location"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "902",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "people",
+        "index": 0
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "903",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "people",
+        "index": 1
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "903"
+          },
+          {
+            "node": "488",
+            "field": "images.image_3"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "477",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "templates": [
+          {
+            "when": {
+              "input": "people",
+              "countAtLeast": 2
+            },
+            "text": "Place the person from image 2 and the person from image 3 into the location from image 1.\n{text}\nKeep the location from image 1 exactly as it is. Do not add any other people."
+          },
+          {
+            "text": "Place the person from image 2 into the location from image 1.\n{text}\nKeep the location from image 1 exactly as it is. Do not add any other people."
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "485",
+          "field": "seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "461",
+          "field": "filename_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/first_frame/{shotId}_ff"
+      }
+    }
+  ]
+}
