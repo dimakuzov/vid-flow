@@ -2,9 +2,13 @@ import fs from "fs";
 import path from "path";
 import {
   cancelComfyPrompt,
+  ComfyRejectedError,
   downloadComfyImage,
+  historyError,
   listHistoryImages,
+  queuePositionOf,
   readComfyHistory,
+  readComfyQueue,
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
@@ -128,8 +132,12 @@ export function enqueueComfyJob(job: ComfyJob): ComfyJob {
     status: "pending",
     queuedAt: job.queuedAt || new Date().toISOString(),
     error: undefined,
+    nodeErrors: undefined,
     files: undefined,
     promptId: undefined,
+    submittedAt: undefined,
+    finishedAt: undefined,
+    queuePosition: null,
   };
   writeJob(next);
   return next;
@@ -168,34 +176,70 @@ async function submitJob(job: ComfyJob): Promise<void> {
   }
   job.promptId = promptId;
   job.status = "running";
+  job.submittedAt = new Date().toISOString();
+  job.queuePosition = null;
   job.error = undefined;
   writeJob(job);
 }
 
-async function finishJob(job: ComfyJob): Promise<void> {
+/** Имя в dir, которого ещё нет: name.png → name-2.png, name-3.png… */
+function writeUnique(dir: string, name: string, bytes: Buffer): string {
+  const ext = path.extname(name);
+  const base = name.slice(0, name.length - ext.length);
+  for (let n = 1; ; n += 1) {
+    const candidate = n === 1 ? name : `${base}-${n}${ext}`;
+    try {
+      // wx: существующий файл не затирается. Байты как есть: метаданные PNG остаются.
+      fs.writeFileSync(path.join(dir, candidate), bytes, { flag: "wx" });
+      return candidate;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  }
+}
+
+type QueueSnapshot = { running: string[]; pending: string[] } | null;
+
+async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
   if (!job.promptId) return;
   const history = await readComfyHistory(job.promptId);
   if (!history) {
+    const position = queue ? queuePositionOf(queue, job.promptId) : (job.queuePosition ?? null);
+    if (position != null || !queue) {
+      // Ждёт или выполняется (или очередь ComfyUI не прочиталась): не таймаут.
+      if (queue && position !== (job.queuePosition ?? null) && !cancelledMeanwhile(job.id)) {
+        job.queuePosition = position;
+        writeJob(job);
+      }
+      return;
+    }
     const started = job.updatedAt ? Date.parse(job.updatedAt) : Number.NaN;
-    if (Number.isFinite(started) && Date.now() - started > HISTORY_TIMEOUT_MS) {
-      throw new Error(`история ${job.promptId} не пришла`);
+    if (job.queuePosition != null) {
+      // Только что пропал из очереди, истории ещё нет: отсчёт таймаута с этой записи.
+      job.queuePosition = null;
+      writeJob(job);
+    } else if (Number.isFinite(started) && Date.now() - started > HISTORY_TIMEOUT_MS) {
+      throw new Error(`ComfyUI потерял задание: ${job.promptId} нет ни в очереди, ни в истории`);
     }
     return;
   }
+  const failed = historyError(history);
+  if (failed) throw failed;
   const saveDir = resolveSaveDir(job.saveTo);
   fs.mkdirSync(saveDir, { recursive: true });
   const saved: string[] = [];
   for (const image of listHistoryImages(history)) {
     const bytes = await downloadComfyImage(image);
-    const name = path.basename(image.filename);
-    fs.writeFileSync(path.join(saveDir, name), bytes);
-    saved.push(name);
+    saved.push(writeUnique(saveDir, path.basename(image.filename), bytes));
   }
   if (!saved.length) throw new Error("ComfyUI не вернул файлов");
   if (cancelledMeanwhile(job.id)) return;
   job.status = "done";
   job.files = saved;
+  job.queuePosition = null;
+  job.finishedAt = new Date().toISOString();
   job.error = undefined;
+  job.nodeErrors = undefined;
   writeJob(job);
   // Статус этапа отдельно не пишем: stage_state.json ссылается на это задание по id,
   // а «На проверке» выводится из файлов в output/.
@@ -225,12 +269,17 @@ export async function cancelComfyJob(id: string): Promise<void> {
   if (job.promptId) await cancelComfyPrompt(job.promptId);
   job.status = "cancelled";
   job.error = undefined;
+  job.queuePosition = null;
+  job.finishedAt = new Date().toISOString();
   writeJob(job);
 }
 
 function failJob(job: ComfyJob, error: unknown): void {
   job.status = "error";
   job.error = error instanceof Error ? error.message : "ошибка ComfyUI";
+  job.nodeErrors = error instanceof ComfyRejectedError && error.nodeErrors.length ? error.nodeErrors : undefined;
+  job.queuePosition = null;
+  job.finishedAt = new Date().toISOString();
   try {
     writeJob(job);
   } catch {
@@ -264,6 +313,7 @@ export async function drainComfyQueue(): Promise<void> {
           offline = true;
           job.status = "pending";
           job.promptId = undefined;
+          job.submittedAt = undefined;
           job.error = undefined;
           try {
             writeJob(job);
@@ -279,15 +329,25 @@ export async function drainComfyQueue(): Promise<void> {
       }
     }
 
-    for (const job of jobs) {
-      if (job.status !== "running" || !job.promptId || running.has(job.id) || !claimJob(job.id)) continue;
+    // Одна выборка GET /queue на проход: место в очереди для всех отправленных заданий.
+    const sent = jobs.filter((job) => job.status === "running" && job.promptId);
+    let queue: QueueSnapshot = null;
+    if (sent.length) {
+      try {
+        queue = await readComfyQueue();
+      } catch {
+        queue = null;
+      }
+    }
+    for (const job of sent) {
+      if (running.has(job.id) || !claimJob(job.id)) continue;
       if (!stillSame(job)) {
         releaseJob(job.id);
         continue;
       }
       running.add(job.id);
       try {
-        await finishJob(job);
+        await finishJob(job, queue);
       } catch (error) {
         if (!comfyOffline(error) && !cancelledMeanwhile(job.id)) failJob(job, error);
       } finally {
