@@ -21,7 +21,7 @@ Lightning 4-step LoRA включена, сила 1.0.
 
 При cfg 1.0 negative на результат не влияет. Лишняя одежда и каблуки убираются чистыми входами, не списком запретов. Negative-нода в графе оставлена на случай cfg выше 1; с Lightning это обычно портит картинку.
 
-Загрузчики в графе — заглушки под Qwen 2.1: UNET, CLIP (`type: qwen_image`), VAE `qwen_image_vae`, Lightning LoRA под свою модель. Имена файлов в JSON не считать каноном.
+Эти параметры относятся к сборке позы. Правка одежды — другой проход: 25 шагов, cfg 1, euler / simple, LoRA `qwen2.1\lenovo_qwen21.safetensors` с силой 0.6. Имена файлов и обязательное поле `resolution_steps` — в разделе «Команда» `playbooks/workflows/characters_comfy.md`. Имена в JSON сборки не канон: UNET bf16 из файла на диске нет.
 
 ## Структура промпта
 
@@ -29,27 +29,39 @@ Lightning 4-step LoRA включена, сила 1.0.
 2. Поза и движение, коротко, как подсказка к скелету.
 3. Кадрирование и свет.
 
-Внешность и одежду текстом не описывать: их задают картинки. Отрицаний в позитивном промпте нет. Писать только то, что должно быть.
+В промпте сборки внешность и одежду текстом не описывать: их задают картинки. В промпте правки одежды называется только меняемый слой. Отрицаний в позитивном промпте нет. Писать только то, что должно быть.
 
 Для мужского персонажа `woman` меняется на `man`. Если лицо не нужно (спиной), фраза про image 3 убирается вместе со связью image3 в обоих энкодерах.
 
 ## Шаблоны
 
-Тексты собраны по проверенным правилам, но сами ещё гипотеза.
+Текст сборки закреплён на teaser s07. Одежду в нём не называть. Фраза «wearing exactly the outfit» на прогоне не использовалась: она снова описывает одежду текстом.
 
-Поза по скелету (шаг сборки):
+Поза по скелету (только когда пользователь явно просит конкретную позу с референса; иначе этот шаблон не использовать):
 
 ```text
 Image 1 is the woman with her complete outfit. Image 2 is a pose skeleton. Image 3 is her face.
 
-The woman from image 1, wearing exactly the outfit from image 1 with every garment, the shoes and the bag, takes the exact pose of the skeleton in image 2: [короткая поза, например: running fast to the right, side profile, mid-stride]. Her face is the face from image 3.
+The woman from image 1 takes the exact pose of the skeleton in image 2: standing straight, arms at her sides. Her face is the face from image 3.
 
-[Full body / Waist-up / From behind]. Plain light grey studio background, soft even light. Photorealistic.
+Full body. Plain light grey studio background, soft even light. Photorealistic.
+```
+
+Правка одежды называет только меняемый слой и держит остальное. В тексте есть `<image1>`. Позу не менять:
+
+```text
+Change the lower garment in <image1>. The green sarafan continues as one skirt from the shoulder straps down below the knees, over the yellow turtleneck. The same grey shoes stay fully visible. The necklace stays on the neck. Her face, pinned-up hair, standing pose, framing, lighting and plain light background stay exactly as in <image1>.
+```
+
+Продление обрезанного кадра вниз. Холст выше исходника, та же фигура:
+
+```text
+Extend <image1> downward into a full-length standing view. The head stays near the top of the frame. Both feet and plain flat shoes are fully visible at the bottom, with a margin of the plain light background under the shoes. Her face, hair, and standing pose stay as in <image1>. Plain light background.
 ```
 
 Если на результате виден сам скелет, добавить: `Image 2 is only a pose guide.`
 
-Правка образа, снять верхний слой (пример: куртка поверх платья). Позу на этом шаге не менять. Скрытую часть описать явно:
+Снять верхний слой одной фразой на шоте не проверялось. Ниже старый пример, его не подставлять вместо правки из раздела «Команда»:
 
 ```text
 The woman in image 1 now wears only the brown dress: the skirt part stays exactly the same, and the upper part continues in the same brown fabric — a simple fitted bodice, long sleeves, a round neckline. One continuous dress from shoulders to below the knees.

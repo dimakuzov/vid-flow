@@ -3,26 +3,96 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { BootstrapPreview } from "@/lib/series/types";
+import type { BootstrapPreview, BootstrapShotDraft } from "@/lib/series/types";
+
+interface TableShot {
+  id: string;
+  title: string;
+  characters: string[];
+  location: string;
+}
 
 interface BootstrapPanelProps {
+  initialEpisodeId: string | null;
+  tableShots: TableShot[];
   initialScenario: string;
+  initialRawScenario: string;
   initialPreview: BootstrapPreview;
+  formatRequestStatus: "pending" | "done" | null;
   onImported: () => void;
 }
 
+function sortShots(shots: BootstrapShotDraft[]): BootstrapShotDraft[] {
+  return [...shots].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+
 export function BootstrapPanel({
+  initialEpisodeId,
+  tableShots,
   initialScenario,
+  initialRawScenario,
   initialPreview,
+  formatRequestStatus,
   onImported,
 }: BootstrapPanelProps) {
+  const tableKey = tableShots.map((shot) => shot.id).join(",");
+  const [raw, setRaw] = useState(initialRawScenario);
   const [scenario, setScenario] = useState(initialScenario);
   const [preview, setPreview] = useState<BootstrapPreview>(initialPreview);
-  const [selected, setSelected] = useState<string[]>(
-    initialPreview.shots.map((shot) => shot.id),
-  );
+  const [selected, setSelected] = useState<string[]>(tableShots.map((shot) => shot.id));
+  const [seenTable, setSeenTable] = useState(tableKey);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+
+  if (seenTable !== tableKey) {
+    setSeenTable(tableKey);
+    setSelected(tableShots.map((shot) => shot.id));
+  }
+
+  const cards = sortShots(
+    (() => {
+      const byId = new Map<string, BootstrapShotDraft>();
+      for (const shot of tableShots) {
+        byId.set(shot.id, {
+          id: shot.id,
+          title: shot.title,
+          summary: "",
+          characters: shot.characters,
+          location: shot.location,
+        });
+      }
+      for (const shot of preview.shots) {
+        const current = byId.get(shot.id);
+        byId.set(shot.id, current ? { ...current, ...shot, summary: shot.summary } : shot);
+      }
+      return [...byId.values()];
+    })(),
+  );
+
+  async function sendRawToAgent() {
+    if (!initialEpisodeId) {
+      setMessage("Сначала выбери или добавь серию в заголовке");
+      return;
+    }
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/series/format-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId: initialEpisodeId, rawText: raw }),
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось записать сценарий");
+      setMessage(data.message);
+      onImported();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function previewScenario() {
     setBusy(true);
@@ -37,8 +107,11 @@ export function BootstrapPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось разобрать сценарий");
       setPreview(data.preview);
-      setSelected(data.preview.shots.map((shot: { id: string }) => shot.id));
-      setMessage(`Найдено кадров: ${data.preview.shots.length}`);
+      setMessage(
+        data.preview.shots.length
+          ? `Кадров в тексте: ${data.preview.shots.length}. Галка добавляет кадр в таблицу, снятая убирает.`
+          : "В этом тексте нет кадров «## s01». Сырой сценарий отправь на разметку.",
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка");
     } finally {
@@ -46,41 +119,38 @@ export function BootstrapPanel({
     }
   }
 
-  async function applySelected() {
-    if (!selected.length) {
-      setMessage("Выберите хотя бы один кадр");
+  async function toggleShot(id: string) {
+    const removing = selected.includes(id);
+    if (!removing && !initialEpisodeId) {
+      setMessage("Сначала выбери или добавь серию в заголовке");
       return;
     }
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch("/api/series/bootstrap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scenario,
-          shotIds: selected,
-          overwriteDocs: false,
-        }),
-        cache: "no-store",
-      });
+      const res = removing
+        ? await fetch(`/api/shots/${id}`, { method: "DELETE" })
+        : await fetch("/api/series/bootstrap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              scenario,
+              shotIds: [id],
+              overwriteDocs: false,
+              episodeId: initialEpisodeId,
+            }),
+            cache: "no-store",
+          });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось создать структуру");
-      setMessage(
-        `Создано: ${data.created.join(", ") || "—"} · обновлено: ${data.updated.join(", ") || "—"}`,
-      );
+      if (!res.ok) throw new Error(data.error || "Не удалось изменить кадр");
+      setSelected((prev) => (removing ? prev.filter((item) => item !== id) : [...prev, id]));
+      setMessage(removing ? `${id} убран из таблицы` : `${id} добавлен в таблицу`);
       onImported();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка");
     } finally {
       setBusy(false);
     }
-  }
-
-  function toggleShot(id: string) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
   }
 
   return (
@@ -90,32 +160,18 @@ export function BootstrapPanel({
           <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-stone-900">
             Импорт сценария
           </h2>
-          <p className="mt-1 max-w-2xl text-sm text-stone-600">
-            Отдельное задание: разобрать весь сценарий серии и создать папки
-            shots/stages. Повторный импорт спрашивает подтверждение по каждому
-            кадру через выбор ниже.
+          <p className="mt-1 max-w-3xl text-sm text-stone-600">
+            Галка ставит кадр в таблицу этой серии. Снятая галка убирает его из таблицы.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" disabled={busy} onClick={previewScenario}>
-            Предпросмотр
-          </Button>
-          <Button disabled={busy} onClick={applySelected}>
-            Создать выбранные
-          </Button>
-        </div>
+        <Button type="button" variant="outline" disabled={busy} onClick={previewScenario}>
+          Предпросмотр
+        </Button>
       </div>
 
-      <Textarea
-        value={scenario}
-        onChange={(event) => setScenario(event.target.value)}
-        className="min-h-48 font-mono text-xs"
-        placeholder={`# Название серии\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.`}
-      />
-
-      {preview.shots.length ? (
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {preview.shots.map((shot) => {
+      {cards.length ? (
+        <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((shot) => {
             const checked = selected.includes(shot.id);
             return (
               <label
@@ -125,6 +181,7 @@ export function BootstrapPanel({
                 <input
                   type="checkbox"
                   checked={checked}
+                  disabled={busy}
                   onChange={() => toggleShot(shot.id)}
                   className="mt-1"
                 />
@@ -141,7 +198,42 @@ export function BootstrapPanel({
             );
           })}
         </div>
-      ) : null}
+      ) : (
+        <p className="mb-4 text-sm text-stone-500">
+          Нажми «Предпросмотр», чтобы разобрать кадры из текста ниже.
+        </p>
+      )}
+
+      <h3 className="text-sm font-medium text-stone-800">Размеченный сценарий</h3>
+      <Textarea
+        value={scenario}
+        onChange={(event) => setScenario(event.target.value)}
+        className="mt-2 min-h-48 font-mono text-xs"
+        placeholder={`# Ночная смена\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.`}
+      />
+
+      <div className="mt-6">
+        <h3 className="text-sm font-medium text-stone-800">Сырой сценарий</h3>
+        <p className="mt-1 max-w-3xl text-sm text-stone-600">
+          Текст как есть. Кнопка только записывает файл. Агент сам не стартует: после
+          неё попроси Cursor в этой папке разобрать входящие серии.
+        </p>
+        <Textarea
+          value={raw}
+          onChange={(event) => setRaw(event.target.value)}
+          className="mt-3 min-h-36 font-mono text-xs"
+          placeholder="Вставь сценарий без разметки кадров."
+        />
+        <Button type="button" className="mt-3" variant="secondary" disabled={busy} onClick={sendRawToAgent}>
+          Отправить на разметку
+        </Button>
+        {formatRequestStatus === "pending" ? (
+          <p className="mt-2 text-sm text-stone-600">
+            Разметка ждёт агента. В локальном Cursor напиши: разбери agent_inbox текущей
+            серии и отформатируй scenario_raw.md в scenario.md. Папки шотов не создавай.
+          </p>
+        ) : null}
+      </div>
 
       {message ? <p className="mt-3 text-sm text-stone-600">{message}</p> : null}
     </section>

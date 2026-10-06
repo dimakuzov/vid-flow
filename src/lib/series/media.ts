@@ -12,28 +12,46 @@ export function mediaKind(filename: string): MediaKind {
 }
 
 export function listMediaFiles(absoluteDir: string): MediaFile[] {
-  if (!fs.existsSync(absoluteDir)) return [];
-  const seriesRoot = getSeriesRoot();
-  return fs
-    .readdirSync(absoluteDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .filter((entry) => MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
-    .map((entry) => {
-      const absolute = path.join(absoluteDir, entry.name);
-      const relativePath = toPosix(path.relative(seriesRoot, absolute));
-      return {
-        name: entry.name,
-        relativePath,
-        kind: mediaKind(entry.name),
-        url: `/api/media/${relativePath}`,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+  let seriesRoot: string;
+  try {
+    seriesRoot = getSeriesRoot();
+  } catch {
+    return [];
+  }
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files: MediaFile[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (!MEDIA_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) continue;
+    const absolute = path.join(absoluteDir, entry.name);
+    let version = 0;
+    try {
+      version = Math.floor(fs.statSync(absolute).mtimeMs);
+    } catch {
+      continue;
+    }
+    const relativePath = toPosix(path.relative(seriesRoot, absolute));
+    files.push({
+      name: entry.name,
+      relativePath,
+      kind: mediaKind(entry.name),
+      url: `/api/media/${relativePath}?v=${version}`,
+    });
+  }
+  return files.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function readTextIfExists(filePath: string): string {
-  if (!fs.existsSync(filePath)) return "";
-  return fs.readFileSync(filePath, "utf8");
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return "";
+  }
 }
 
 export function writeText(filePath: string, content: string): void {

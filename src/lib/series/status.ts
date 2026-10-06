@@ -50,7 +50,6 @@ export function deriveStageStatus(
   shotId: string,
   stageId: StageId,
   expectedCharacters: string[],
-  upstreamOk: boolean,
 ): StageStatus {
   const stored = readStatusFile(shotId, stageId);
   if (stored.status === "waiting") return "waiting";
@@ -79,9 +78,6 @@ export function deriveStageStatus(
   const prompt = readTextIfExists(path.join(dir, "prompt.md")).trim();
   const workflow = readTextIfExists(path.join(dir, "workflow.md")).trim();
   if (prompt || workflow || stored.status === "prep") {
-    if (stageId === "first_frame" && !upstreamOk && stored.status !== "prep") {
-      return prompt || workflow ? "prep" : "empty";
-    }
     return "prep";
   }
 

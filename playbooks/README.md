@@ -11,12 +11,14 @@
 
 Базы identity серии (не playbooks):
 
-- `data/series/characters/{name}/` — portrait, side, full body
-- `data/series/locations/{locationId}/` — общий вид локации
+- `data/characters/{name}/` — portrait, side, full body
+- `data/locations/{locationId}/` — общий вид локации
+- `data/references/` — общие референсы сериала, не refs кадра
+- `data/scenarios/` — документы сценариев, не рабочий `scenario.md` серии
 
 Shot-этапы `characters` и `location` собирают вариант кадра из этих баз. Контракт этапа тот же: `refs/`, `output/`, `approve/` и пять документов.
 
-Сейчас заполнены правила shot-персонажа (Qwen Image Edit, гипотеза «образ + скелет + лицо»):
+Сейчас заполнены правила shot-персонажа (по умолчанию Qwen Image Edit одежды; скелет только по явной просьбе взять позу с референса; сборка проверена на teaser s07):
 
 - `stages/characters.md` — оригинал на русском, для модели `stages/characters.en.md`
 - `models/qwen_image.md` — оригинал на русском, для модели `models/qwen_image.en.md`

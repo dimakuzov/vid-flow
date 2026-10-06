@@ -4,7 +4,7 @@ JSON открывается в ComfyUI вручную. Frameboard граф не 
 
 | Файл | Этап | Статус |
 | --- | --- | --- |
-| `character_pose_outfit_qwen.json` | `characters` | Гипотеза: образ + скелет позы + лицо |
+| `character_pose_outfit_qwen.json` | `characters` | Скелет и сборка позы. Не по умолчанию: только если явно просят конкретную позу с референса. Команда: `characters_comfy.md` |
 | `location_views_multiple_angles.json` | `location` | Простой ракурс, четыре ветки, 9:16. Формат API |
 | `qwen21_character_compositing.json` | `first_frame` | Вписать персонажей в локацию. Формат API |
 

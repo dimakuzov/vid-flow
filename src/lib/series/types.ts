@@ -13,6 +13,7 @@ export interface StageSummary {
   id: StageId;
   status: StageStatus;
   outputCount: number;
+  outputNames: string[];
   approveCount: number;
   expectedApproveCount: number;
   thumbnails: MediaFile[];
@@ -27,13 +28,23 @@ export interface ShotSummary {
   stages: Record<StageId, StageSummary>;
 }
 
+export interface SeriesChoice {
+  id: string;
+  title: string;
+}
+
 export interface SeriesSummary {
   id: string;
   title: string;
   description: string;
   root: string;
+  episodeId: string | null;
+  episodeTitle: string;
+  episodes: SeriesChoice[];
   shots: ShotSummary[];
   scenarioExists: boolean;
+  hasRawScenario: boolean;
+  formatRequestStatus: "pending" | "done" | null;
 }
 
 export interface StageDetail {
@@ -48,7 +59,9 @@ export interface StageDetail {
     llmNotes: string;
     refs: string;
     workflow: string;
+    runLog: string;
   };
+  promptHistory: { id: string; savedAt: string; prompt: string }[];
   refs: MediaFile[];
   output: MediaFile[];
   approve: MediaFile[];
@@ -58,7 +71,15 @@ export interface StageDetail {
     status: "pending" | "done";
     createdAt: string;
     refsChangedByUser: boolean;
+    comfy: "wait" | "queued" | "error" | "agent" | null;
+    comfyJobId: string | null;
+    comfyError: string | null;
   } | null;
+  watch: {
+    stopped: boolean;
+    stoppedAt: string | null;
+    videoDone: boolean;
+  };
 }
 
 export interface BootstrapShotDraft {

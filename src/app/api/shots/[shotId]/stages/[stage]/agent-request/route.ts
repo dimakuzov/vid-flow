@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { STAGES, type StageId } from "@/lib/series/constants";
-import { submitAgentRequest } from "@/lib/series/agent-request";
+import { readAgentDispatch, submitAgentRequest } from "@/lib/series/agent-request";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -20,6 +20,7 @@ export async function POST(
       prompt?: string;
       refs?: string;
       workflow?: string;
+      videoWorkflow?: unknown;
     };
     const submitted = submitAgentRequest({
       shotId,
@@ -28,14 +29,15 @@ export async function POST(
       prompt: body.prompt || "",
       refsNote: body.refs || "",
       workflowNote: body.workflow || "",
+      videoWorkflow: body.videoWorkflow === "flf" ? "flf" : "i2v",
     });
-
-    const refsLine = submitted.refsChangedByUser
-      ? "Референсы менялись вручную, агент оставит их и перепишет промпт."
-      : "Референсы вручную не менялись, агент может собрать их заново вместе с промптом.";
+    const dispatch = readAgentDispatch(shotId, stage as StageId);
 
     return NextResponse.json({
-      message: `Запрос лежит в data/series/agent_inbox.md. ${refsLine}`,
+      message:
+        dispatch?.state === "agent"
+          ? "Сохранено и отдано агенту. Он сам поставит прогон в Comfy, файлы появятся в output/."
+          : "Сохранено и отдано агенту. Когда он допишет промпт, доска сама поставит прогон в Comfy.",
       refsChangedByUser: submitted.refsChangedByUser,
       stage: getStageDetail(shotId, stage as StageId),
     });

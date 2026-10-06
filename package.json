@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3456 -H 0.0.0.0",
     "lint": "eslint",
-    "bootstrap:sample": "node --import tsx scripts/bootstrap-sample.ts"
+    "bootstrap:sample": "node --import tsx scripts/bootstrap-sample.ts",
+    "comfy-queue": "node --import tsx scripts/comfy-queue.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/workflows/location_comf
 
 Graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`. It is ComfyUI API format. Drag the file into the ComfyUI window.
 
-Pass A takes `data/series/locations/{locationId}/view.png` and makes four vertical 9:16 views for one shot. Prompt text: `playbooks/models/qwen_location.en.md`.
+Pass A takes `data/locations/{locationId}/view.png` and makes four vertical 9:16 views for one shot. Prompt text: `playbooks/models/qwen_location.en.md`.
 
 Frameboard does not run the graph.
 

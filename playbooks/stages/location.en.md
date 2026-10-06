@@ -9,12 +9,12 @@ Prompts: `playbooks/models/qwen_location.en.md`. How to run the angle graph: `pl
 ## Depends on the library
 
 ```text
-data/series/locations/{locationId}/
+data/locations/{locationId}/
   view.png          # one source image for the location
   description.txt   # objects, colors, and materials that are actually on view.png
 ```
 
-`{locationId}` is the name from `scenario.md` (`night_cafe`, `street_rain`). One pass uses one `view.png`. Do not mix old variants from subfolders.
+`{locationId}` is the name from the episode `scenario.md` (`night_cafe`, `street_rain`). The shot lives in `data/episodes/{episodeId}/shots/{shotId}/location/`. One pass uses one `view.png`. Do not mix old variants from subfolders.
 
 Extra object photos (a bus stop, a lantern) stay in that folder and are copied into the shot `refs/` only when an edit uses them.
 
