@@ -65,6 +65,12 @@ for (const name of manifests) {
       if (typeof value.input === "string") {
         const input = inputs[value.input];
         assert.ok(input, `${binding.id}: слот ссылается на неизвестный вход ${value.input}`);
+        for (const step of (value.steps as { unless?: string }[] | undefined) ?? []) {
+          if (step.unless === undefined) continue;
+          // В JSON "\b" — символ backspace, а не граница слова: нужно "\\b".
+          assert.ok(!/[\u0000-\u001f]/.test(step.unless), `${binding.id}: управляющий символ в unless (нужно \\\\b, а не \\b)`);
+          assert.doesNotThrow(() => new RegExp(step.unless!, "i"), `${binding.id}: unless не регэксп`);
+        }
         for (const template of (value.templates as { when?: { input: string } }[] | undefined) ?? []) {
           if (template.when) assert.ok(inputs[template.when.input], `${binding.id}: when.input ${template.when.input}`);
         }
