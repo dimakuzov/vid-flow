@@ -158,7 +158,14 @@ async function submitJob(job: ComfyJob): Promise<void> {
     const filename = upload.filename || path.basename(source);
     await uploadComfyImage(fs.readFileSync(source), filename);
   }
-  job.promptId = await submitComfyPrompt(job.prompt);
+  if (cancelledMeanwhile(job.id)) return;
+  const promptId = await submitComfyPrompt(job.prompt);
+  // «Отменить» могли нажать, пока шёл запрос: не затираем cancelled и снимаем prompt из ComfyUI.
+  if (cancelledMeanwhile(job.id)) {
+    await cancelComfyPrompt(promptId);
+    return;
+  }
+  job.promptId = promptId;
   job.status = "running";
   job.error = undefined;
   writeJob(job);
@@ -184,12 +191,21 @@ async function finishJob(job: ComfyJob): Promise<void> {
     saved.push(name);
   }
   if (!saved.length) throw new Error("ComfyUI не вернул файлов");
+  if (cancelledMeanwhile(job.id)) return;
   job.status = "done";
   job.files = saved;
   job.error = undefined;
   writeJob(job);
   // Статус этапа отдельно не пишем: stage_state.json ссылается на это задание по id,
   // а «На проверке» выводится из файлов в output/.
+}
+
+function cancelledMeanwhile(id: string): boolean {
+  try {
+    return readComfyJob(id)?.status === "cancelled";
+  } catch {
+    return false;
+  }
 }
 
 /** Задание могли отменить, пока цикл держал его старую копию. */
@@ -241,7 +257,9 @@ export async function drainComfyQueue(): Promise<void> {
         writeJob(job);
         await submitJob(job);
       } catch (error) {
-        if (comfyOffline(error)) {
+        if (cancelledMeanwhile(job.id)) {
+          // Отменённое задание оставляем отменённым.
+        } else if (comfyOffline(error)) {
           offline = true;
           job.status = "pending";
           job.promptId = undefined;
@@ -270,7 +288,7 @@ export async function drainComfyQueue(): Promise<void> {
       try {
         await finishJob(job);
       } catch (error) {
-        if (!comfyOffline(error)) failJob(job, error);
+        if (!comfyOffline(error) && !cancelledMeanwhile(job.id)) failJob(job, error);
       } finally {
         running.delete(job.id);
         releaseJob(job.id);

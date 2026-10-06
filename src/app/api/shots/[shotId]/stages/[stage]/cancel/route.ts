@@ -3,6 +3,7 @@ import { STAGES, type StageId } from "@/lib/series/constants";
 import { cancelStage } from "@/lib/series/agent-dispatch";
 import { assertSafeSegment } from "@/lib/series/paths";
 import { getStageDetail } from "@/lib/series/scanner";
+import { readStageState } from "@/lib/series/stage-state";
 
 export const runtime = "nodejs";
 
@@ -16,9 +17,10 @@ export async function POST(
     if (!STAGES.includes(stage as StageId)) {
       return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
     }
+    const wasError = readStageState(shotId, stage as StageId).phase === "error";
     await cancelStage(shotId, stage as StageId);
     return NextResponse.json({
-      message: "Операция отменена. Этап снова свободен.",
+      message: wasError ? "Ошибка сброшена. Этап снова свободен." : "Операция отменена. Этап снова свободен.",
       stage: getStageDetail(shotId, stage as StageId),
     });
   } catch (error) {
