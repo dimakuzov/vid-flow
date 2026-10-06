@@ -2,7 +2,7 @@
 
 Сначала прочитай `docs/briefs/00-overview.md`, затем `docs/contracts/graph-binding.md`, `docs/contracts/comfy-job.md`, `docs/contracts/stage-folder.md`.
 
-Ветка `comfy-runner`, worktree `../vid-flow-comfy`, `DATA_ROOT=$TEMP/frameboard-comfy`, порт 3463, `COMFY_URL=http://127.0.0.1:9`.
+Ветка `b3-comfy-runner`, worktree `../vid-flow-comfy`, `DATA_ROOT=$TEMP/frameboard-comfy`, порт 3463, `COMFY_URL=http://127.0.0.1:9`.
 
 ## Твои файлы (правишь только их)
 

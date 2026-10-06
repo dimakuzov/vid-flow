@@ -91,10 +91,10 @@ API routes — тонкие обёртки над функцией модуля;
 ### 1. Worktree на каждый бриф
 
 ```bash
-git worktree add ../vid-flow-comfy -b comfy-runner contracts
-git worktree add ../vid-flow-playbooks -b playbooks contracts
-git worktree add ../vid-flow-agent -b agent-bridge contracts
-git worktree add ../vid-flow-ui -b ui contracts
+git worktree add ../vid-flow-comfy -b b3-comfy-runner contracts
+git worktree add ../vid-flow-playbooks -b b4-playbooks contracts
+git worktree add ../vid-flow-agent -b b5-agent-bridge contracts
+git worktree add ../vid-flow-ui -b b6-ui contracts
 ```
 
 В каждом worktree один раз: `npm install` (папка `node_modules` у worktree своя).

@@ -2,7 +2,7 @@
 
 Сначала прочитай `docs/briefs/00-overview.md`, затем `docs/contracts/agent-request.md`, `docs/contracts/stage-folder.md`, `docs/contracts/graph-binding.md` (разделы про выбор варианта).
 
-Ветка `agent-bridge`, worktree `../vid-flow-agent`, `DATA_ROOT=$TEMP/frameboard-agent`, порт 3465, `COMFY_URL=http://127.0.0.1:9`.
+Ветка `b5-agent-bridge`, worktree `../vid-flow-agent`, `DATA_ROOT=$TEMP/frameboard-agent`, порт 3465, `COMFY_URL=http://127.0.0.1:9`.
 
 ## Твои файлы (правишь только их)
 

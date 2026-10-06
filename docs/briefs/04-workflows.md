@@ -2,7 +2,7 @@
 
 Сначала прочитай `docs/briefs/00-overview.md`, затем `docs/contracts/graph-binding.md`.
 
-Ветка `playbooks`, worktree `../vid-flow-playbooks`. Код не запускаешь, ComfyUI не запускаешь (если пользователь не попросит).
+Ветка `b4-playbooks`, worktree `../vid-flow-playbooks`. Код не запускаешь, ComfyUI не запускаешь (если пользователь не попросит).
 
 ## Твои файлы (правишь только их)
 
