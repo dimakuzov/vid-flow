@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { readAgentDispatch, submitAgentRequest } from "@/lib/series/agent-request";
+import type { AgentMode } from "@/lib/contracts/agent-request";
+import { submitAgentRequest } from "@/lib/series/agent-request";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
+
+function submittedMessage(mode: AgentMode | undefined): string {
+  if (mode === "text") return "Отдано агенту. Он перепишет промпт, затем доска сама поставит прогон в Comfy.";
+  if (mode === "agent") return "Отдано агенту. Он сделает этап сам, файлы появятся в output/.";
+  return "Сохранено. Задача в llm_task.md этапа: агент в чате берёт её из agent_inbox.md и ставит done.";
+}
 
 export async function POST(request: Request, context: StageRouteContext) {
   try {
@@ -18,6 +25,8 @@ export async function POST(request: Request, context: StageRouteContext) {
       runWorkflow?: unknown;
       /** Старое имя выбора графа (i2v / flf). */
       videoWorkflow?: unknown;
+      /** manual | ollama | claude. Нет — FRAMEBOARD_AGENT_PROVIDER. */
+      provider?: unknown;
     };
     const submitted = submitAgentRequest({
       episodeId,
@@ -33,14 +42,11 @@ export async function POST(request: Request, context: StageRouteContext) {
           : typeof body.videoWorkflow === "string"
             ? body.videoWorkflow
             : undefined,
+      provider: typeof body.provider === "string" ? body.provider : undefined,
     });
-    const dispatch = readAgentDispatch(episodeId, shotId, stageId);
 
     return NextResponse.json({
-      message:
-        dispatch?.state === "agent"
-          ? "Сохранено и отдано агенту. Он сам поставит прогон в Comfy, файлы появятся в output/."
-          : "Сохранено и отдано агенту. Когда он допишет промпт, доска сама поставит прогон в Comfy.",
+      message: submittedMessage(submitted.mode),
       refsChangedByUser: submitted.refsChangedByUser,
       stage: getStageDetail(episodeId, shotId, stageId),
     });
