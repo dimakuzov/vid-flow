@@ -57,7 +57,7 @@ No more than two characters per pass, or the surroundings drift.
 2. Make the shot outfit in a separate Qwen Image 2.1 edit. The pose graph does not change clothes. Do not change the pose on that pass.
 3. If the base lower garment still shows under the new clothes, replace it in a second edit. Write what is worn. Do not write “no trousers”.
 4. If the feet are missing because the frame is cropped, extend the same figure downward.
-5. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `status.json` to `done` only when every character in the shot has that file.
+5. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `"status": "done"` in `agent_request.json` only when every character in the shot has that file. Do not write `status.json`: the board sets the stage status.
 6. Run the skeleton and `playbooks/workflows/comfy/character_pose_outfit_qwen.json` only when the user explicitly asks for a specific pose from a reference. Otherwise skip these steps. Then image 1 is one outfit figure, image 2 is the skeleton, image 3 is the face, and the skeleton must show both arms, both hands, both legs, and both feet.
 
 Prompt and parameters: `playbooks/models/qwen_image.en.md`. How to run the graph: `playbooks/workflows/characters_comfy.en.md`.
@@ -106,4 +106,4 @@ Prompt templates are in the model playbook. The assembly text does not name clot
 
 ## Where to write the test result
 
-Write the run result in `run_log.md`. Leave `llm_notes.md` as the user's recommendation for the current prompt. Do not roll back settings that are already locked because a new shot is different.
+Write the run result in `run_log.md`. Do not touch `llm_notes.md`: the board clears it when the request is sent. Do not roll back settings that are already locked because a new shot is different.

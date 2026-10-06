@@ -89,7 +89,7 @@ image 1 = `refs/{name}_outfit.png`. image 2 = `refs/{name}_pose.png`. image 3 = 
 
 Если в ответе `node_errors`, записать имя ноды и текст. Недостающее поле закрыть дефолтом этой ноды. Steps, cfg, sampler и LoRA не менять.
 
-`status.json` этапа ставить в `done`, когда approve есть у каждого персонажа кадра. Итог прогона дописать в `run_log.md`. `llm_notes.md` — только рекомендация пользователя, её журналом не затирать. Перед заменой `prompt.md` предыдущий текст остаётся в `prompt_history.json`.
+`"status": "done"` в `agent_request.json` ставить, когда approve есть у каждого персонажа кадра. `status.json` не трогать: статус этапа ставит доска. Итог прогона дописать в `run_log.md`. `llm_notes.md` не трогать. Перед заменой `prompt.md` предыдущий текст остаётся в `prompt_history.json`.
 
 ## Если что-то не так
 

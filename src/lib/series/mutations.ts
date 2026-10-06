@@ -6,6 +6,12 @@ import { assertSafeSegment, ensureStageDirs, shotDir, shotsDir, stageDir } from 
 import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
+import { readStageState, setIdle } from "./stage-state";
+
+/** Ручное действие пользователя снимает показ прошлой ошибки. Идущую операцию не трогает. */
+function clearStageError(shotId: string, stageId: StageId): void {
+  if (readStageState(shotId, stageId).phase === "error") setIdle(shotId, stageId);
+}
 
 function nameInStem(stem: string, token: string): boolean {
   if (stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`)) return true;
@@ -107,6 +113,7 @@ export async function saveUpload(options: {
 
   if (options.target === "output") {
     writeStatusFile(shotId, options.stageId, { status: "review" });
+    clearStageError(shotId, options.stageId);
   }
 
   return { savedAs };
@@ -175,6 +182,7 @@ export function approveFiles(options: {
   }
 
   writeStatusFile(shotId, options.stageId, { status: "approved" });
+  clearStageError(shotId, options.stageId);
   return [...new Set(saved)];
 }
 
@@ -211,12 +219,6 @@ export function removeApprovedFile(shotId: string, stageId: StageId, filename: s
     writeStatusFile(safeShot, stageId, { status: output.length ? "review" : "prep" });
   }
   return safeName;
-}
-
-export function setWaiting(shotId: string, stageId: StageId): void {
-  writeStatusFile(assertSafeSegment(shotId, "shot"), stageId, {
-    status: "waiting",
-  });
 }
 
 export function updateStageDocs(options: {

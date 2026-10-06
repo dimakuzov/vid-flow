@@ -5,6 +5,7 @@ import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { updateStageDocs } from "./mutations";
 import { readShotMeta } from "./shot-meta";
+import { assertStageFree, writeStageState } from "./stage-state";
 import {
   agentInboxRelative,
   assertSafeSegment,
@@ -20,7 +21,7 @@ const REQUEST_MD = "agent_request.md";
 const LLM_TASK = "llm_task.md";
 const DISPATCH_FILE = "agent_dispatch.json";
 
-export type AgentComfyState = "wait" | "queued" | "error" | "agent";
+export type AgentComfyState = "wait" | "queued" | "error" | "agent" | "cancelled";
 export type AgentVideoWorkflow = "i2v" | "flf";
 
 export interface AgentDispatch {
@@ -51,7 +52,7 @@ export interface AgentRequestFile {
   shotId: string;
   stageId: StageId;
   createdAt: string;
-  status: "pending" | "done";
+  status: "pending" | "done" | "cancelled";
   message: string;
   refsChangedByUser: boolean;
   changes: {
@@ -71,7 +72,7 @@ export interface AgentRequestFile {
 }
 
 export interface AgentRequestSummary {
-  status: "pending" | "done";
+  status: "pending" | "done" | "cancelled";
   createdAt: string;
   refsChangedByUser: boolean;
   comfy: AgentComfyState | null;
@@ -139,8 +140,8 @@ function renderRequestMarkdown(request: AgentRequestFile, boardQueues: boolean):
     ? "refsChangedByUser is true. Leave every file in refs/ as it is. Rewrite prompt.md only."
     : "refsChangedByUser is false. Rewrite prompt.md. Rebuild reference images only if the user message means the current references are wrong.";
   const finish = boardQueues
-    ? "The board queues Comfy after this file is done. Rewrite prompt.md from the user message, then clear llm_notes.md. Do not queue Comfy. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json."
-    : "Run the stage playbook, including its Comfy pass. Do not delete or edit agent_dispatch.json. The last write is `\"status\": \"done\"` in this json.";
+    ? "The board queues Comfy after this file is done. Rewrite prompt.md from the user message. prompt.md is the exact text that goes to the model. Do not queue Comfy. Do not edit llm_notes.md, status.json, stage_state.json or agent_dispatch.json: the board owns them. The last write is `\"status\": \"done\"` in this json."
+    : "Run the stage playbook, including its Comfy pass. Do not edit llm_notes.md, status.json, stage_state.json or agent_dispatch.json: the board owns them. The last write is `\"status\": \"done\"` in this json.";
 
   return `# Agent request
 
@@ -369,20 +370,20 @@ function renderLlmTask(request: AgentRequestFile, boardQueues: boolean): string 
 
 Прогон, не останавливаясь на тексте prompt.md: прочитай уже лежащий на диске файл \`playbooks/workflows/characters_comfy.md\`, раздел «Команда». Git pull для этого файла не делай. JSON графа не редактируй. \`update_comfyui.bat\` не запускай. Один персонаж за проход. Старые файлы в output/ и approve/ не удаляй. Скелет и граф character_pose_outfit_qwen.json не запускай, пока в сообщении пользователя нет явной просьбы взять конкретную позу с референса. Описание действия кадра такой просьбой не считается.
 
-Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь этап \`status.json\` в done и \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь. \`agent_dispatch.json\` не удаляй и не правь. Доска этот этап в Comfy не ставит.
+Готово, когда у каждого персонажа из списка есть \`approve/{имя}_${request.shotId}.png\` и одежда на картинке совпадает с сообщением. Тогда поставь \`"status": "done"\` в \`${REQUEST_JSON}\`. Раньше done не ставь. \`status.json\`, \`stage_state.json\`, \`llm_notes.md\` и \`agent_dispatch.json\` не трогай: их ведёт доска. Доска этот этап в Comfy не ставит.
 `
       : boardQueues
         ? `
 ## Что сделать
 
-Перепиши \`prompt.md\` по сообщению пользователя. Предыдущий промпт оставь в истории, если доска сама этого не сделала. Затем очисти \`llm_notes.md\`: рекомендация уже вошла в промпт. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь. В Comfy ничего не ставь.
+Перепиши \`prompt.md\` по сообщению пользователя. \`prompt.md\` — ровно тот текст, который уйдёт в модель. Историю промпта ведёт доска. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`llm_notes.md\`, \`status.json\`, \`stage_state.json\` и \`agent_dispatch.json\` не трогай: их ведёт доска. В Comfy ничего не ставь.
 
 Последней записью поставь \`"status": "done"\` в \`${REQUEST_JSON}\`. После этого доска сама отправит этап в Comfy.
 `
         : `
 ## Что сделать
 
-Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`agent_dispatch.json\` не удаляй и не правь.
+Прочитай \`agent_request.md\` в этой же папке и плейбук этапа в \`playbooks/\`. Сообщение пользователя выше — это задание. Другие кадры не открывай. \`output/\` и \`approve/\` не удаляй. \`data/\` не коммить. \`llm_notes.md\`, \`status.json\`, \`stage_state.json\` и \`agent_dispatch.json\` не трогай: их ведёт доска. Когда закончишь, поставь \`"status": "done"\` в \`${REQUEST_JSON}\`.
 `;
 
   return `# Задача для LLM
@@ -483,6 +484,7 @@ export function submitAgentRequest(options: {
   videoWorkflow?: AgentVideoWorkflow;
 }): AgentRequestFile {
   const shotId = assertSafeSegment(options.shotId, "shot");
+  assertStageFree(shotId, options.stageId);
   const typed = options.message.trim();
   const message = typed || "Сгенерируй по текущим документам этапа.";
 
@@ -494,7 +496,9 @@ export function submitAgentRequest(options: {
     shotId,
     stageId: options.stageId,
     prompt: options.prompt,
-    llmNotes: options.message,
+    // Рекомендация уходит в agent_request.json. Поле ввода очищается сразу,
+    // чтобы старая правка не попала ни агенту, ни в модель повторно.
+    llmNotes: "",
     refs: options.refsNote,
     workflow: options.workflowNote,
   });
@@ -546,6 +550,33 @@ export function submitAgentRequest(options: {
     videoWorkflow: options.videoWorkflow === "flf" ? "flf" : "i2v",
     updatedAt: request.createdAt,
   });
+  writeStageState(shotId, options.stageId, {
+    phase: "agent",
+    requestId: request.id,
+    agentRunsComfy: !boardQueues,
+    since: request.createdAt,
+  });
   rebuildAgentInbox();
   return request;
+}
+
+/** Отмечает запрос отменённым. Фазу этапа меняет вызывающий код. */
+export function cancelAgentRequest(shotId: string, stageId: StageId): boolean {
+  const request = readAgentRequest(shotId, stageId);
+  if (!request || request.status !== "pending") return false;
+  const dir = stageDir(shotId, stageId);
+  writeText(
+    path.join(dir, REQUEST_JSON),
+    JSON.stringify({ ...request, status: "cancelled" }, null, 2) + "\n",
+  );
+  const dispatch = readAgentDispatch(shotId, stageId);
+  if (dispatch && dispatch.requestId === request.id) {
+    writeAgentDispatch(shotId, stageId, {
+      ...dispatch,
+      state: "cancelled",
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  rebuildAgentInbox();
+  return true;
 }

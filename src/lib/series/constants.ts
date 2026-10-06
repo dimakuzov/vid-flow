@@ -24,17 +24,27 @@ export const STAGE_DOCS = [
   "status.json",
 ] as const;
 
+/**
+ * Статус клетки. empty/prep/review/approved выводятся из папок этапа,
+ * agent/queued/running/error — из stage_state.json (активная операция перекрывает папки).
+ */
 export type StageStatus =
   | "empty"
   | "prep"
-  | "waiting"
+  | "agent"
+  | "queued"
+  | "running"
+  | "error"
   | "review"
   | "approved";
 
 export const STATUS_LABELS: Record<StageStatus, string> = {
   empty: "Пусто",
   prep: "Подготовка",
-  waiting: "Ожидание",
+  agent: "Агент обрабатывает",
+  queued: "Ожидает очереди",
+  running: "Генерация в ComfyUI",
+  error: "Ошибка",
   review: "На проверке",
   approved: "Утверждено",
 };

@@ -25,7 +25,8 @@ Create shot folders only when the user asks, from an already formatted `scenario
 Before other stage work, read `data/episodes/{episodeId}/agent_inbox.md`. Each pending stage item points at `shots/{shotId}/{stage}/agent_request.md`.
 
 - Rewrite that stage's `prompt.md` from the user message. The previous prompt is kept by the board in `prompt_history.json` when the file changes.
-- Do not append the run log to `llm_notes.md`. That file is only the user's next recommendation. Append the run note to `run_log.md`.
+- The user message is in `agent_request.md` / `llm_task.md`. `prompt.md` is the exact text that goes to the model.
+- Do not touch `llm_notes.md`, `status.json`, `stage_state.json` or `agent_dispatch.json`. The board owns them: it clears the recommendation field when the request is sent and sets every stage status itself. Append a run note to `run_log.md` only if you ran a generation.
 - Rebuild refs only when `refsChangedByUser` is false and the message means the references are wrong. When it is true, leave `refs/` untouched.
 - Then write `agent_baseline.json` (`capturedAt`, `prompt`, `refsNote`, `workflowNote`, `refs` with `name`, `sha256`, `bytes`), set `agent_touch.json` to `{ "refsTouchedByUser": false }`, and set `"status": "done"` in `agent_request.json`.
 
@@ -35,7 +36,7 @@ While this chat is open, check the current episode every 20 seconds.
 
 - Read `data/current_episode.txt`, then `data/episodes/{episodeId}/agent_inbox.md`.
 - Skip a shot when `shots/{shotId}/agent_watch.json` has `"stopped": true`, or when `shots/{shotId}/final_render/approve/` already has a file.
-- If a stage request is `pending` and the shot is still open, accept it: rewrite that stage's `prompt.md` from the recommendation, leave the previous prompt in `prompt_history.json`, clear `llm_notes.md`, append the note to `run_log.md` only if a generation was run, then set the request to `done`.
+- If a stage request is `pending` and the shot is still open, accept it: rewrite that stage's `prompt.md` from the message in `agent_request.md`, append the note to `run_log.md` only if a generation was run, then set the request to `done`. A request with `cancelled` is skipped.
 - If every shot is stopped or has a finished video, stop checking.
 - Do not commit `data/`.
 
@@ -47,7 +48,7 @@ A shot with no specific characters and no specific location is made directly in 
 
 If the inbox item is `characters`, the paperwork above is not the result. Run ComfyUI with the command in `playbooks/workflows/characters_comfy.md` (English: `playbooks/workflows/characters_comfy.en.md`). Claude follows the same section.
 
-ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The default pass is the outfit edit only. Do not extract a skeleton and do not run `character_pose_outfit_qwen.json` unless the user message explicitly asks to take a specific pose from a reference. A description of the shot action is not that request. Set the stage `status.json` to `done` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message.
+ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The default pass is the outfit edit only. Do not extract a skeleton and do not run `character_pose_outfit_qwen.json` unless the user message explicitly asks to take a specific pose from a reference. A description of the shot action is not that request. Set `"status": "done"` in `agent_request.json` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message. Do not write `status.json`.
 
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation

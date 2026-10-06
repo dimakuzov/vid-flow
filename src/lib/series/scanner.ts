@@ -29,6 +29,7 @@ import {
   readStatusFile,
 } from "./status";
 import { readAgentRequestSummary } from "./agent-request";
+import { readStageState } from "./stage-state";
 import type { SeriesChoice, SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
 
 function parseSeriesMarkdown(content: string): { title: string; description: string } {
@@ -53,6 +54,7 @@ function stageThumbnails(shotId: string, stageId: StageId) {
 
 function buildStageSummary(shotId: string, stageId: StageId, characters: string[]): StageSummary {
   const status = deriveStageStatus(shotId, stageId, characters);
+  const state = readStageState(shotId, stageId);
   const output = listMediaFiles(path.join(stageDir(shotId, stageId), "output"));
   const approve = listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
   return {
@@ -64,6 +66,9 @@ function buildStageSummary(shotId: string, stageId: StageId, characters: string[
     expectedApproveCount: expectedApproveCount(stageId, characters),
     thumbnails: stageThumbnails(shotId, stageId),
     canAutoReady: true,
+    busy: state.busy,
+    phaseSince: state.phase === "idle" ? null : state.since,
+    phaseError: state.error,
   };
 }
 
@@ -233,6 +238,7 @@ export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
     approve: listMediaFiles(path.join(dir, "approve")),
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(getSeriesRoot(), dir)),
+    state: readStageState(shotId, stageId),
     agentRequest: readAgentRequestSummary(shotId, stageId),
     watch: readShotWatch(shotId),
   };

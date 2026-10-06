@@ -3,9 +3,14 @@ import path from "path";
 import type { StageId, StageStatus } from "./constants";
 import { listMediaFiles, readTextIfExists } from "./media";
 import { stageDir } from "./paths";
+import { readStageState } from "./stage-state";
 
+/**
+ * status.json хранит ожидаемых персонажей и заметку. Поле `status` в нём только
+ * информационное (последнее, что записала доска); статус клетки считает deriveStageStatus.
+ */
 export interface StatusFile {
-  status?: StageStatus;
+  status?: StageStatus | "done" | "waiting";
   expectedCharacters?: string[];
   updatedAt?: string;
   notes?: string;
@@ -51,8 +56,10 @@ export function deriveStageStatus(
   stageId: StageId,
   expectedCharacters: string[],
 ): StageStatus {
+  const state = readStageState(shotId, stageId);
+  if (state.phase !== "idle") return state.phase;
+
   const stored = readStatusFile(shotId, stageId);
-  if (stored.status === "waiting") return "waiting";
 
   const dir = stageDir(shotId, stageId);
   const approve = listMediaFiles(path.join(dir, "approve"));

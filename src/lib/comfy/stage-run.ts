@@ -10,7 +10,7 @@ import {
   toPosix,
 } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
-import { readStatusFile, writeStatusFile } from "../series/status";
+import { assertStageFree, readStageStateFile, writeStageState } from "../series/stage-state";
 import { enqueueComfyJob, startComfyQueue, type ComfyJob } from "./queue";
 
 type ApiNode = { class_type: string; inputs: Record<string, unknown> };
@@ -84,15 +84,17 @@ function locationImage(shotId: string, locationId: string): string {
 function queueLocation(shotId: string): ComfyJob {
   const meta = readShotMeta(shotId);
   const stagePath = stageDir(shotId, "location");
+  // В модель идёт только prompt.md. llm_notes.md — поле ввода рекомендации для агента.
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
-  const notes = readTextIfExists(path.join(stagePath, "llm_notes.md"));
-  if (refusesAngleGraph(`${promptMd}\n${notes}`)) {
+  if (refusesAngleGraph(promptMd)) {
     throw new Error(
       "В тексте кадра сказано не использовать граф ракурсов. Отдельного графа правки в playbooks нет, в очередь его не ставлю.",
     );
   }
-  const text = generationText(promptMd, notes, meta.characters);
-  if (!text) throw new Error("Нет текста для генерации. Напиши рекомендацию или prompt.md.");
+  const text = generationText(promptMd, "", meta.characters);
+  if (!text) {
+    throw new Error("В prompt.md нет текста для генерации. Отправь рекомендацию агенту или впиши промпт сам.");
+  }
   const spoken = /no people/i.test(text) ? text : `${text}\nSame place, no people.`;
   const image = locationImage(shotId, meta.location);
   const filename = path.basename(image);
@@ -134,9 +136,8 @@ function firstFramePrompt(notes: string, characterCount: number): string {
 function queueFirstFrame(shotId: string): ComfyJob {
   const meta = readShotMeta(shotId);
   const stagePath = stageDir(shotId, "first_frame");
-  const notes = readTextIfExists(path.join(stagePath, "llm_notes.md"));
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
-  const extra = notes.trim() || generationText(promptMd, "", meta.characters) || "";
+  const extra = generationText(promptMd, "", meta.characters) || "";
   const locationDir = stageDir(shotId, "location");
   const locationImageFile = newestImage(path.join(locationDir, "approve"));
   if (!locationImageFile) throw new Error("Нет утверждённой локации для первого кадра.");
@@ -207,9 +208,10 @@ function queueVideo(
   const meta = readShotMeta(shotId);
   const stagePath = stageDir(shotId, stageId);
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
-  const notes = readTextIfExists(path.join(stagePath, "llm_notes.md"));
-  const spoken = generationText(promptMd, notes, meta.characters);
-  if (!spoken) throw new Error("Нет текста движения. Напиши рекомендацию или действие в prompt.md.");
+  const spoken = generationText(promptMd, "", meta.characters);
+  if (!spoken) {
+    throw new Error("В prompt.md нет текста движения. Отправь рекомендацию агенту или впиши промпт сам.");
+  }
   const start = newestImage(path.join(stageDir(shotId, "first_frame"), "approve"));
   if (!start) throw new Error("Нет утверждённого первого кадра.");
   const prompt = loadApiGraph(
@@ -229,7 +231,7 @@ function queueVideo(
   const text = videoPrompt(spoken, meta.characters);
   prompt["129:93"].inputs.text = text;
   prompt["129:86"].inputs.noise_seed = newSeed();
-  const seconds = secondsInText(`${notes}\n${promptMd}`);
+  const seconds = secondsInText(promptMd);
   if (seconds != null) prompt["129:161"].inputs.value = seconds;
   const folder = stageId === "final_render" ? "final" : "video";
   prompt["108"].inputs.filename_prefix = `frameboard/${folder}/${shotId}_${workflow}`;
@@ -245,9 +247,11 @@ function queueVideo(
 export function queueStageRun(
   shotId: string,
   stageId: StageId,
-  options?: { videoWorkflow?: VideoWorkflow },
+  options?: { videoWorkflow?: VideoWorkflow; fromAgent?: boolean },
 ): { id: string; message: string } {
   getSeriesRoot();
+  // Ручной запуск закрыт, пока идёт операция. Из цикла после ответа агента — разрешён.
+  if (!options?.fromAgent) assertStageFree(shotId, stageId);
   let job: ComfyJob;
   if (stageId === "location") job = queueLocation(shotId);
   else if (stageId === "first_frame") job = queueFirstFrame(shotId);
@@ -258,9 +262,12 @@ export function queueStageRun(
       "Граф одежды в API-формате не лежит в playbooks, поэтому доска не ставит его в Comfy. Прогон одежды делает агент по playbooks/workflows/characters_comfy.md. Граф позы отсюда не запускаю.",
     );
   }
-  if (readStatusFile(shotId, stageId).status === "waiting") {
-    writeStatusFile(shotId, stageId, { status: "prep" });
-  }
+  const previous = readStageStateFile(shotId, stageId);
+  writeStageState(shotId, stageId, {
+    phase: "comfy",
+    jobId: job.id,
+    requestId: options?.fromAgent ? previous?.requestId : undefined,
+  });
   startComfyQueue();
   return {
     id: job.id,

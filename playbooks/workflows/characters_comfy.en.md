@@ -75,7 +75,7 @@ The assembly prompt does not describe clothing or appearance. Template: `playboo
 
 Queue only at `http://127.0.0.1:8188/`: `POST /upload/image`, `POST /prompt`, `GET /history/{prompt_id}`, `GET /view`. If this shell cannot open that address, write `data/comfy_queue/<id>.json` with `status: pending`, an API-format `prompt`, `uploads`, and `saveTo` inside `data/`. The board process on the ComfyUI machine submits it and writes `status`, `files`, and `error` back into that file. Wait until `done` or `error`. If the response has `node_errors`, record the node name and the text. Fill a missing field with that node's default. Do not change steps, cfg, sampler, or LoRA.
 
-Set the stage `status.json` to `done` only when every character in the shot has an approve file. Append the run note to `run_log.md`. `llm_notes.md` is only the user's recommendation. Do not overwrite it with the log. The previous `prompt.md` stays in `prompt_history.json` when the prompt is replaced.
+Set `"status": "done"` in `agent_request.json` only when every character in the shot has an approve file. Do not write `status.json`: the board sets the stage status. Append the run note to `run_log.md`. Do not touch `llm_notes.md`. The previous `prompt.md` stays in `prompt_history.json` when the prompt is replaced.
 
 ## If something is wrong
 

@@ -52,6 +52,22 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
     }
   }
 
+  async function cancelAction() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось отменить");
+      setMessage(data.message || "Отменено");
+      onChanged();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onFileSelected(file: File | null) {
     if (!file) return;
     setBusy(true);
@@ -125,7 +141,11 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group flex h-full min-h-28 w-full flex-col gap-2 rounded-xl border border-stone-300/70 bg-white/70 p-3 text-left transition hover:border-teal-600/40 hover:bg-white"
+        className={`group flex h-full min-h-28 w-full flex-col gap-2 rounded-xl border p-3 text-left transition ${
+          stage.busy
+            ? "border-sky-400/60 bg-sky-50/70"
+            : "border-stone-300/70 bg-white/70 hover:border-teal-600/40 hover:bg-white"
+        }`}
       >
         <div className="flex items-center justify-between gap-2">
           <StatusPill status={stage.status} />
@@ -133,6 +153,13 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
             {stage.approveCount}/{stage.expectedApproveCount}
           </span>
         </div>
+
+        {stage.busy && stage.phaseSince ? (
+          <p className="text-[11px] text-sky-900" suppressHydrationWarning>с {formatSince(stage.phaseSince)}</p>
+        ) : null}
+        {stage.status === "error" && stage.phaseError ? (
+          <p className="line-clamp-3 text-[11px] leading-snug text-red-800">{stage.phaseError}</p>
+        ) : null}
 
         {stage.thumbnails.length > 0 ? (
           <div className="flex items-center gap-2">
@@ -225,9 +252,25 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
                 </select>
               </label>
             ) : null}
-            <Button disabled={busy} onClick={runAction}>
-              Запустить
-            </Button>
+            {stage.busy ? (
+              <>
+                <p className="text-sm text-sky-900">
+                  {STATUS_LABELS[stage.status]}. Запуск и отправка агенту закрыты до конца операции.
+                </p>
+                <Button variant="destructive" disabled={busy} onClick={cancelAction}>
+                  Отменить
+                </Button>
+              </>
+            ) : (
+              <Button disabled={busy} onClick={runAction}>
+                Запустить
+              </Button>
+            )}
+            {stage.status === "error" ? (
+              <Button variant="outline" disabled={busy} onClick={cancelAction}>
+                Сбросить ошибку
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               disabled={busy}
@@ -252,4 +295,10 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
       </Dialog>
     </>
   );
+}
+
+function formatSince(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 }

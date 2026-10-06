@@ -1,4 +1,5 @@
 import type { StageId, StageStatus } from "./constants";
+import type { StageState } from "./stage-state";
 
 export type MediaKind = "image" | "video" | "other";
 
@@ -18,6 +19,10 @@ export interface StageSummary {
   expectedApproveCount: number;
   thumbnails: MediaFile[];
   canAutoReady: boolean;
+  /** Идёт операция (агент или ComfyUI): запуск и отправка агенту закрыты. */
+  busy: boolean;
+  phaseSince: string | null;
+  phaseError: string | null;
 }
 
 export interface ShotSummary {
@@ -67,11 +72,12 @@ export interface StageDetail {
   approve: MediaFile[];
   playbooks: string[];
   relativeDir: string;
+  state: StageState;
   agentRequest: {
-    status: "pending" | "done";
+    status: "pending" | "done" | "cancelled";
     createdAt: string;
     refsChangedByUser: boolean;
-    comfy: "wait" | "queued" | "error" | "agent" | null;
+    comfy: "wait" | "queued" | "error" | "agent" | "cancelled" | null;
     comfyJobId: string | null;
     comfyError: string | null;
   } | null;

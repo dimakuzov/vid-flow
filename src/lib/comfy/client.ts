@@ -70,6 +70,34 @@ export async function waitComfyHistory(promptId: string, timeoutMs = 15 * 60 * 1
   throw new Error(`история ${promptId} не пришла`);
 }
 
+/**
+ * Снимает prompt из очереди ComfyUI. Если он уже выполняется — прерывает именно его.
+ * Ошибки сети игнорирует: отмена на доске важнее, чем ответ ComfyUI.
+ */
+export async function cancelComfyPrompt(promptId: string): Promise<void> {
+  try {
+    const res = await fetch(`${comfyBase()}/queue`);
+    if (res.ok) {
+      const data = (await res.json()) as { queue_running?: unknown[][] };
+      const running = (data.queue_running || []).some((item) => item?.[1] === promptId);
+      if (running) {
+        await fetch(`${comfyBase()}/interrupt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt_id: promptId }),
+        });
+      }
+    }
+    await fetch(`${comfyBase()}/queue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ delete: [promptId] }),
+    });
+  } catch {
+    // ComfyUI недоступен: задание на доске всё равно помечается отменённым.
+  }
+}
+
 export function listHistoryImages(history: ComfyHistory): ComfyImageRef[] {
   const files: ComfyImageRef[] = [];
   for (const output of Object.values(history.outputs || {})) {

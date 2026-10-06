@@ -1,19 +1,18 @@
 import fs from "fs";
 import path from "path";
 import {
+  cancelComfyPrompt,
   downloadComfyImage,
   listHistoryImages,
   readComfyHistory,
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
-import type { StageId } from "../series/constants";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
-import { readStatusFile, writeStatusFile } from "../series/status";
 
 export interface ComfyJob {
   id: string;
-  status: "pending" | "running" | "done" | "error";
+  status: "pending" | "running" | "done" | "error" | "cancelled";
   prompt: Record<string, { class_type: string; inputs: Record<string, unknown> }>;
   uploads?: { path: string; filename?: string }[];
   saveTo: string;
@@ -189,27 +188,27 @@ async function finishJob(job: ComfyJob): Promise<void> {
   job.files = saved;
   job.error = undefined;
   writeJob(job);
-  markStageReview(job.saveTo);
+  // Статус этапа отдельно не пишем: stage_state.json ссылается на это задание по id,
+  // а «На проверке» выводится из файлов в output/.
 }
 
-function markStageReview(saveTo: string): void {
-  const match = saveTo
-    .replace(/\\/g, "/")
-    .match(/shots\/(s\d+)\/(characters|location|first_frame|video_preview|final_render)\/output\/?$/i);
-  if (!match) return;
-  const shotId = match[1].toLowerCase();
-  const stageId = match[2].toLowerCase() as StageId;
+/** Задание могли отменить, пока цикл держал его старую копию. */
+function stillSame(job: ComfyJob): boolean {
   try {
-    const stored = readStatusFile(shotId, stageId);
-    if (stored.status === "approved") return;
-    writeStatusFile(shotId, stageId, {
-      status: "review",
-      expectedCharacters: stored.expectedCharacters,
-      notes: stored.notes,
-    });
+    const fresh = readComfyJob(job.id);
+    return !!fresh && fresh.status === job.status;
   } catch {
-    // The pictures are already in output/. The table reads that folder on its own.
+    return false;
   }
+}
+
+export async function cancelComfyJob(id: string): Promise<void> {
+  const job = readComfyJob(id);
+  if (!job || job.status === "done" || job.status === "error" || job.status === "cancelled") return;
+  if (job.promptId) await cancelComfyPrompt(job.promptId);
+  job.status = "cancelled";
+  job.error = undefined;
+  writeJob(job);
 }
 
 function failJob(job: ComfyJob, error: unknown): void {
@@ -231,6 +230,10 @@ export async function drainComfyQueue(): Promise<void> {
     for (const job of jobs) {
       const needsSubmit = job.status === "pending" || (job.status === "running" && !job.promptId);
       if (!needsSubmit || offline || running.has(job.id) || !claimJob(job.id)) continue;
+      if (!stillSame(job)) {
+        releaseJob(job.id);
+        continue;
+      }
       running.add(job.id);
       job.status = "running";
       job.error = undefined;
@@ -259,6 +262,10 @@ export async function drainComfyQueue(): Promise<void> {
 
     for (const job of jobs) {
       if (job.status !== "running" || !job.promptId || running.has(job.id) || !claimJob(job.id)) continue;
+      if (!stillSame(job)) {
+        releaseJob(job.id);
+        continue;
+      }
       running.add(job.id);
       try {
         await finishJob(job);
