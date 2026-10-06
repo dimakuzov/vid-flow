@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queueStageRun, type VideoWorkflow } from "@/lib/comfy/stage-run";
-import { STAGES, type StageId } from "@/lib/series/constants";
+import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -9,17 +9,11 @@ function videoWorkflow(value: unknown): VideoWorkflow {
   return value === "flf" ? "flf" : "i2v";
 }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ shotId: string; stage: string }> },
-) {
+export async function POST(request: Request, context: StageRouteContext) {
   try {
-    const { shotId, stage } = await context.params;
-    if (!STAGES.includes(stage as StageId)) {
-      return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
-    }
+    const { episodeId, shotId, stageId } = parseStageParams(await context.params);
     let workflow: VideoWorkflow = "i2v";
-    if (stage === "video_preview" || stage === "final_render") {
+    if (stageId === "video_preview" || stageId === "final_render") {
       try {
         const body = (await request.json()) as { workflow?: unknown };
         workflow = videoWorkflow(body.workflow);
@@ -28,11 +22,11 @@ export async function POST(
       }
     }
 
-    const queued = queueStageRun(shotId, stage as StageId, { videoWorkflow: workflow });
+    const queued = queueStageRun(episodeId, shotId, stageId, { videoWorkflow: workflow });
     return NextResponse.json({
       message: queued.message,
       jobId: queued.id,
-      stage: getStageDetail(shotId, stage as StageId),
+      stage: getStageDetail(episodeId, shotId, stageId),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ошибка запуска";

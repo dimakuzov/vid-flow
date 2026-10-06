@@ -13,6 +13,10 @@ import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/path
 export interface ComfyJob {
   id: string;
   status: "pending" | "running" | "done" | "error" | "cancelled";
+  /** Чей это прогон. Пишет постановщик (stage-run); очередь только хранит. Ручные задания могут их не иметь. */
+  episodeId?: string;
+  shotId?: string;
+  stageId?: string;
   prompt: Record<string, { class_type: string; inputs: Record<string, unknown> }>;
   uploads?: { path: string; filename?: string }[];
   saveTo: string;

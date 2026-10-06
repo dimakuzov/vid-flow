@@ -209,6 +209,7 @@ export function SeriesBoard({
                     {STAGES.map((stageId) => (
                       <td key={stageId} className="align-top">
                         <StageCell
+                          episodeId={series.episodeId ?? ""}
                           shotId={shot.id}
                           stageId={stageId}
                           stage={shot.stages[stageId]}

@@ -11,12 +11,12 @@ export interface ShotWatch {
   videoDone: boolean;
 }
 
-function watchPath(shotId: string): string {
-  return path.join(shotDir(assertSafeSegment(shotId, "shot")), WATCH_FILE);
+function watchPath(episodeId: string, shotId: string): string {
+  return path.join(shotDir(episodeId, assertSafeSegment(shotId, "shot")), WATCH_FILE);
 }
 
-export function readShotWatch(shotId: string): ShotWatch {
-  const file = watchPath(shotId);
+export function readShotWatch(episodeId: string, shotId: string): ShotWatch {
+  const file = watchPath(episodeId, shotId);
   let stopped = false;
   let stoppedAt: string | null = null;
   if (fs.existsSync(file)) {
@@ -31,16 +31,20 @@ export function readShotWatch(shotId: string): ShotWatch {
       stopped = false;
     }
   }
-  const approve = listMediaFiles(path.join(stageDir(shotId, "final_render"), "approve"));
+  const approve = listMediaFiles(path.join(stageDir(episodeId, shotId, "final_render"), "approve"));
   return { stopped, stoppedAt, videoDone: approve.length > 0 };
 }
 
-export function setShotWatchStopped(shotId: string, stopped: boolean): ShotWatch {
-  const file = watchPath(shotId);
+export function setShotWatchStopped(
+  episodeId: string,
+  shotId: string,
+  stopped: boolean,
+): ShotWatch {
+  const file = watchPath(episodeId, shotId);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const payload = stopped
     ? { stopped: true, stoppedAt: new Date().toISOString() }
     : { stopped: false, stoppedAt: null };
   fs.writeFileSync(file, JSON.stringify(payload, null, 2) + "\n", "utf8");
-  return readShotWatch(shotId);
+  return readShotWatch(episodeId, shotId);
 }

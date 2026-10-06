@@ -256,6 +256,8 @@ export function StageWorkspace({
   initialDetail: StageDetail;
 }) {
   const [detail, setDetail] = useState<StageDetail>(initialDetail);
+  const shotApi = `/api/episodes/${initialDetail.episodeId}/shots/${shotId}`;
+  const stageApi = `${shotApi}/stages/${stageId}`;
   const [seenDetail, setSeenDetail] = useState(initialDetail);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -279,7 +281,7 @@ export function StageWorkspace({
 
   const reload = useCallback(async () => {
     setError("");
-    const res = await fetch(`/api/shots/${shotId}/stages/${stageId}`, {
+    const res = await fetch(`${stageApi}`, {
       cache: "no-store",
     });
     const data = await res.json();
@@ -305,7 +307,7 @@ export function StageWorkspace({
     let stopped = false;
     const timer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      fetch(`/api/shots/${shotId}/stages/${stageId}`, { cache: "no-store" })
+      fetch(`${stageApi}`, { cache: "no-store" })
         .then(async (res) => {
           const data = (await res.json()) as StageDetail & { error?: string };
           if (!res.ok || stopped) return;
@@ -365,7 +367,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/agent-request`, {
+      const res = await fetch(`${stageApi}/agent-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -407,7 +409,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/prompt-history`, {
+      const res = await fetch(`${stageApi}/prompt-history`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ versionId }),
@@ -437,7 +439,7 @@ export function StageWorkspace({
         form.set("file", file);
         form.set("target", target);
         form.set("approveAfter", approveAfter ? "true" : "false");
-        const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/upload`, {
+        const res = await fetch(`${stageApi}/upload`, {
           method: "POST",
           body: form,
         });
@@ -458,7 +460,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`${stageApi}/approve`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename }),
@@ -482,7 +484,7 @@ export function StageWorkspace({
     }
     setBusy(true);
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`${stageApi}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filenames: names, from: "output" }),
@@ -508,7 +510,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/watch`, {
+      const res = await fetch(`${shotApi}/watch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stopped }),
@@ -534,7 +536,7 @@ export function StageWorkspace({
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/cancel`, { method: "POST" });
+      const res = await fetch(`${stageApi}/cancel`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось отменить");
       if (data.stage) setDetail(data.stage);
@@ -550,7 +552,7 @@ export function StageWorkspace({
     setBusy(true);
     try {
       // Сначала сохранить то, что сейчас в полях: в модель идёт prompt.md с диска.
-      const saved = await fetch(`/api/shots/${shotId}/stages/${stageId}`, {
+      const saved = await fetch(`${stageApi}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(docs),
@@ -559,7 +561,7 @@ export function StageWorkspace({
         const data = await saved.json();
         throw new Error(data.error || "Не удалось сохранить промпт");
       }
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/run`, {
+      const res = await fetch(`${stageApi}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(

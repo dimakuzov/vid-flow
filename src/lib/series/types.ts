@@ -53,6 +53,7 @@ export interface SeriesSummary {
 }
 
 export interface StageDetail {
+  episodeId: string;
   shotId: string;
   shotTitle: string;
   stageId: StageId;

@@ -9,8 +9,9 @@ import { assertStageFree, writeStageState } from "./stage-state";
 import {
   agentInboxRelative,
   assertSafeSegment,
+  episodeRoot,
   getCharactersRoot,
-  getSeriesRoot,
+  listShotIds,
   stageDir,
 } from "./paths";
 
@@ -49,6 +50,7 @@ export interface AgentBaseline {
 
 export interface AgentRequestFile {
   id: string;
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   createdAt: string;
@@ -80,12 +82,12 @@ export interface AgentRequestSummary {
   comfyError: string | null;
 }
 
-function touchPath(shotId: string, stageId: StageId): string {
-  return path.join(stageDir(shotId, stageId), TOUCH_FILE);
+function touchPath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), TOUCH_FILE);
 }
 
-function readTouch(shotId: string, stageId: StageId): boolean {
-  const file = touchPath(shotId, stageId);
+function readTouch(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const file = touchPath(episodeId, shotId, stageId);
   if (!fs.existsSync(file)) return false;
   try {
     const data = JSON.parse(fs.readFileSync(file, "utf8")) as { refsTouchedByUser?: boolean };
@@ -95,8 +97,8 @@ function readTouch(shotId: string, stageId: StageId): boolean {
   }
 }
 
-function readBaseline(shotId: string, stageId: StageId): AgentBaseline | null {
-  const file = path.join(stageDir(shotId, stageId), BASELINE_FILE);
+function readBaseline(episodeId: string, shotId: string, stageId: StageId): AgentBaseline | null {
+  const file = path.join(stageDir(episodeId, shotId, stageId), BASELINE_FILE);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentBaseline;
@@ -105,8 +107,8 @@ function readBaseline(shotId: string, stageId: StageId): AgentBaseline | null {
   }
 }
 
-function fingerprintRefs(shotId: string, stageId: StageId): RefFingerprint[] {
-  const dir = path.join(stageDir(shotId, stageId), "refs");
+function fingerprintRefs(episodeId: string, shotId: string, stageId: StageId): RefFingerprint[] {
+  const dir = path.join(stageDir(episodeId, shotId, stageId), "refs");
   if (!fs.existsSync(dir)) return [];
   return fs
     .readdirSync(dir)
@@ -147,6 +149,7 @@ function renderRequestMarkdown(request: AgentRequestFile, boardQueues: boolean):
 
 The user sent this from «Рекомендация для LLM».
 
+- episode: ${request.episodeId}
 - shot: ${request.shotId}
 - stage: ${request.stageId}
 - at: ${request.createdAt}
@@ -218,19 +221,8 @@ function readPendingFormatRequest(
   }
 }
 
-function listShotIds(root: string): string[] {
-  const dir = path.join(root, "shots");
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => /^s\d+$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-}
-
-export function readAgentRequest(shotId: string, stageId: StageId): AgentRequestFile | null {
-  const file = path.join(stageDir(shotId, stageId), REQUEST_JSON);
+export function readAgentRequest(episodeId: string, shotId: string, stageId: StageId): AgentRequestFile | null {
+  const file = path.join(stageDir(episodeId, shotId, stageId), REQUEST_JSON);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentRequestFile;
@@ -240,12 +232,13 @@ export function readAgentRequest(shotId: string, stageId: StageId): AgentRequest
 }
 
 export function readAgentRequestSummary(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
 ): AgentRequestSummary | null {
-  const request = readAgentRequest(shotId, stageId);
+  const request = readAgentRequest(episodeId, shotId, stageId);
   if (!request) return null;
-  const dispatch = readAgentDispatch(shotId, stageId);
+  const dispatch = readAgentDispatch(episodeId, shotId, stageId);
   return {
     status: request.status,
     createdAt: request.createdAt,
@@ -256,8 +249,8 @@ export function readAgentRequestSummary(
   };
 }
 
-export function rebuildAgentInbox(): void {
-  const root = getSeriesRoot();
+export function rebuildAgentInbox(episodeId: string): void {
+  const root = episodeRoot(episodeId);
   const lines = [
     "# Входящие агенту",
     "",
@@ -279,9 +272,9 @@ export function rebuildAgentInbox(): void {
     lines.push("");
   }
 
-  for (const shotId of listShotIds(root)) {
+  for (const shotId of listShotIds(episodeId)) {
     for (const stageId of STAGES) {
-      const request = readAgentRequest(shotId, stageId);
+      const request = readAgentRequest(episodeId, shotId, stageId);
       if (!request || request.status !== "pending") continue;
       pending += 1;
       const preview = request.message.trim().split(/\r?\n/)[0] || "(пусто)";
@@ -302,7 +295,7 @@ export function rebuildAgentInbox(): void {
   }
 
   if (pending) {
-    lines.push(`Файл входящих: ${agentInboxRelative(formatRequest?.episodeId)}.`);
+    lines.push(`Файл входящих: ${agentInboxRelative(episodeId)}.`);
     lines.push("");
   }
 
@@ -329,8 +322,8 @@ function bulletFiles(dir: string): string {
 }
 
 function renderLlmTask(request: AgentRequestFile, boardQueues: boolean): string {
-  const dir = stageDir(request.shotId, request.stageId);
-  const meta = readShotMeta(request.shotId);
+  const dir = stageDir(request.episodeId, request.shotId, request.stageId);
+  const meta = readShotMeta(request.episodeId, request.shotId);
   const characters = meta.characters.length ? meta.characters.join(", ") : "(в shot.md не указаны)";
   const libraries = meta.characters.length
     ? meta.characters
@@ -425,12 +418,12 @@ ${libraries}
 ${charactersBlock}${firstFrameBlock}`;
 }
 
-function dispatchPath(shotId: string, stageId: StageId): string {
-  return path.join(stageDir(shotId, stageId), DISPATCH_FILE);
+function dispatchPath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), DISPATCH_FILE);
 }
 
-export function readAgentDispatch(shotId: string, stageId: StageId): AgentDispatch | null {
-  const file = dispatchPath(shotId, stageId);
+export function readAgentDispatch(episodeId: string, shotId: string, stageId: StageId): AgentDispatch | null {
+  const file = dispatchPath(episodeId, shotId, stageId);
   if (!fs.existsSync(file)) return null;
   try {
     return JSON.parse(fs.readFileSync(file, "utf8")) as AgentDispatch;
@@ -440,15 +433,16 @@ export function readAgentDispatch(shotId: string, stageId: StageId): AgentDispat
 }
 
 export function writeAgentDispatch(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   dispatch: AgentDispatch,
 ): void {
-  writeText(dispatchPath(shotId, stageId), JSON.stringify(dispatch, null, 2) + "\n");
+  writeText(dispatchPath(episodeId, shotId, stageId), JSON.stringify(dispatch, null, 2) + "\n");
 }
 
-function hasApprovedImage(shotId: string, stageId: StageId): boolean {
-  const dir = path.join(stageDir(shotId, stageId), "approve");
+function hasApprovedImage(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const dir = path.join(stageDir(episodeId, shotId, stageId), "approve");
   if (!fs.existsSync(dir)) return false;
   return fs.readdirSync(dir).some((name) => {
     if (!/\.(png|jpe?g|webp)$/i.test(name)) return false;
@@ -460,21 +454,18 @@ function hasApprovedImage(shotId: string, stageId: StageId): boolean {
   });
 }
 
-export function stageBoardQueues(shotId: string, stageId: StageId): boolean {
+export function stageBoardQueues(episodeId: string, shotId: string, stageId: StageId): boolean {
   if (stageId === "location" || stageId === "video_preview" || stageId === "final_render") {
     return true;
   }
   if (stageId === "first_frame") {
-    return hasApprovedImage(shotId, "location") && hasApprovedImage(shotId, "characters");
+    return hasApprovedImage(episodeId, shotId, "location") && hasApprovedImage(episodeId, shotId, "characters");
   }
   return false;
 }
 
-export function listSeriesShotIds(): string[] {
-  return listShotIds(getSeriesRoot());
-}
-
 export function submitAgentRequest(options: {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   message: string;
@@ -483,16 +474,18 @@ export function submitAgentRequest(options: {
   workflowNote: string;
   videoWorkflow?: AgentVideoWorkflow;
 }): AgentRequestFile {
+  const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
-  assertStageFree(shotId, options.stageId);
+  assertStageFree(episodeId, shotId, options.stageId);
   const typed = options.message.trim();
   const message = typed || "Сгенерируй по текущим документам этапа.";
 
-  const baseline = readBaseline(shotId, options.stageId);
-  const touched = readTouch(shotId, options.stageId);
-  const currentRefs = fingerprintRefs(shotId, options.stageId);
+  const baseline = readBaseline(episodeId, shotId, options.stageId);
+  const touched = readTouch(episodeId, shotId, options.stageId);
+  const currentRefs = fingerprintRefs(episodeId, shotId, options.stageId);
 
   updateStageDocs({
+    episodeId,
     shotId,
     stageId: options.stageId,
     prompt: options.prompt,
@@ -517,6 +510,7 @@ export function submitAgentRequest(options: {
 
   const request: AgentRequestFile = {
     id: `${shotId}-${options.stageId}-${Date.now()}`,
+    episodeId,
     shotId,
     stageId: options.stageId,
     createdAt: new Date().toISOString(),
@@ -539,44 +533,44 @@ export function submitAgentRequest(options: {
     },
   };
 
-  const boardQueues = stageBoardQueues(shotId, options.stageId);
-  const dir = stageDir(shotId, options.stageId);
+  const boardQueues = stageBoardQueues(episodeId, shotId, options.stageId);
+  const dir = stageDir(episodeId, shotId, options.stageId);
   writeText(path.join(dir, REQUEST_JSON), JSON.stringify(request, null, 2) + "\n");
   writeText(path.join(dir, REQUEST_MD), renderRequestMarkdown(request, boardQueues));
   writeText(path.join(dir, LLM_TASK), renderLlmTask(request, boardQueues));
-  writeAgentDispatch(shotId, options.stageId, {
+  writeAgentDispatch(episodeId, shotId, options.stageId, {
     requestId: request.id,
     state: boardQueues ? "wait" : "agent",
     videoWorkflow: options.videoWorkflow === "flf" ? "flf" : "i2v",
     updatedAt: request.createdAt,
   });
-  writeStageState(shotId, options.stageId, {
+  writeStageState(episodeId, shotId, options.stageId, {
     phase: "agent",
     requestId: request.id,
     agentRunsComfy: !boardQueues,
     since: request.createdAt,
   });
-  rebuildAgentInbox();
+  rebuildAgentInbox(episodeId);
   return request;
 }
 
 /** Отмечает запрос отменённым. Фазу этапа меняет вызывающий код. */
-export function cancelAgentRequest(shotId: string, stageId: StageId): boolean {
-  const request = readAgentRequest(shotId, stageId);
+export function cancelAgentRequest(episodeId: string, shotId: string, stageId: StageId): boolean {
+  const request = readAgentRequest(episodeId, shotId, stageId);
   if (!request || request.status !== "pending") return false;
-  const dir = stageDir(shotId, stageId);
+  const dir = stageDir(episodeId, shotId, stageId);
   writeText(
     path.join(dir, REQUEST_JSON),
     JSON.stringify({ ...request, status: "cancelled" }, null, 2) + "\n",
   );
-  const dispatch = readAgentDispatch(shotId, stageId);
+  const dispatch = readAgentDispatch(episodeId, shotId, stageId);
   if (dispatch && dispatch.requestId === request.id) {
-    writeAgentDispatch(shotId, stageId, {
+    writeAgentDispatch(episodeId, shotId, stageId, {
       ...dispatch,
       state: "cancelled",
       updatedAt: new Date().toISOString(),
     });
   }
-  rebuildAgentInbox();
+  rebuildAgentInbox(episodeId);
   return true;
 }

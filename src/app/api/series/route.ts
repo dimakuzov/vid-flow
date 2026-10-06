@@ -3,6 +3,7 @@ import { scanSeries } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
 
+/** Сводка открытого эпизода (`current_episode.txt`). Конкретный эпизод: `/api/episodes/<id>`. */
 export async function GET() {
   try {
     const series = scanSeries();

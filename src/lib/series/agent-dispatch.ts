@@ -1,9 +1,9 @@
 import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
 import { STAGES, type StageId } from "./constants";
+import { listEpisodeIds, listShotIds } from "./paths";
 import {
   cancelAgentRequest,
-  listSeriesShotIds,
   readAgentDispatch,
   readAgentRequest,
   writeAgentDispatch,
@@ -24,15 +24,15 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 /** Агент закончил: этапы, которые запускает доска, уходят в Comfy. */
-function queueAfterAgent(shotId: string, stageId: StageId): void {
-  const dispatch = readAgentDispatch(shotId, stageId);
+function queueAfterAgent(episodeId: string, shotId: string, stageId: StageId): void {
+  const dispatch = readAgentDispatch(episodeId, shotId, stageId);
   try {
-    const queued = queueStageRun(shotId, stageId, {
+    const queued = queueStageRun(episodeId, shotId, stageId, {
       videoWorkflow: dispatch?.videoWorkflow === "flf" ? "flf" : "i2v",
       fromAgent: true,
     });
     if (dispatch) {
-      writeAgentDispatch(shotId, stageId, {
+      writeAgentDispatch(episodeId, shotId, stageId, {
         ...dispatch,
         state: "queued",
         jobId: queued.id,
@@ -42,9 +42,9 @@ function queueAfterAgent(shotId: string, stageId: StageId): void {
     }
   } catch (error) {
     const message = errorText(error, "Не удалось поставить в Comfy");
-    setError(shotId, stageId, message);
+    setError(episodeId, shotId, stageId, message);
     if (dispatch) {
-      writeAgentDispatch(shotId, stageId, {
+      writeAgentDispatch(episodeId, shotId, stageId, {
         ...dispatch,
         state: "error",
         error: message,
@@ -59,36 +59,37 @@ function queueAfterAgent(shotId: string, stageId: StageId): void {
  * agent → comfy (агент поставил done) / idle (агент сам гонял Comfy) / error (таймаут),
  * comfy → idle (задание done) / error (задание упало или пропало).
  */
-export function reconcileStage(shotId: string, stageId: StageId): void {
-  const file = readStageStateFile(shotId, stageId);
+export function reconcileStage(episodeId: string, shotId: string, stageId: StageId): void {
+  const file = readStageStateFile(episodeId, shotId, stageId);
 
   if (!file) {
     // Запросы, отправленные до появления stage_state.json.
-    const dispatch = readAgentDispatch(shotId, stageId);
-    const request = readAgentRequest(shotId, stageId);
-    if (dispatch?.state === "wait" && request?.status === "done") queueAfterAgent(shotId, stageId);
+    const dispatch = readAgentDispatch(episodeId, shotId, stageId);
+    const request = readAgentRequest(episodeId, shotId, stageId);
+    if (dispatch?.state === "wait" && request?.status === "done") queueAfterAgent(episodeId, shotId, stageId);
     return;
   }
 
   if (file.phase === "agent") {
-    const request = readAgentRequest(shotId, stageId);
+    const request = readAgentRequest(episodeId, shotId, stageId);
     if (!request || (file.requestId && request.id !== file.requestId)) {
-      setError(shotId, stageId, "Запрос агенту пропал или заменён");
+      setError(episodeId, shotId, stageId, "Запрос агенту пропал или заменён");
       return;
     }
     if (request.status === "cancelled") {
-      setIdle(shotId, stageId);
+      setIdle(episodeId, shotId, stageId);
       return;
     }
     if (request.status === "done") {
-      if (file.agentRunsComfy) setIdle(shotId, stageId);
-      else queueAfterAgent(shotId, stageId);
+      if (file.agentRunsComfy) setIdle(episodeId, shotId, stageId);
+      else queueAfterAgent(episodeId, shotId, stageId);
       return;
     }
     const since = Date.parse(file.since);
     if (Number.isFinite(since) && Date.now() - since > AGENT_TIMEOUT_MS) {
       const minutes = Math.round(AGENT_TIMEOUT_MS / 60000);
       setError(
+        episodeId,
         shotId,
         stageId,
         `Агент не ответил за ${minutes} мин. Запрос остаётся во входящих: можно отправить заново или отменить.`,
@@ -98,38 +99,41 @@ export function reconcileStage(shotId: string, stageId: StageId): void {
   }
 
   if (file.phase === "comfy") {
-    const state: StageState = readStageState(shotId, stageId);
-    if (state.phase === "idle") setIdle(shotId, stageId);
-    else if (state.phase === "error") setError(shotId, stageId, state.error || "Ошибка ComfyUI");
+    const state: StageState = readStageState(episodeId, shotId, stageId);
+    if (state.phase === "idle") setIdle(episodeId, shotId, stageId);
+    else if (state.phase === "error") setError(episodeId, shotId, stageId, state.error || "Ошибка ComfyUI");
   }
 }
 
-function tick(): void {
-  let shotIds: string[];
-  try {
-    shotIds = listSeriesShotIds();
-  } catch {
-    return;
-  }
-  for (const shotId of shotIds) {
-    for (const stageId of STAGES) {
-      try {
-        reconcileStage(shotId, stageId);
-      } catch {
-        // Файл этапа ещё пишется. Следующий проход прочитает его снова.
+/** Один проход фонового цикла по всем эпизодам, а не только по открытому в шапке. */
+export function reconcileAllStages(): void {
+  for (const episodeId of listEpisodeIds()) {
+    let shotIds: string[];
+    try {
+      shotIds = listShotIds(episodeId);
+    } catch {
+      continue;
+    }
+    for (const shotId of shotIds) {
+      for (const stageId of STAGES) {
+        try {
+          reconcileStage(episodeId, shotId, stageId);
+        } catch {
+          // Файл этапа ещё пишется. Следующий проход прочитает его снова.
+        }
       }
     }
   }
 }
 
 /** Кнопка «Отменить»: снимает запрос агенту и задание в очереди, возвращает этап в покой. */
-export async function cancelStage(shotId: string, stageId: StageId): Promise<void> {
-  const file = readStageStateFile(shotId, stageId);
-  if (file?.phase === "agent" || file?.phase === "error") cancelAgentRequest(shotId, stageId);
+export async function cancelStage(episodeId: string, shotId: string, stageId: StageId): Promise<void> {
+  const file = readStageStateFile(episodeId, shotId, stageId);
+  if (file?.phase === "agent" || file?.phase === "error") cancelAgentRequest(episodeId, shotId, stageId);
   if (file?.jobId && (file.phase === "comfy" || file.phase === "error")) {
     await cancelComfyJob(file.jobId);
   }
-  setIdle(shotId, stageId);
+  setIdle(episodeId, shotId, stageId);
 }
 
 export function startAgentDispatch(): void {
@@ -140,7 +144,7 @@ export function startAgentDispatch(): void {
     if (ticking) return;
     ticking = true;
     try {
-      tick();
+      reconcileAllStages();
     } finally {
       ticking = false;
     }

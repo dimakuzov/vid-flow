@@ -1,20 +1,13 @@
 import { NextResponse } from "next/server";
-import { STAGES, type StageId } from "@/lib/series/constants";
 import { approveFiles, removeApprovedFile } from "@/lib/series/mutations";
+import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ shotId: string; stage: string }> },
-) {
+export async function POST(request: Request, context: StageRouteContext) {
   try {
-    const { shotId, stage } = await context.params;
-    if (!STAGES.includes(stage as StageId)) {
-      return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
-    }
-
+    const { episodeId, shotId, stageId } = parseStageParams(await context.params);
     const body = (await request.json()) as {
       filenames?: string[];
       from?: "output" | "refs";
@@ -25,15 +18,16 @@ export async function POST(
     }
 
     const approved = approveFiles({
+      episodeId,
       shotId,
-      stageId: stage as StageId,
+      stageId,
       filenames: body.filenames,
       from: body.from || "output",
     });
 
     return NextResponse.json({
       approved,
-      stage: getStageDetail(shotId, stage as StageId),
+      stage: getStageDetail(episodeId, shotId, stageId),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ошибка утверждения";
@@ -41,23 +35,17 @@ export async function POST(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ shotId: string; stage: string }> },
-) {
+export async function DELETE(request: Request, context: StageRouteContext) {
   try {
-    const { shotId, stage } = await context.params;
-    if (!STAGES.includes(stage as StageId)) {
-      return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
-    }
+    const { episodeId, shotId, stageId } = parseStageParams(await context.params);
     const body = (await request.json()) as { filename?: string };
     if (!body.filename) {
       return NextResponse.json({ error: "Не выбран файл" }, { status: 400 });
     }
-    const removed = removeApprovedFile(shotId, stage as StageId, body.filename);
+    const removed = removeApprovedFile(episodeId, shotId, stageId, body.filename);
     return NextResponse.json({
       removed,
-      stage: getStageDetail(shotId, stage as StageId),
+      stage: getStageDetail(episodeId, shotId, stageId),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось убрать файл";

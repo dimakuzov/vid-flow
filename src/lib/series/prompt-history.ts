@@ -16,8 +16,8 @@ interface PromptHistoryStore {
 
 const HISTORY_FILE = "prompt_history.json";
 
-function historyPath(shotId: string, stageId: StageId): string {
-  return path.join(stageDir(assertSafeSegment(shotId, "shot"), stageId), HISTORY_FILE);
+function historyPath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, assertSafeSegment(shotId, "shot"), stageId), HISTORY_FILE);
 }
 
 function readStore(file: string): PromptHistoryStore {
@@ -50,10 +50,14 @@ function versionId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function syncPromptHistory(shotId: string, stageId: StageId): PromptVersion[] {
-  const dir = stageDir(assertSafeSegment(shotId, "shot"), stageId);
+export function syncPromptHistory(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+): PromptVersion[] {
+  const dir = stageDir(episodeId, assertSafeSegment(shotId, "shot"), stageId);
   const promptFile = path.join(dir, "prompt.md");
-  const file = historyPath(shotId, stageId);
+  const file = historyPath(episodeId, shotId, stageId);
   const store = readStore(file);
   let prompt = "";
   try {
@@ -80,12 +84,13 @@ export function syncPromptHistory(shotId: string, stageId: StageId): PromptVersi
 }
 
 export function restorePromptVersion(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   versionIdToRestore: string,
 ): void {
-  syncPromptHistory(shotId, stageId);
-  const file = historyPath(shotId, stageId);
+  syncPromptHistory(episodeId, shotId, stageId);
+  const file = historyPath(episodeId, shotId, stageId);
   const store = readStore(file);
   const version = store.versions.find((item) => item.id === versionIdToRestore);
   if (!version) throw new Error("Такой версии промпта нет");
@@ -98,7 +103,7 @@ export function restorePromptVersion(
   }
   store.versions = store.versions.filter((item) => item.id !== version.id);
   store.current = version.prompt;
-  const dir = stageDir(assertSafeSegment(shotId, "shot"), stageId);
+  const dir = stageDir(episodeId, assertSafeSegment(shotId, "shot"), stageId);
   fs.writeFileSync(path.join(dir, "prompt.md"), version.prompt, "utf8");
   writeStore(file, store);
 }

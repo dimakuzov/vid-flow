@@ -10,16 +10,13 @@ import { syncPromptHistory } from "./prompt-history";
 import { readShotWatch } from "./shot-watch";
 import { readFormatRequest } from "./format-request";
 import {
-  ensureDataScaffold,
-  ensureSeriesScaffold,
-  episodeDir,
+  episodeRoot,
   getDataRoot,
   getPlaybooksRoot,
-  getSeriesRoot,
   listEpisodeIds,
+  listShotIds,
   readCurrentEpisodeId,
   stageDir,
-  shotsDir,
   toPosix,
 } from "./paths";
 import { readShotMeta } from "./shot-meta";
@@ -46,17 +43,22 @@ function parseSeriesMarkdown(content: string): { title: string; description: str
   };
 }
 
-function stageThumbnails(shotId: string, stageId: StageId) {
-  const approve = listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
+function stageThumbnails(episodeId: string, shotId: string, stageId: StageId) {
+  const approve = listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "approve"));
   if (approve.length) return approve.slice(0, 3);
-  return listMediaFiles(path.join(stageDir(shotId, stageId), "output")).slice(0, 3);
+  return listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "output")).slice(0, 3);
 }
 
-function buildStageSummary(shotId: string, stageId: StageId, characters: string[]): StageSummary {
-  const status = deriveStageStatus(shotId, stageId, characters);
-  const state = readStageState(shotId, stageId);
-  const output = listMediaFiles(path.join(stageDir(shotId, stageId), "output"));
-  const approve = listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
+function buildStageSummary(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  characters: string[],
+): StageSummary {
+  const status = deriveStageStatus(episodeId, shotId, stageId, characters);
+  const state = readStageState(episodeId, shotId, stageId);
+  const output = listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "output"));
+  const approve = listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "approve"));
   return {
     id: stageId,
     status,
@@ -64,7 +66,7 @@ function buildStageSummary(shotId: string, stageId: StageId, characters: string[
     outputNames: output.map((file) => file.name),
     approveCount: approve.length,
     expectedApproveCount: expectedApproveCount(stageId, characters),
-    thumbnails: stageThumbnails(shotId, stageId),
+    thumbnails: stageThumbnails(episodeId, shotId, stageId),
     canAutoReady: true,
     busy: state.busy,
     phaseSince: state.phase === "idle" ? null : state.since,
@@ -72,23 +74,12 @@ function buildStageSummary(shotId: string, stageId: StageId, characters: string[
   };
 }
 
-export function listShotIds(seriesRoot = getSeriesRoot()): string[] {
-  const dir = shotsDir(seriesRoot);
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => /^s\d+$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-}
-
 function readShow(): { title: string; description: string } {
   return parseSeriesMarkdown(readTextIfExists(path.join(getDataRoot(), "show.md")));
 }
 
 function episodeChoiceTitle(episodeId: string): string {
-  const root = episodeDir(episodeId);
+  const root = episodeRoot(episodeId);
   const episodeMd = readTextIfExists(path.join(root, "episode.md"));
   const legacySeriesMd = readTextIfExists(path.join(root, "series.md"));
   const title = parseSeriesMarkdown(episodeMd || legacySeriesMd).title;
@@ -117,14 +108,17 @@ function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
   };
 }
 
-export function scanSeries(): SeriesSummary {
-  ensureDataScaffold();
+/**
+ * Сводка эпизода для таблицы. Чтение без записей (кроме истории промпта на странице этапа).
+ * Без episodeId — открытый эпизод из `current_episode.txt`.
+ */
+export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
   const episodes = listEpisodeChoices();
-  const episodeId = readCurrentEpisodeId();
+  const episodeId = requestedEpisodeId || readCurrentEpisodeId();
   if (!episodeId) return emptySeries(episodes);
 
-  const root = process.env.SERIES_ROOT ? getSeriesRoot() : episodeDir(episodeId);
-  ensureSeriesScaffold(root);
+  const root = episodeRoot(episodeId);
+  if (!fs.existsSync(root)) throw new Error(`Эпизода ${episodeId} нет`);
   const show = readShow();
   const episodeMd = readTextIfExists(path.join(root, "episode.md"));
   const legacySeriesMd = readTextIfExists(path.join(root, "series.md"));
@@ -133,11 +127,14 @@ export function scanSeries(): SeriesSummary {
   const raw = readTextIfExists(path.join(root, "scenario_raw.md"));
   const scenario = readTextIfExists(path.join(root, "scenario.md"));
   const shots: ShotSummary[] = [];
-  for (const shotId of listShotIds(root)) {
+  for (const shotId of listShotIds(episodeId)) {
     try {
-      const meta = readShotMeta(shotId);
+      const meta = readShotMeta(episodeId, shotId);
       const stages = Object.fromEntries(
-        STAGES.map((stageId) => [stageId, buildStageSummary(shotId, stageId, meta.characters)]),
+        STAGES.map((stageId) => [
+          stageId,
+          buildStageSummary(episodeId, shotId, stageId, meta.characters),
+        ]),
       ) as Record<StageId, StageSummary>;
       shots.push({
         id: shotId,
@@ -210,13 +207,15 @@ function playbooksForStage(stageId: StageId): string[] {
     .map((rel) => toPosix(rel));
 }
 
-export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
-  const meta = readShotMeta(shotId);
-  const dir = stageDir(shotId, stageId);
-  const status = deriveStageStatus(shotId, stageId, meta.characters);
-  const stored = readStatusFile(shotId, stageId);
+export function getStageDetail(episodeId: string, shotId: string, stageId: StageId): StageDetail {
+  const meta = readShotMeta(episodeId, shotId);
+  const dir = stageDir(episodeId, shotId, stageId);
+  if (!fs.existsSync(path.dirname(dir))) throw new Error(`Кадра ${shotId} нет в эпизоде ${episodeId}`);
+  const status = deriveStageStatus(episodeId, shotId, stageId, meta.characters);
+  const stored = readStatusFile(episodeId, shotId, stageId);
 
   return {
+    episodeId,
     shotId,
     shotTitle: meta.title,
     stageId,
@@ -232,14 +231,14 @@ export function getStageDetail(shotId: string, stageId: StageId): StageDetail {
       workflow: readTextIfExists(path.join(dir, "workflow.md")),
       runLog: readTextIfExists(path.join(dir, "run_log.md")),
     },
-    promptHistory: syncPromptHistory(shotId, stageId),
+    promptHistory: syncPromptHistory(episodeId, shotId, stageId),
     refs: listMediaFiles(path.join(dir, "refs")),
     output: listMediaFiles(path.join(dir, "output")),
     approve: listMediaFiles(path.join(dir, "approve")),
     playbooks: playbooksForStage(stageId),
-    relativeDir: toPosix(path.relative(getSeriesRoot(), dir)),
-    state: readStageState(shotId, stageId),
-    agentRequest: readAgentRequestSummary(shotId, stageId),
-    watch: readShotWatch(shotId),
+    relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
+    state: readStageState(episodeId, shotId, stageId),
+    agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
+    watch: readShotWatch(episodeId, shotId),
   };
 }

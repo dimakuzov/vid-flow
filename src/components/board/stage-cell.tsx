@@ -16,13 +16,14 @@ import type { StageSummary } from "@/lib/series/types";
 import { StatusPill } from "./status-pill";
 
 interface StageCellProps {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   stage: StageSummary;
   onChanged: () => void;
 }
 
-export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps) {
+export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: StageCellProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -34,7 +35,7 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/run`, {
+      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -56,7 +57,7 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
     setBusy(true);
     setMessage("");
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/cancel`, { method: "POST" });
+      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/cancel`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось отменить");
       setMessage(data.message || "Отменено");
@@ -77,7 +78,7 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
       form.set("file", file);
       form.set("target", "output");
       form.set("approveAfter", uploadMode === "approve" ? "true" : "false");
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/upload`, {
+      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/upload`, {
         method: "POST",
         body: form,
       });
@@ -115,7 +116,7 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
     }
     setBusy(true);
     try {
-      const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
+      const res = await fetch(`/api/episodes/${episodeId}/shots/${shotId}/stages/${stageId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filenames, from: "output" }),

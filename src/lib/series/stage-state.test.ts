@@ -17,10 +17,11 @@ import { submitAgentRequest, readAgentRequest } from "./agent-request";
 import { cancelStage, reconcileStage } from "./agent-dispatch";
 import { queueStageRun } from "../comfy/stage-run";
 import { readComfyJob } from "../comfy/queue";
-import { ensureEpisode, ensureStageDirs, stageDir, shotDir } from "./paths";
+import { createEpisode, ensureStageDirs, stageDir, shotDir } from "./paths";
 import { readStageState, readStageStateFile, writeStageState } from "./stage-state";
 import { deriveStageStatus } from "./status";
 
+const EP = "e01";
 const SHOT = "s01";
 const STAGE = "location" as const;
 const PNG = Buffer.from(
@@ -30,11 +31,12 @@ const PNG = Buffer.from(
 );
 
 function dir(...parts: string[]): string {
-  return path.join(stageDir(SHOT, STAGE), ...parts);
+  return path.join(stageDir(EP, SHOT, STAGE), ...parts);
 }
 
 function sendToAgent(message = "Сделай вечер") {
   return submitAgentRequest({
+    episodeId: EP,
     shotId: SHOT,
     stageId: STAGE,
     message,
@@ -57,10 +59,10 @@ function patchJob(id: string, patch: Record<string, unknown>) {
 }
 
 before(() => {
-  ensureEpisode("e01");
-  fs.mkdirSync(shotDir(SHOT), { recursive: true });
-  fs.writeFileSync(path.join(shotDir(SHOT), "shot.md"), "# Cafe\n\n- location: cafe\n");
-  ensureStageDirs(SHOT);
+  createEpisode(EP);
+  fs.mkdirSync(shotDir(EP, SHOT), { recursive: true });
+  fs.writeFileSync(path.join(shotDir(EP, SHOT), "shot.md"), "# Cafe\n\n- location: cafe\n");
+  ensureStageDirs(EP, SHOT);
   fs.writeFileSync(dir("refs", "view.png"), PNG);
 });
 
@@ -69,7 +71,7 @@ after(() => {
 });
 
 test("новый этап свободен", () => {
-  const state = readStageState(SHOT, STAGE);
+  const state = readStageState(EP, SHOT, STAGE);
   assert.equal(state.phase, "idle");
   assert.equal(state.busy, false);
 });
@@ -77,24 +79,24 @@ test("новый этап свободен", () => {
 test("отправка агенту: фаза agent, поле рекомендации очищено, этап закрыт", () => {
   fs.writeFileSync(dir("llm_notes.md"), "Сделай вечер");
   const request = sendToAgent();
-  assert.equal(readStageState(SHOT, STAGE).phase, "agent");
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "agent");
   assert.equal(fs.readFileSync(dir("llm_notes.md"), "utf8"), "");
-  assert.equal(readAgentRequest(SHOT, STAGE)?.message, "Сделай вечер");
-  assert.equal(readStageStateFile(SHOT, STAGE)?.requestId, request.id);
+  assert.equal(readAgentRequest(EP, SHOT, STAGE)?.message, "Сделай вечер");
+  assert.equal(readStageStateFile(EP, SHOT, STAGE)?.requestId, request.id);
   assert.throws(() => sendToAgent("ещё раз"), /Этап занят/);
-  assert.throws(() => queueStageRun(SHOT, STAGE), /Этап занят/);
-  assert.equal(deriveStageStatus(SHOT, STAGE, []), "agent");
+  assert.throws(() => queueStageRun(EP, SHOT, STAGE), /Этап занят/);
+  assert.equal(deriveStageStatus(EP, SHOT, STAGE, []), "agent");
 });
 
 test("агент закончил → задание в очереди, в модель идёт prompt.md, не рекомендация", () => {
   fs.writeFileSync(dir("prompt.md"), "Evening light over the old cafe.");
   fs.writeFileSync(dir("llm_notes.md"), "ЭТО НЕ ДОЛЖНО ПОПАСТЬ В МОДЕЛЬ");
   markAgentDone();
-  reconcileStage(SHOT, STAGE);
-  const file = readStageStateFile(SHOT, STAGE);
+  reconcileStage(EP, SHOT, STAGE);
+  const file = readStageStateFile(EP, SHOT, STAGE);
   assert.equal(file?.phase, "comfy");
   assert.ok(file?.jobId);
-  assert.equal(readStageState(SHOT, STAGE).phase, "queued");
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "queued");
   const job = readComfyJob(file!.jobId!);
   const text = String(job?.prompt["100"].inputs.value);
   assert.match(text, /Evening light over the old cafe\./);
@@ -102,49 +104,49 @@ test("агент закончил → задание в очереди, в мо�
 });
 
 test("ComfyUI принял задание → running; готово → idle и «на проверке»", () => {
-  const jobId = readStageStateFile(SHOT, STAGE)!.jobId!;
+  const jobId = readStageStateFile(EP, SHOT, STAGE)!.jobId!;
   patchJob(jobId, { status: "running", promptId: "abc" });
-  assert.equal(readStageState(SHOT, STAGE).phase, "running");
-  assert.equal(readStageState(SHOT, STAGE).busy, true);
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "running");
+  assert.equal(readStageState(EP, SHOT, STAGE).busy, true);
   patchJob(jobId, { status: "done", files: ["x.png"] });
   fs.writeFileSync(dir("output", "x.png"), PNG);
-  reconcileStage(SHOT, STAGE);
-  assert.equal(readStageStateFile(SHOT, STAGE)?.phase, "idle");
-  assert.equal(deriveStageStatus(SHOT, STAGE, []), "review");
+  reconcileStage(EP, SHOT, STAGE);
+  assert.equal(readStageStateFile(EP, SHOT, STAGE)?.phase, "idle");
+  assert.equal(deriveStageStatus(EP, SHOT, STAGE, []), "review");
 });
 
 test("ошибка задания → error, этап свободен, сброс возвращает idle", async () => {
-  const queued = queueStageRun(SHOT, STAGE);
+  const queued = queueStageRun(EP, SHOT, STAGE);
   patchJob(queued.id, { status: "error", error: "node_errors KSampler" });
-  reconcileStage(SHOT, STAGE);
-  const state = readStageState(SHOT, STAGE);
+  reconcileStage(EP, SHOT, STAGE);
+  const state = readStageState(EP, SHOT, STAGE);
   assert.equal(state.phase, "error");
   assert.equal(state.busy, false);
   assert.match(state.error || "", /KSampler/);
-  await cancelStage(SHOT, STAGE);
-  assert.equal(readStageState(SHOT, STAGE).phase, "idle");
+  await cancelStage(EP, SHOT, STAGE);
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "idle");
 });
 
 test("отмена во время работы агента", async () => {
   sendToAgent();
-  await cancelStage(SHOT, STAGE);
-  assert.equal(readStageState(SHOT, STAGE).phase, "idle");
-  assert.equal(readAgentRequest(SHOT, STAGE)?.status, "cancelled");
+  await cancelStage(EP, SHOT, STAGE);
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "idle");
+  assert.equal(readAgentRequest(EP, SHOT, STAGE)?.status, "cancelled");
 });
 
 test("отмена задания, которое ещё не ушло в ComfyUI", async () => {
-  const queued = queueStageRun(SHOT, STAGE);
-  await cancelStage(SHOT, STAGE);
+  const queued = queueStageRun(EP, SHOT, STAGE);
+  await cancelStage(EP, SHOT, STAGE);
   assert.equal(readComfyJob(queued.id)?.status, "cancelled");
-  assert.equal(readStageState(SHOT, STAGE).phase, "idle");
+  assert.equal(readStageState(EP, SHOT, STAGE).phase, "idle");
 });
 
 test("агент молчит дольше таймаута → error", () => {
   sendToAgent();
-  const file = readStageStateFile(SHOT, STAGE)!;
-  writeStageState(SHOT, STAGE, { ...file, since: "2000-01-01T00:00:00.000Z" });
-  reconcileStage(SHOT, STAGE);
-  const state = readStageState(SHOT, STAGE);
+  const file = readStageStateFile(EP, SHOT, STAGE)!;
+  writeStageState(EP, SHOT, STAGE, { ...file, since: "2000-01-01T00:00:00.000Z" });
+  reconcileStage(EP, SHOT, STAGE);
+  const state = readStageState(EP, SHOT, STAGE);
   assert.equal(state.phase, "error");
   assert.match(state.error || "", /не ответил/);
 });

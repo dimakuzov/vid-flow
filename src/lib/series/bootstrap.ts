@@ -2,14 +2,7 @@ import fs from "fs";
 import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
-import {
-  ensureEpisode,
-  ensureStageDirs,
-  getSeriesRoot,
-  readCurrentEpisodeId,
-  resolveEpisodeRoot,
-  stageDir,
-} from "./paths";
+import { createEpisode, ensureStageDirs, episodeRoot, stageDir } from "./paths";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
 import { writeStatusFile } from "./status";
 import type { BootstrapPreview, BootstrapShotDraft } from "./types";
@@ -136,8 +129,8 @@ function defaultWorkflow(stageId: StageId): string {
   return note;
 }
 
-function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {
-  const dir = stageDir(shot.id, stageId);
+function seedStageDocs(episodeId: string, shot: BootstrapShotDraft, stageId: StageId): void {
+  const dir = stageDir(episodeId, shot.id, stageId);
   writeText(path.join(dir, "prompt.md"), defaultPrompt(stageId, shot) + "\n");
   writeText(
     path.join(dir, "llm_notes.md"),
@@ -145,7 +138,7 @@ function seedStageDocs(shot: BootstrapShotDraft, stageId: StageId): void {
   );
   writeText(path.join(dir, "refs.md"), defaultRefs(stageId, shot));
   writeText(path.join(dir, "workflow.md"), defaultWorkflow(stageId));
-  writeStatusFile(shot.id, stageId, {
+  writeStatusFile(episodeId, shot.id, stageId, {
     status: "prep",
     expectedCharacters:
       stageId === "characters" ? shot.characters : undefined,
@@ -156,13 +149,12 @@ export function applyBootstrap(options: {
   scenario?: string;
   shotIds?: string[];
   overwriteDocs?: boolean;
-  episodeId?: string;
+  episodeId: string;
 }): { created: string[]; updated: string[]; skipped: string[] } {
-  const episodeKey = options.episodeId?.trim() || readCurrentEpisodeId();
+  const episodeKey = options.episodeId.trim();
   if (!episodeKey) throw new Error("Укажи имя эпизода, например e01");
 
-  const scenario =
-    options.scenario ?? readScenarioFile(resolveEpisodeRoot(episodeKey));
+  const scenario = options.scenario ?? readScenarioFile(episodeRoot(episodeKey));
   if (!scenario.trim()) {
     throw new Error("Размеченный сценарий пуст — нечего импортировать");
   }
@@ -186,8 +178,8 @@ export function applyBootstrap(options: {
     );
   }
 
-  const episodeId = ensureEpisode(episodeKey);
-  const root = getSeriesRoot();
+  const episodeId = createEpisode(episodeKey);
+  const root = episodeRoot(episodeId);
   const scenarioPath = path.join(root, "scenario.md");
   writeText(scenarioPath, scenario.endsWith("\n") ? scenario : `${scenario}\n`);
   writeText(
@@ -207,7 +199,7 @@ export function applyBootstrap(options: {
 
     const shotPath = path.join(root, "shots", shot.id);
     const existed = fs.existsSync(shotPath);
-    ensureStageDirs(shot.id, root);
+    ensureStageDirs(episodeId, shot.id);
 
     const meta: ShotMeta = {
       id: shot.id,
@@ -216,13 +208,13 @@ export function applyBootstrap(options: {
       characters: shot.characters,
       location: shot.location,
     };
-    writeShotMeta(meta);
+    writeShotMeta(episodeId, meta);
 
     for (const stageId of STAGES) {
-      const promptPath = path.join(stageDir(shot.id, stageId), "prompt.md");
+      const promptPath = path.join(stageDir(episodeId, shot.id, stageId), "prompt.md");
       const hasPrompt = fs.existsSync(promptPath) && fs.readFileSync(promptPath, "utf8").trim();
       if (!hasPrompt || options.overwriteDocs) {
-        seedStageDocs(shot, stageId);
+        seedStageDocs(episodeId, shot, stageId);
       }
     }
 
@@ -238,11 +230,11 @@ function readScenarioFile(root: string): string {
   return fs.existsSync(scenarioPath) ? fs.readFileSync(scenarioPath, "utf8") : "";
 }
 
-export function readScenarioText(): string {
-  return readScenarioFile(getSeriesRoot());
+export function readScenarioText(episodeId: string): string {
+  return readScenarioFile(episodeRoot(episodeId));
 }
 
-export function readRawScenarioText(): string {
-  const rawPath = path.join(getSeriesRoot(), "scenario_raw.md");
+export function readRawScenarioText(episodeId: string): string {
+  const rawPath = path.join(episodeRoot(episodeId), "scenario_raw.md");
   return fs.existsSync(rawPath) ? fs.readFileSync(rawPath, "utf8") : "";
 }

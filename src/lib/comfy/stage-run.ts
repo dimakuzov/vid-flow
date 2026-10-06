@@ -2,13 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
-import {
-  getLocationsRoot,
-  getPlaybooksRoot,
-  getSeriesRoot,
-  stageDir,
-  toPosix,
-} from "../series/paths";
+import { getLocationsRoot, getPlaybooksRoot, stageDir, toPosix } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
 import { assertStageFree, readStageStateFile, writeStageState } from "../series/stage-state";
 import { enqueueComfyJob, startComfyQueue, type ComfyJob } from "./queue";
@@ -64,8 +58,8 @@ function generationText(promptMd: string, notes: string, characters: string[]): 
   return text || null;
 }
 
-function locationImage(shotId: string, locationId: string): string {
-  const refs = listImages(path.join(stageDir(shotId, "location"), "refs"));
+function locationImage(episodeId: string, shotId: string, locationId: string): string {
+  const refs = listImages(path.join(stageDir(episodeId, shotId, "location"), "refs"));
   if (refs[0]) return refs[0];
   const root = getLocationsRoot();
   if (!fs.existsSync(root) || !locationId) {
@@ -81,9 +75,9 @@ function locationImage(shotId: string, locationId: string): string {
   throw new Error(`В ${folderName} нет view.png`);
 }
 
-function queueLocation(shotId: string): ComfyJob {
-  const meta = readShotMeta(shotId);
-  const stagePath = stageDir(shotId, "location");
+function queueLocation(episodeId: string, shotId: string): ComfyJob {
+  const meta = readShotMeta(episodeId, shotId);
+  const stagePath = stageDir(episodeId, shotId, "location");
   // В модель идёт только prompt.md. llm_notes.md — поле ввода рекомендации для агента.
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
   if (refusesAngleGraph(promptMd)) {
@@ -96,7 +90,7 @@ function queueLocation(shotId: string): ComfyJob {
     throw new Error("В prompt.md нет текста для генерации. Отправь рекомендацию агенту или впиши промпт сам.");
   }
   const spoken = /no people/i.test(text) ? text : `${text}\nSame place, no people.`;
-  const image = locationImage(shotId, meta.location);
+  const image = locationImage(episodeId, shotId, meta.location);
   const filename = path.basename(image);
   const prompt = loadApiGraph("location_views_multiple_angles.json");
   prompt["25"].inputs.image = filename;
@@ -109,6 +103,9 @@ function queueLocation(shotId: string): ComfyJob {
   return enqueueComfyJob({
     id: `${shotId}-location-${Date.now()}`,
     status: "pending",
+    episodeId,
+    shotId,
+    stageId: "location",
     prompt,
     uploads: [{ path: relativeToCwd(image), filename }],
     saveTo: relativeToCwd(path.join(stagePath, "output")),
@@ -133,15 +130,15 @@ function firstFramePrompt(notes: string, characterCount: number): string {
   return extra ? `${place}\n${extra}\n${keep}` : `${place}\n${keep}`;
 }
 
-function queueFirstFrame(shotId: string): ComfyJob {
-  const meta = readShotMeta(shotId);
-  const stagePath = stageDir(shotId, "first_frame");
+function queueFirstFrame(episodeId: string, shotId: string): ComfyJob {
+  const meta = readShotMeta(episodeId, shotId);
+  const stagePath = stageDir(episodeId, shotId, "first_frame");
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
   const extra = generationText(promptMd, "", meta.characters) || "";
-  const locationDir = stageDir(shotId, "location");
+  const locationDir = stageDir(episodeId, shotId, "location");
   const locationImageFile = newestImage(path.join(locationDir, "approve"));
   if (!locationImageFile) throw new Error("Нет утверждённой локации для первого кадра.");
-  const characters = listImages(path.join(stageDir(shotId, "characters"), "approve"));
+  const characters = listImages(path.join(stageDir(episodeId, shotId, "characters"), "approve"));
   if (!characters.length) throw new Error("Нет утверждённых персонажей для первого кадра.");
   const prompt = loadApiGraph("qwen21_character_compositing.json");
   const uploads: { path: string; filename: string }[] = [];
@@ -163,6 +160,9 @@ function queueFirstFrame(shotId: string): ComfyJob {
   return enqueueComfyJob({
     id: `${shotId}-first-${Date.now()}`,
     status: "pending",
+    episodeId,
+    shotId,
+    stageId: "first_frame",
     prompt,
     uploads,
     saveTo: relativeToCwd(path.join(stagePath, "output")),
@@ -201,18 +201,19 @@ function secondsInText(text: string): number | null {
 }
 
 function queueVideo(
+  episodeId: string,
   shotId: string,
   workflow: VideoWorkflow,
   stageId: "video_preview" | "final_render" = "video_preview",
 ): ComfyJob {
-  const meta = readShotMeta(shotId);
-  const stagePath = stageDir(shotId, stageId);
+  const meta = readShotMeta(episodeId, shotId);
+  const stagePath = stageDir(episodeId, shotId, stageId);
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
   const spoken = generationText(promptMd, "", meta.characters);
   if (!spoken) {
     throw new Error("В prompt.md нет текста движения. Отправь рекомендацию агенту или впиши промпт сам.");
   }
-  const start = newestImage(path.join(stageDir(shotId, "first_frame"), "approve"));
+  const start = newestImage(path.join(stageDir(episodeId, shotId, "first_frame"), "approve"));
   if (!start) throw new Error("Нет утверждённого первого кадра.");
   const prompt = loadApiGraph(
     workflow === "flf" ? "wan22_flf_sketch_turbo_api.json" : "wan22_i2v_sketch_turbo_api.json",
@@ -238,6 +239,9 @@ function queueVideo(
   return enqueueComfyJob({
     id: `${shotId}-${stageId}-${workflow}-${Date.now()}`,
     status: "pending",
+    episodeId,
+    shotId,
+    stageId,
     prompt,
     uploads,
     saveTo: relativeToCwd(path.join(stagePath, "output")),
@@ -245,25 +249,25 @@ function queueVideo(
 }
 
 export function queueStageRun(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   options?: { videoWorkflow?: VideoWorkflow; fromAgent?: boolean },
 ): { id: string; message: string } {
-  getSeriesRoot();
   // Ручной запуск закрыт, пока идёт операция. Из цикла после ответа агента — разрешён.
-  if (!options?.fromAgent) assertStageFree(shotId, stageId);
+  if (!options?.fromAgent) assertStageFree(episodeId, shotId, stageId);
   let job: ComfyJob;
-  if (stageId === "location") job = queueLocation(shotId);
-  else if (stageId === "first_frame") job = queueFirstFrame(shotId);
+  if (stageId === "location") job = queueLocation(episodeId, shotId);
+  else if (stageId === "first_frame") job = queueFirstFrame(episodeId, shotId);
   else if (stageId === "video_preview" || stageId === "final_render") {
-    job = queueVideo(shotId, options?.videoWorkflow || "i2v", stageId);
+    job = queueVideo(episodeId, shotId, options?.videoWorkflow || "i2v", stageId);
   } else {
     throw new Error(
       "Граф одежды в API-формате не лежит в playbooks, поэтому доска не ставит его в Comfy. Прогон одежды делает агент по playbooks/workflows/characters_comfy.md. Граф позы отсюда не запускаю.",
     );
   }
-  const previous = readStageStateFile(shotId, stageId);
-  writeStageState(shotId, stageId, {
+  const previous = readStageStateFile(episodeId, shotId, stageId);
+  writeStageState(episodeId, shotId, stageId, {
     phase: "comfy",
     jobId: job.id,
     requestId: options?.fromAgent ? previous?.requestId : undefined,

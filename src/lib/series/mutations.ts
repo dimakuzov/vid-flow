@@ -9,8 +9,8 @@ import { readStatusFile, writeStatusFile } from "./status";
 import { readStageState, setIdle } from "./stage-state";
 
 /** Ручное действие пользователя снимает показ прошлой ошибки. Идущую операцию не трогает. */
-function clearStageError(shotId: string, stageId: StageId): void {
-  if (readStageState(shotId, stageId).phase === "error") setIdle(shotId, stageId);
+function clearStageError(episodeId: string, shotId: string, stageId: StageId): void {
+  if (readStageState(episodeId, shotId, stageId).phase === "error") setIdle(episodeId, shotId, stageId);
 }
 
 function nameInStem(stem: string, token: string): boolean {
@@ -76,6 +76,7 @@ function uniqueTarget(dir: string, filename: string): string {
 }
 
 export async function saveUpload(options: {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   target: "refs" | "output";
@@ -83,16 +84,17 @@ export async function saveUpload(options: {
   bytes: Buffer;
   approveAfter?: boolean;
 }): Promise<{ savedAs: string; approvedAs?: string }> {
+  const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
-  ensureStageDirs(shotId);
-  const dir = path.join(stageDir(shotId, options.stageId), options.target);
+  ensureStageDirs(episodeId, shotId);
+  const dir = path.join(stageDir(episodeId, shotId, options.stageId), options.target);
   fs.mkdirSync(dir, { recursive: true });
   const savedAs = uniqueTarget(dir, path.basename(options.filename));
   fs.writeFileSync(path.join(dir, savedAs), options.bytes);
 
   if (options.target === "refs") {
     fs.writeFileSync(
-      path.join(stageDir(shotId, options.stageId), "agent_touch.json"),
+      path.join(stageDir(episodeId, shotId, options.stageId), "agent_touch.json"),
       JSON.stringify(
         { refsTouchedByUser: true, touchedAt: new Date().toISOString() },
         null,
@@ -103,6 +105,7 @@ export async function saveUpload(options: {
 
   if (options.approveAfter) {
     const approvedAs = approveFiles({
+      episodeId,
       shotId,
       stageId: options.stageId,
       filenames: [savedAs],
@@ -112,22 +115,24 @@ export async function saveUpload(options: {
   }
 
   if (options.target === "output") {
-    writeStatusFile(shotId, options.stageId, { status: "review" });
-    clearStageError(shotId, options.stageId);
+    writeStatusFile(episodeId, shotId, options.stageId, { status: "review" });
+    clearStageError(episodeId, shotId, options.stageId);
   }
 
   return { savedAs };
 }
 
 export function approveFiles(options: {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   filenames: string[];
   from?: "output" | "refs";
 }): string[] {
+  const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
-  ensureStageDirs(shotId);
-  const stagePath = stageDir(shotId, options.stageId);
+  ensureStageDirs(episodeId, shotId);
+  const stagePath = stageDir(episodeId, shotId, options.stageId);
   const fromDir = path.join(stagePath, options.from || "output");
   const approveDir = path.join(stagePath, "approve");
   fs.mkdirSync(approveDir, { recursive: true });
@@ -139,7 +144,7 @@ export function approveFiles(options: {
   }
 
   const characters =
-    options.stageId === "characters" ? readShotMeta(shotId).characters : [];
+    options.stageId === "characters" ? readShotMeta(episodeId, shotId).characters : [];
   const filenames =
     options.stageId === "characters"
       ? [...options.filenames].sort(
@@ -181,18 +186,23 @@ export function approveFiles(options: {
     );
   }
 
-  writeStatusFile(shotId, options.stageId, { status: "approved" });
-  clearStageError(shotId, options.stageId);
+  writeStatusFile(episodeId, shotId, options.stageId, { status: "approved" });
+  clearStageError(episodeId, shotId, options.stageId);
   return [...new Set(saved)];
 }
 
-export function removeApprovedFile(shotId: string, stageId: StageId, filename: string): string {
+export function removeApprovedFile(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  filename: string,
+): string {
   const safeShot = assertSafeSegment(shotId, "shot");
   const safeName = path.basename(filename);
   if (!safeName || safeName !== filename || safeName === "." || safeName === "..") {
     throw new Error("Некорректное имя файла");
   }
-  const approveDir = path.join(stageDir(safeShot, stageId), "approve");
+  const approveDir = path.join(stageDir(episodeId, safeShot, stageId), "approve");
   const target = path.join(approveDir, safeName);
   if (!target.startsWith(approveDir + path.sep)) {
     throw new Error("Некорректное имя файла");
@@ -203,8 +213,8 @@ export function removeApprovedFile(shotId: string, stageId: StageId, filename: s
   fs.unlinkSync(target);
 
   const remaining = listMediaFiles(approveDir);
-  const output = listMediaFiles(path.join(stageDir(safeShot, stageId), "output"));
-  const names = stageId === "characters" ? readShotMeta(safeShot).characters : [];
+  const output = listMediaFiles(path.join(stageDir(episodeId, safeShot, stageId), "output"));
+  const names = stageId === "characters" ? readShotMeta(episodeId, safeShot).characters : [];
   const stillApproved =
     stageId === "characters"
       ? names.length
@@ -215,13 +225,14 @@ export function removeApprovedFile(shotId: string, stageId: StageId, filename: s
           )
         : remaining.length > 0
       : remaining.length > 0;
-  if (!stillApproved && readStatusFile(safeShot, stageId).status === "approved") {
-    writeStatusFile(safeShot, stageId, { status: output.length ? "review" : "prep" });
+  if (!stillApproved && readStatusFile(episodeId, safeShot, stageId).status === "approved") {
+    writeStatusFile(episodeId, safeShot, stageId, { status: output.length ? "review" : "prep" });
   }
   return safeName;
 }
 
 export function updateStageDocs(options: {
+  episodeId: string;
   shotId: string;
   stageId: StageId;
   prompt?: string;
@@ -229,11 +240,12 @@ export function updateStageDocs(options: {
   refs?: string;
   workflow?: string;
 }): void {
+  const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
-  const dir = stageDir(shotId, options.stageId);
+  const dir = stageDir(episodeId, shotId, options.stageId);
   fs.mkdirSync(dir, { recursive: true });
   if (typeof options.prompt === "string") {
-    syncPromptHistory(shotId, options.stageId);
+    syncPromptHistory(episodeId, shotId, options.stageId);
   }
   const mapping: Array<[string | undefined, string]> = [
     [options.prompt, "prompt.md"],
@@ -247,19 +259,19 @@ export function updateStageDocs(options: {
     }
   }
   if (typeof options.prompt === "string") {
-    syncPromptHistory(shotId, options.stageId);
+    syncPromptHistory(episodeId, shotId, options.stageId);
   }
 }
 
-export function listApprove(shotId: string, stageId: StageId) {
-  return listMediaFiles(path.join(stageDir(shotId, stageId), "approve"));
+export function listApprove(episodeId: string, shotId: string, stageId: StageId) {
+  return listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "approve"));
 }
 
-export function deleteShot(shotId: string): void {
+export function deleteShot(episodeId: string, shotId: string): void {
   const id = assertSafeSegment(shotId, "кадр");
   if (!/^s\d+$/i.test(id)) throw new Error("Некорректный кадр");
-  const dir = path.resolve(shotDir(id));
-  const root = path.resolve(shotsDir());
+  const dir = path.resolve(shotDir(episodeId, id));
+  const root = path.resolve(shotsDir(episodeId));
   if (dir !== root && !dir.startsWith(root + path.sep)) {
     throw new Error("Некорректный кадр");
   }

@@ -50,17 +50,17 @@ export const PHASE_LABELS: Record<StagePhase, string> = {
   error: "Ошибка",
 };
 
-function statePath(shotId: string, stageId: StageId, root?: string): string {
-  return path.join(stageDir(shotId, stageId, root), STATE_FILE);
+function statePath(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), STATE_FILE);
 }
 
 export function readStageStateFile(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
-  root?: string,
 ): StageStateFile | null {
   try {
-    const data = JSON.parse(fs.readFileSync(statePath(shotId, stageId, root), "utf8")) as StageStateFile;
+    const data = JSON.parse(fs.readFileSync(statePath(episodeId, shotId, stageId), "utf8")) as StageStateFile;
     if (!data || typeof data.phase !== "string") return null;
     return data;
   } catch {
@@ -69,36 +69,36 @@ export function readStageStateFile(
 }
 
 export function writeStageState(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   next: Omit<StageStateFile, "since" | "updatedAt"> & { since?: string },
-  root?: string,
 ): StageStateFile {
   const now = new Date().toISOString();
   const data: StageStateFile = { ...next, since: next.since || now, updatedAt: now };
-  const file = statePath(shotId, stageId, root);
+  const file = statePath(episodeId, shotId, stageId);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n", "utf8");
   return data;
 }
 
-export function setIdle(shotId: string, stageId: StageId, root?: string): StageStateFile {
-  return writeStageState(shotId, stageId, { phase: "idle" }, root);
+export function setIdle(episodeId: string, shotId: string, stageId: StageId): StageStateFile {
+  return writeStageState(episodeId, shotId, stageId, { phase: "idle" });
 }
 
 export function setError(
+  episodeId: string,
   shotId: string,
   stageId: StageId,
   error: string,
-  root?: string,
 ): StageStateFile {
-  const prev = readStageStateFile(shotId, stageId, root);
-  return writeStageState(
-    shotId,
-    stageId,
-    { phase: "error", error, requestId: prev?.requestId, jobId: prev?.jobId },
-    root,
-  );
+  const prev = readStageStateFile(episodeId, shotId, stageId);
+  return writeStageState(episodeId, shotId, stageId, {
+    phase: "error",
+    error,
+    requestId: prev?.requestId,
+    jobId: prev?.jobId,
+  });
 }
 
 interface JobSnapshot {
@@ -123,8 +123,8 @@ export function readJobSnapshot(jobId: string): JobSnapshot | null | "missing" {
  * Фаза, которую видит интерфейс. Чистое чтение: ничего не пишет.
  * Переводы comfy → idle/error и таймаут агента записывает фоновый цикл (reconcileStageState).
  */
-export function readStageState(shotId: string, stageId: StageId, root?: string): StageState {
-  const file = readStageStateFile(shotId, stageId, root);
+export function readStageState(episodeId: string, shotId: string, stageId: StageId): StageState {
+  const file = readStageStateFile(episodeId, shotId, stageId);
   const base = {
     since: file?.since ?? null,
     requestId: file?.requestId ?? null,
@@ -166,7 +166,7 @@ export class StageBusyError extends Error {
   }
 }
 
-export function assertStageFree(shotId: string, stageId: StageId, root?: string): void {
-  const state = readStageState(shotId, stageId, root);
+export function assertStageFree(episodeId: string, shotId: string, stageId: StageId): void {
+  const state = readStageState(episodeId, shotId, stageId);
   if (state.busy) throw new StageBusyError(state);
 }

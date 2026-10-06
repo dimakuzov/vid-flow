@@ -1,27 +1,19 @@
 import { NextResponse } from "next/server";
-import { STAGES, type StageId } from "@/lib/series/constants";
 import { cancelStage } from "@/lib/series/agent-dispatch";
-import { assertSafeSegment } from "@/lib/series/paths";
+import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 import { readStageState } from "@/lib/series/stage-state";
 
 export const runtime = "nodejs";
 
-export async function POST(
-  _request: Request,
-  context: { params: Promise<{ shotId: string; stage: string }> },
-) {
+export async function POST(_request: Request, context: StageRouteContext) {
   try {
-    const { shotId, stage } = await context.params;
-    assertSafeSegment(shotId, "shot");
-    if (!STAGES.includes(stage as StageId)) {
-      return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
-    }
-    const wasError = readStageState(shotId, stage as StageId).phase === "error";
-    await cancelStage(shotId, stage as StageId);
+    const { episodeId, shotId, stageId } = parseStageParams(await context.params);
+    const wasError = readStageState(episodeId, shotId, stageId).phase === "error";
+    await cancelStage(episodeId, shotId, stageId);
     return NextResponse.json({
       message: wasError ? "Ошибка сброшена. Этап снова свободен." : "Операция отменена. Этап снова свободен.",
-      stage: getStageDetail(shotId, stage as StageId),
+      stage: getStageDetail(episodeId, shotId, stageId),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось отменить";
