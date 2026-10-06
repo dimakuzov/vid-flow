@@ -25,7 +25,7 @@
     "text": {
       "kind": "text",
       "from": "prompt",
-      "required": false,
+      "required": true,
       "label": "prompt.md"
     }
   },
@@ -84,19 +84,7 @@
         }
       ],
       "value": {
-        "input": "text",
-        "templates": [
-          {
-            "when": {
-              "input": "people",
-              "countAtLeast": 2
-            },
-            "text": "Place the person from image 2 and the person from image 3 into the location from image 1.\n{text}\nKeep the location from image 1 exactly as it is. Do not add any other people."
-          },
-          {
-            "text": "Place the person from image 2 into the location from image 1.\n{text}\nKeep the location from image 1 exactly as it is. Do not add any other people."
-          }
-        ]
+        "input": "text"
       }
     },
     {

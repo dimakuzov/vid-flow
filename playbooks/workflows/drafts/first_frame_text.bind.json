@@ -1,0 +1,63 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "first_frame_text",
+  "graph": "qwen21_character_compositing.json",
+  "stage": "first_frame",
+  "label": "Первый кадр по тексту (без персонажей и локации)",
+  "description": "Кадр без конкретных персонажей и локации: по тексту, картинки из refs/ (0–3) — референсы.",
+  "playbook": "models/qwen_first_frame.en.md",
+  "order": 20,
+  "aliases": [],
+  "when": { "shot": { "characters": "none", "location": "none" } },
+  "inputs": {
+    "refs": {
+      "kind": "image",
+      "from": "refs",
+      "pick": "all",
+      "min": 0,
+      "max": 3,
+      "label": "Референсы в refs/ (необязательно)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "label": "prompt.md"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "470", "field": "image" }],
+      "value": { "input": "refs", "index": 0 },
+      "whenEmpty": {
+        "remove": [{ "node": "470" }, { "node": "488", "field": "images.image_1" }]
+      }
+    },
+    {
+      "targets": [{ "node": "902", "field": "image" }],
+      "value": { "input": "refs", "index": 1 },
+      "whenEmpty": {
+        "remove": [{ "node": "902" }, { "node": "488", "field": "images.image_2" }]
+      }
+    },
+    {
+      "targets": [{ "node": "903", "field": "image" }],
+      "value": { "input": "refs", "index": 2 },
+      "whenEmpty": {
+        "remove": [{ "node": "903" }, { "node": "488", "field": "images.image_3" }]
+      }
+    },
+    {
+      "targets": [{ "node": "477", "field": "value" }],
+      "value": { "input": "text" }
+    },
+    {
+      "targets": [{ "node": "485", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "461", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/first_frame/{shotId}_ff_text" }
+    }
+  ]
+}
