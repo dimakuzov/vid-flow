@@ -12,7 +12,11 @@ export async function POST(request: Request, context: StageRouteContext) {
       message?: string;
       prompt?: string;
       refs?: string;
+      /** Заметка workflow.md. */
       workflow?: string;
+      /** id манифеста графа (docs/contracts/graph-binding.md). */
+      runWorkflow?: unknown;
+      /** Старое имя выбора графа (i2v / flf). */
       videoWorkflow?: unknown;
     };
     const submitted = submitAgentRequest({
@@ -23,7 +27,12 @@ export async function POST(request: Request, context: StageRouteContext) {
       prompt: body.prompt || "",
       refsNote: body.refs || "",
       workflowNote: body.workflow || "",
-      videoWorkflow: body.videoWorkflow === "flf" ? "flf" : "i2v",
+      workflow:
+        typeof body.runWorkflow === "string"
+          ? body.runWorkflow
+          : typeof body.videoWorkflow === "string"
+            ? body.videoWorkflow
+            : undefined,
     });
     const dispatch = readAgentDispatch(episodeId, shotId, stageId);
 

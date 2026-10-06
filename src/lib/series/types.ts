@@ -1,5 +1,10 @@
+import type { AgentProviderId, AgentRequestStatus } from "../contracts/agent-request";
+import type { JobSummary } from "../contracts/comfy-job";
+import type { WorkflowChoice } from "../contracts/graph-binding";
 import type { StageId, StageStatus } from "./constants";
 import type { StageState } from "./stage-state";
+
+export type { JobSummary, WorkflowChoice };
 
 export type MediaKind = "image" | "video" | "other";
 
@@ -74,10 +79,20 @@ export interface StageDetail {
   playbooks: string[];
   relativeDir: string;
   state: StageState;
+  /** Выбранный воркфлоу (run_settings.json). null — вариант по умолчанию (WorkflowChoice.isDefault). */
+  workflow: string | null;
+  /** Воркфлоу этапа для меню, по order. Пусто — доска этот этап не запускает. */
+  workflows: WorkflowChoice[];
+  /** Последнее задание очереди этапа (stage_state.jobId). */
+  job: JobSummary | null;
   agentRequest: {
-    status: "pending" | "done" | "cancelled";
+    status: AgentRequestStatus;
     createdAt: string;
     refsChangedByUser: boolean;
+    /** Пусто — manual (запросы до контракта agent-request). */
+    provider: AgentProviderId | null;
+    error: string | null;
+    suggestedWorkflow: string | null;
     comfy: "wait" | "queued" | "error" | "agent" | "cancelled" | null;
     comfyJobId: string | null;
     comfyError: string | null;

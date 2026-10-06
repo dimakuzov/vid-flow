@@ -1,6 +1,12 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import type {
+  AgentProviderId,
+  AgentRequestFile,
+  AgentRequestStatus,
+  RefFingerprint,
+} from "../contracts/agent-request";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { updateStageDocs } from "./mutations";
@@ -23,22 +29,21 @@ const LLM_TASK = "llm_task.md";
 const DISPATCH_FILE = "agent_dispatch.json";
 
 export type AgentComfyState = "wait" | "queued" | "error" | "agent" | "cancelled";
-export type AgentVideoWorkflow = "i2v" | "flf";
 
 export interface AgentDispatch {
   requestId: string;
   state: AgentComfyState;
-  videoWorkflow?: AgentVideoWorkflow;
+  /** id манифеста (или старое имя), с которым доска поставит прогон после done. Нет — выбор этапа. */
+  workflow?: string;
+  /** Старое поле: i2v / flf. Читается, если нет workflow. */
+  videoWorkflow?: string;
   jobId?: string;
   error?: string;
   updatedAt: string;
 }
 
-export interface RefFingerprint {
-  name: string;
-  sha256: string;
-  bytes: number;
-}
+// Схема запроса — docs/contracts/agent-request.md.
+export type { AgentRequestFile, RefFingerprint };
 
 export interface AgentBaseline {
   capturedAt: string;
@@ -48,35 +53,13 @@ export interface AgentBaseline {
   refs: RefFingerprint[];
 }
 
-export interface AgentRequestFile {
-  id: string;
-  episodeId: string;
-  shotId: string;
-  stageId: StageId;
-  createdAt: string;
-  status: "pending" | "done" | "cancelled";
-  message: string;
-  refsChangedByUser: boolean;
-  changes: {
-    prompt: "changed" | "unchanged" | "no-baseline";
-    refsNote: "changed" | "unchanged" | "no-baseline";
-    workflowNote: "changed" | "unchanged" | "no-baseline";
-    refFilesAdded: string[];
-    refFilesRemoved: string[];
-    refFilesReplaced: string[];
-  };
-  current: {
-    prompt: string;
-    refsNote: string;
-    workflowNote: string;
-    refFiles: RefFingerprint[];
-  };
-}
-
 export interface AgentRequestSummary {
-  status: "pending" | "done" | "cancelled";
+  status: AgentRequestStatus;
   createdAt: string;
   refsChangedByUser: boolean;
+  provider: AgentProviderId | null;
+  error: string | null;
+  suggestedWorkflow: string | null;
   comfy: AgentComfyState | null;
   comfyJobId: string | null;
   comfyError: string | null;
@@ -243,6 +226,9 @@ export function readAgentRequestSummary(
     status: request.status,
     createdAt: request.createdAt,
     refsChangedByUser: request.refsChangedByUser,
+    provider: request.provider ?? null,
+    error: request.error ?? null,
+    suggestedWorkflow: request.suggestedWorkflow ?? null,
     comfy: dispatch?.state ?? null,
     comfyJobId: dispatch?.jobId ?? null,
     comfyError: dispatch?.error ?? null,
@@ -472,7 +458,8 @@ export function submitAgentRequest(options: {
   prompt: string;
   refsNote: string;
   workflowNote: string;
-  videoWorkflow?: AgentVideoWorkflow;
+  /** id манифеста или старое имя (i2v, flf). Нет — выбор этапа. */
+  workflow?: string;
 }): AgentRequestFile {
   const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
@@ -541,7 +528,7 @@ export function submitAgentRequest(options: {
   writeAgentDispatch(episodeId, shotId, options.stageId, {
     requestId: request.id,
     state: boardQueues ? "wait" : "agent",
-    videoWorkflow: options.videoWorkflow === "flf" ? "flf" : "i2v",
+    workflow: options.workflow || undefined,
     updatedAt: request.createdAt,
   });
   writeStageState(episodeId, shotId, options.stageId, {

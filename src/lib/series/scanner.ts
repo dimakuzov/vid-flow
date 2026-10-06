@@ -26,7 +26,9 @@ import {
   readStatusFile,
 } from "./status";
 import { readAgentRequestSummary } from "./agent-request";
-import { readStageState } from "./stage-state";
+import { listWorkflowChoices } from "../comfy/workflows";
+import { readRunSettings } from "./run-settings";
+import { readJobSummary, readStageState } from "./stage-state";
 import type { SeriesChoice, SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
 
 function parseSeriesMarkdown(content: string): { title: string; description: string } {
@@ -213,6 +215,7 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
   if (!fs.existsSync(path.dirname(dir))) throw new Error(`Кадра ${shotId} нет в эпизоде ${episodeId}`);
   const status = deriveStageStatus(episodeId, shotId, stageId, meta.characters);
   const stored = readStatusFile(episodeId, shotId, stageId);
+  const state = readStageState(episodeId, shotId, stageId);
 
   return {
     episodeId,
@@ -237,7 +240,10 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     approve: listMediaFiles(path.join(dir, "approve")),
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
-    state: readStageState(episodeId, shotId, stageId),
+    state,
+    workflow: readRunSettings(episodeId, shotId, stageId).workflow ?? null,
+    workflows: listWorkflowChoices(episodeId, shotId, stageId),
+    job: readJobSummary(state.jobId),
     agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
     watch: readShotWatch(episodeId, shotId),
   };

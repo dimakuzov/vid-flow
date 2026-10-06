@@ -78,24 +78,6 @@ export function parseScenario(content: string): BootstrapPreview {
   return { seriesTitle: title, shots };
 }
 
-function defaultPrompt(stageId: StageId, shot: BootstrapShotDraft): string {
-  switch (stageId) {
-    case "characters":
-      return `Собери shot-вариант персонажей для ${shot.id} (${shot.title}).\nПерсонажи: ${shot.characters.join(", ") || "уточнить"}.\nВнешность берётся из data/characters/{name}/ (portrait, side, full_body; если имени нет — существующий png этой папки).\nПо умолчанию меняется только одежда. Скелет и сборка позы не нужны, пока в задании прямо не сказано взять конкретную позу с референса.\nПрогон, не останавливаясь на тексте: playbooks/workflows/characters_comfy.md, раздел «Команда».\nПравила: playbooks/stages/characters.md`;
-    case "location":
-      return `Собери shot-вариант локации без персонажей для ${shot.id}.\nЛокация: ${shot.location || "уточнить"}.\nОбщий вид: data/locations/${shot.location || "{locationId}"}/.\nПравила: playbooks/stages/location.md`;
-    case "first_frame":
-      if (!shot.characters.length && !shot.location.trim()) {
-        return `Собери первый кадр ${shot.id} сразу. Персонажей и локации в кадре нет, предыдущие этапы не делать.\nДействие: ${shot.summary || shot.title}`;
-      }
-      return `Собери первый кадр для ${shot.id}.\nУтверждённые персонажи и локация, если они уже есть, входят в кадр. Если их нет, не жди предыдущие этапы и собери кадр по действию.\nДействие: ${shot.summary || shot.title}`;
-    case "video_preview":
-      return `Сгенерируй preview-видео низкого разрешения для ${shot.id}.\nПроверь движение и развитие кадра.\nДействие: ${shot.summary || shot.title}`;
-    case "final_render":
-      return `Финальный рендер высокого разрешения для ${shot.id} на основе approved preview.`;
-  }
-}
-
 function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   if (stageId === "characters") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
@@ -131,7 +113,9 @@ function defaultWorkflow(stageId: StageId): string {
 
 function seedStageDocs(episodeId: string, shot: BootstrapShotDraft, stageId: StageId): void {
   const dir = stageDir(episodeId, shot.id, stageId);
-  writeText(path.join(dir, "prompt.md"), defaultPrompt(stageId, shot) + "\n");
+  // prompt.md — ровно текст для модели, на её языке. Доска его не сочиняет: пишет агент
+  // по плейбуку модели или пользователь. Действие кадра лежит в shot.md.
+  writeText(path.join(dir, "prompt.md"), "");
   writeText(
     path.join(dir, "llm_notes.md"),
     "",

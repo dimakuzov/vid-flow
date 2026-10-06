@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
+import { writeRunSettings } from "@/lib/series/run-settings";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 
@@ -23,7 +25,15 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       llmNotes?: string;
       refs?: string;
       workflow?: string;
+      /** Выбор графа (id манифеста). Пустая строка — вернуть вариант по умолчанию. */
+      runWorkflow?: string;
     };
+    if (typeof body.runWorkflow === "string") {
+      const workflow = body.runWorkflow.trim()
+        ? resolveWorkflowId(episodeId, shotId, stageId, body.runWorkflow)
+        : null;
+      writeRunSettings(episodeId, shotId, stageId, { workflow: workflow ?? undefined });
+    }
     updateStageDocs({
       episodeId,
       shotId,

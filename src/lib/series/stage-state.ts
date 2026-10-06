@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import type { ComfyJob, JobSummary } from "../contracts/comfy-job";
 import type { StageId } from "./constants";
 import { getComfyQueueRoot, stageDir } from "./paths";
 
@@ -117,6 +118,25 @@ export function readJobSnapshot(jobId: string): JobSnapshot | null | "missing" {
   } catch {
     return null;
   }
+}
+
+/** Сводка задания для интерфейса (docs/contracts/comfy-job.md). Чистое чтение. */
+export function readJobSummary(jobId: string | null | undefined): JobSummary | null {
+  if (!jobId) return null;
+  const job = readJobSnapshot(jobId) as Partial<ComfyJob> | null | "missing";
+  if (!job || job === "missing" || typeof job.status !== "string") return null;
+  return {
+    id: jobId,
+    status: job.status,
+    workflow: job.workflow ?? null,
+    queuedAt: job.queuedAt ?? null,
+    submittedAt: job.submittedAt ?? null,
+    finishedAt: job.finishedAt ?? null,
+    queuePosition: typeof job.queuePosition === "number" ? job.queuePosition : null,
+    files: Array.isArray(job.files) ? job.files : [],
+    error: job.error ?? null,
+    nodeErrors: Array.isArray(job.nodeErrors) ? job.nodeErrors : [],
+  };
 }
 
 /**

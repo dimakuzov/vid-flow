@@ -8,23 +8,13 @@ import {
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
+import { registerLoop } from "../background";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
 
-export interface ComfyJob {
-  id: string;
-  status: "pending" | "running" | "done" | "error" | "cancelled";
-  /** Чей это прогон. Пишет постановщик (stage-run); очередь только хранит. Ручные задания могут их не иметь. */
-  episodeId?: string;
-  shotId?: string;
-  stageId?: string;
-  prompt: Record<string, { class_type: string; inputs: Record<string, unknown> }>;
-  uploads?: { path: string; filename?: string }[];
-  saveTo: string;
-  promptId?: string;
-  files?: string[];
-  error?: string;
-  updatedAt?: string;
-}
+import type { ComfyJob } from "../contracts/comfy-job";
+
+// Схема задания — docs/contracts/comfy-job.md.
+export type { ComfyJob };
 
 const running = new Set<string>();
 const HISTORY_TIMEOUT_MS = 15 * 60 * 1000;
@@ -133,7 +123,14 @@ export function enqueueComfyJob(job: ComfyJob): ComfyJob {
   if (!job.prompt || typeof job.prompt !== "object") throw new Error("prompt обязателен");
   resolveSaveDir(job.saveTo);
   for (const upload of job.uploads || []) resolveReadable(upload.path);
-  const next: ComfyJob = { ...job, status: "pending", error: undefined, files: undefined, promptId: undefined };
+  const next: ComfyJob = {
+    ...job,
+    status: "pending",
+    queuedAt: job.queuedAt || new Date().toISOString(),
+    error: undefined,
+    files: undefined,
+    promptId: undefined,
+  };
   writeJob(next);
   return next;
 }
@@ -304,11 +301,5 @@ export async function drainComfyQueue(): Promise<void> {
 }
 
 export function startComfyQueue(): void {
-  const marker = globalThis as typeof globalThis & { __frameboardComfyQueue?: boolean };
-  if (marker.__frameboardComfyQueue) return;
-  marker.__frameboardComfyQueue = true;
-  setInterval(() => {
-    void drainComfyQueue();
-  }, 2000);
-  void drainComfyQueue();
+  registerLoop("comfy-queue", 2000, drainComfyQueue);
 }

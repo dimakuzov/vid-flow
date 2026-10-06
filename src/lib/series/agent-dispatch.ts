@@ -1,3 +1,4 @@
+import { registerLoop } from "../background";
 import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
 import { STAGES, type StageId } from "./constants";
@@ -17,7 +18,6 @@ import {
   type StageState,
 } from "./stage-state";
 
-let ticking = false;
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -28,7 +28,7 @@ function queueAfterAgent(episodeId: string, shotId: string, stageId: StageId): v
   const dispatch = readAgentDispatch(episodeId, shotId, stageId);
   try {
     const queued = queueStageRun(episodeId, shotId, stageId, {
-      videoWorkflow: dispatch?.videoWorkflow === "flf" ? "flf" : "i2v",
+      workflow: dispatch?.workflow || dispatch?.videoWorkflow,
       fromAgent: true,
     });
     if (dispatch) {
@@ -137,16 +137,5 @@ export async function cancelStage(episodeId: string, shotId: string, stageId: St
 }
 
 export function startAgentDispatch(): void {
-  const g = globalThis as { __frameboardAgentDispatch?: boolean };
-  if (g.__frameboardAgentDispatch) return;
-  g.__frameboardAgentDispatch = true;
-  setInterval(() => {
-    if (ticking) return;
-    ticking = true;
-    try {
-      reconcileAllStages();
-    } finally {
-      ticking = false;
-    }
-  }, 3000);
+  registerLoop("agent-dispatch", 3000, reconcileAllStages);
 }

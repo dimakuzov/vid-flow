@@ -1,28 +1,24 @@
 import { NextResponse } from "next/server";
-import { queueStageRun, type VideoWorkflow } from "@/lib/comfy/stage-run";
+import { queueStageRun } from "@/lib/comfy/stage-run";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
 
-function videoWorkflow(value: unknown): VideoWorkflow {
-  return value === "flf" ? "flf" : "i2v";
-}
-
 export async function POST(request: Request, context: StageRouteContext) {
   try {
     const { episodeId, shotId, stageId } = parseStageParams(await context.params);
-    let workflow: VideoWorkflow = "i2v";
-    if (stageId === "video_preview" || stageId === "final_render") {
-      try {
-        const body = (await request.json()) as { workflow?: unknown };
-        workflow = videoWorkflow(body.workflow);
-      } catch {
-        workflow = "i2v";
-      }
+    // runWorkflow — id манифеста; workflow — старое имя поля (i2v, flf). Нет — выбор этапа или вариант по умолчанию.
+    let workflow: string | undefined;
+    try {
+      const body = (await request.json()) as { runWorkflow?: unknown; workflow?: unknown };
+      const raw = body.runWorkflow ?? body.workflow;
+      if (typeof raw === "string") workflow = raw;
+    } catch {
+      workflow = undefined;
     }
 
-    const queued = queueStageRun(episodeId, shotId, stageId, { videoWorkflow: workflow });
+    const queued = queueStageRun(episodeId, shotId, stageId, { workflow });
     return NextResponse.json({
       message: queued.message,
       jobId: queued.id,

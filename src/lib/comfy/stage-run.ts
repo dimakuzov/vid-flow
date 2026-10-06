@@ -5,7 +5,9 @@ import { readTextIfExists } from "../series/media";
 import { getLocationsRoot, getPlaybooksRoot, stageDir, toPosix } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
 import { assertStageFree, readStageStateFile, writeStageState } from "../series/stage-state";
+import { readRunSettings } from "../series/run-settings";
 import { enqueueComfyJob, startComfyQueue, type ComfyJob } from "./queue";
+import { resolveWorkflowId } from "./workflows";
 
 type ApiNode = { class_type: string; inputs: Record<string, unknown> };
 type ApiPrompt = Record<string, ApiNode>;
@@ -75,7 +77,7 @@ function locationImage(episodeId: string, shotId: string, locationId: string): s
   throw new Error(`В ${folderName} нет view.png`);
 }
 
-function queueLocation(episodeId: string, shotId: string): ComfyJob {
+function queueLocation(episodeId: string, shotId: string, workflow: string | null): ComfyJob {
   const meta = readShotMeta(episodeId, shotId);
   const stagePath = stageDir(episodeId, shotId, "location");
   // В модель идёт только prompt.md. llm_notes.md — поле ввода рекомендации для агента.
@@ -106,6 +108,7 @@ function queueLocation(episodeId: string, shotId: string): ComfyJob {
     episodeId,
     shotId,
     stageId: "location",
+    workflow: workflow ?? undefined,
     prompt,
     uploads: [{ path: relativeToCwd(image), filename }],
     saveTo: relativeToCwd(path.join(stagePath, "output")),
@@ -130,7 +133,7 @@ function firstFramePrompt(notes: string, characterCount: number): string {
   return extra ? `${place}\n${extra}\n${keep}` : `${place}\n${keep}`;
 }
 
-function queueFirstFrame(episodeId: string, shotId: string): ComfyJob {
+function queueFirstFrame(episodeId: string, shotId: string, workflow: string | null): ComfyJob {
   const meta = readShotMeta(episodeId, shotId);
   const stagePath = stageDir(episodeId, shotId, "first_frame");
   const promptMd = readTextIfExists(path.join(stagePath, "prompt.md"));
@@ -163,6 +166,7 @@ function queueFirstFrame(episodeId: string, shotId: string): ComfyJob {
     episodeId,
     shotId,
     stageId: "first_frame",
+    workflow: workflow ?? undefined,
     prompt,
     uploads,
     saveTo: relativeToCwd(path.join(stagePath, "output")),
@@ -204,7 +208,8 @@ function queueVideo(
   episodeId: string,
   shotId: string,
   workflow: VideoWorkflow,
-  stageId: "video_preview" | "final_render" = "video_preview",
+  stageId: "video_preview" | "final_render",
+  workflowId: string | null,
 ): ComfyJob {
   const meta = readShotMeta(episodeId, shotId);
   const stagePath = stageDir(episodeId, shotId, stageId);
@@ -242,25 +247,37 @@ function queueVideo(
     episodeId,
     shotId,
     stageId,
+    workflow: workflowId ?? undefined,
     prompt,
     uploads,
     saveTo: relativeToCwd(path.join(stagePath, "output")),
   });
 }
 
+/**
+ * Ставит прогон этапа в очередь. workflow — id манифеста или старое имя (`i2v`, `flf`);
+ * пусто — выбор этапа (run_settings.json), иначе вариант по умолчанию.
+ */
 export function queueStageRun(
   episodeId: string,
   shotId: string,
   stageId: StageId,
-  options?: { videoWorkflow?: VideoWorkflow; fromAgent?: boolean },
+  options?: { workflow?: string | null; fromAgent?: boolean },
 ): { id: string; message: string } {
   // Ручной запуск закрыт, пока идёт операция. Из цикла после ответа агента — разрешён.
   if (!options?.fromAgent) assertStageFree(episodeId, shotId, stageId);
+  const workflow = resolveWorkflowId(
+    episodeId,
+    shotId,
+    stageId,
+    options?.workflow || readRunSettings(episodeId, shotId, stageId).workflow,
+  );
   let job: ComfyJob;
-  if (stageId === "location") job = queueLocation(episodeId, shotId);
-  else if (stageId === "first_frame") job = queueFirstFrame(episodeId, shotId);
+  if (stageId === "location") job = queueLocation(episodeId, shotId, workflow);
+  else if (stageId === "first_frame") job = queueFirstFrame(episodeId, shotId, workflow);
   else if (stageId === "video_preview" || stageId === "final_render") {
-    job = queueVideo(episodeId, shotId, options?.videoWorkflow || "i2v", stageId);
+    const video: VideoWorkflow = workflow?.endsWith("_flf") ? "flf" : "i2v";
+    job = queueVideo(episodeId, shotId, video, stageId, workflow);
   } else {
     throw new Error(
       "Граф одежды в API-формате не лежит в playbooks, поэтому доска не ставит его в Comfy. Прогон одежды делает агент по playbooks/workflows/characters_comfy.md. Граф позы отсюда не запускаю.",

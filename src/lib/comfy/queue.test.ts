@@ -8,7 +8,8 @@ import { after, test } from "node:test";
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frameboard-queue-"));
 process.env.DATA_ROOT = tmp;
 process.env.COMFY_URL = "http://comfy.test";
-(globalThis as { __frameboardComfyQueue?: boolean }).__frameboardComfyQueue = true;
+// Фоновые циклы в тесте не запускаем: задания остаются файлами.
+process.env.FRAMEBOARD_LOOPS = "off";
 
 import { cancelComfyJob, drainComfyQueue, enqueueComfyJob, readComfyJob } from "./queue";
 

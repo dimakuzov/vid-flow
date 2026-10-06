@@ -10,8 +10,8 @@ process.env.DATA_ROOT = tmp;
 process.env.PLAYBOOKS_ROOT ||= path.resolve(__dirname, "../../../playbooks");
 process.env.COMFY_URL = "http://127.0.0.1:9";
 delete process.env.SERIES_ROOT;
-// Фоновую очередь в тесте не запускаем: задания остаются файлами.
-(globalThis as { __frameboardComfyQueue?: boolean }).__frameboardComfyQueue = true;
+// Фоновые циклы в тесте не запускаем: задания остаются файлами.
+process.env.FRAMEBOARD_LOOPS = "off";
 
 import { submitAgentRequest, readAgentRequest } from "./agent-request";
 import { cancelStage, reconcileStage } from "./agent-dispatch";
