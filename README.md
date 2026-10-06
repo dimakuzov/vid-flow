@@ -19,13 +19,14 @@ npm run dev
 
 Открой [http://127.0.0.1:3456](http://127.0.0.1:3456).
 
-По умолчанию серия лежит в `data/series`.  
-Глобальные playbooks — в `playbooks/` (общие для всех серий).
+Один сериал на репозиторий. Общие папки: `data/characters`, `data/locations`, `data/references`, `data/scenarios`. Серии — в `data/episodes/<имя>/`. Текущая серия записана в `data/current_episode.txt`.  
+Глобальные playbooks — в `playbooks/`.
 
-Чтобы указать другой корень серии:
+Другая папка данных или конкретный эпизод:
 
 ```bash
-SERIES_ROOT=/absolute/path/to/series npm run dev
+DATA_ROOT=/absolute/path/to/data npm run dev
+SERIES_ROOT=/absolute/path/to/episode npm run dev
 ```
 
 ## Что уже работает
@@ -41,25 +42,36 @@ SERIES_ROOT=/absolute/path/to/series npm run dev
 ## Структура серии
 
 ```text
-data/series/
-  series.md
-  scenario.md
-  shots/
-    s01/
-      shot.md
-      characters/
-        refs/
-        output/
-        approve/
-        prompt.md
-        llm_notes.md
-        refs.md
-        workflow.md
-        status.json
-      location/
-      first_frame/
-      video_preview/
-      final_render/
+data/
+  show.md
+  current_episode.txt
+  characters/          # база: {name}/portrait.png, side.png, full_body.png
+  locations/           # база: {locationId}/ — общий вид
+  references/          # общие референсы сериала
+  scenarios/           # документы сценариев
+  episodes/
+    e01/
+      episode.md
+      scenario_raw.md  # сырой текст для агента
+      scenario.md      # кадры ## s01, их читает скрипт
+      format_request.md
+      agent_inbox.md
+      shots/
+        s01/
+          shot.md
+          characters/
+            refs/
+            output/
+            approve/
+            prompt.md
+            llm_notes.md
+            refs.md
+            workflow.md
+            status.json
+          location/
+          first_frame/
+          video_preview/
+          final_render/
 ```
 
 Имена персонажей в approve: `lena_s01.png`, `mark_s01.png`.
@@ -67,7 +79,9 @@ data/series/
 ## Агент и playbooks
 
 - Инструкция агенту по сборке структуры: `docs/AGENT_BOOTSTRAP.md`
-- Свои model/workflow гайды клади в `playbooks/` — приложение подхватит их на странице этапа
+- Гайды модели и этапа: `playbooks/`. Страница этапа показывает связанные файлы
+- Shot-персонаж по умолчанию — правка одежды из `data/characters/`. Граф со скелетом `playbooks/workflows/comfy/character_pose_outfit_qwen.json` только если явно просят конкретную позу с референса
+- Сырой сценарий: кнопка «Отправить на разметку» пишет `scenario_raw.md` и строку в `agent_inbox.md`. Агент в Cursor форматирует его в `scenario.md`. «Создать выбранные» — отдельный скрипт, он только создаёт папки из уже размеченного текста
 
 ## Стек
 

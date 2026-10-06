@@ -28,6 +28,7 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
   const [message, setMessage] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadMode, setUploadMode] = useState<"output" | "approve">("output");
+  const [videoWorkflow, setVideoWorkflow] = useState<"i2v" | "flf">("i2v");
 
   async function runAction() {
     setBusy(true);
@@ -35,6 +36,10 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
     try {
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/run`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          stageId === "video_preview" || stageId === "final_render" ? { workflow: videoWorkflow } : {},
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось запустить");
@@ -77,9 +82,19 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
   }
 
   async function approveFirstOutput() {
-    const name = stage.thumbnails[0]?.name;
-    if (!name) {
-      setMessage("Нет файлов для утверждения. Сначала загрузите вариант.");
+    const outputNames = stage.outputNames ?? [];
+    const filenames =
+      stageId === "characters"
+        ? outputNames
+        : stage.thumbnails[0] && !stage.thumbnails[0].relativePath.includes("/approve/")
+          ? [stage.thumbnails[0].name]
+          : [];
+    if (!filenames.length) {
+      setMessage(
+        stage.outputCount
+          ? "Новый вариант в output. Откройте «Редактировать», отметьте имя файла и нажмите «Утвердить выбранные»."
+          : "Нет файлов для утверждения. Сначала загрузите вариант.",
+      );
       return;
     }
     setBusy(true);
@@ -87,11 +102,16 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
       const res = await fetch(`/api/shots/${shotId}/stages/${stageId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filenames: [name], from: "output" }),
+        body: JSON.stringify({ filenames, from: "output" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось утвердить");
-      setMessage(`Утверждено: ${data.approved?.join(", ")}`);
+      const approved = data.approved?.join(", ");
+      setMessage(
+        stageId === "characters" && data.stage?.status !== "approved"
+          ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
+          : `Утверждено: ${approved}`,
+      );
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка");
@@ -123,15 +143,15 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
                     key={file.relativePath}
                     src={file.url}
                     alt={file.name}
-                    width={40}
-                    height={40}
+                    width={72}
+                    height={128}
                     unoptimized
-                    className="h-10 w-10 rounded-md border border-white object-cover shadow-sm"
+                    className="h-32 w-[4.5rem] rounded-md border border-white object-cover object-top shadow-sm"
                   />
                 ) : (
                   <div
                     key={file.relativePath}
-                    className="flex h-10 w-10 items-center justify-center rounded-md border border-white bg-stone-900 text-[10px] text-white shadow-sm"
+                    className="flex h-32 w-[4.5rem] items-center justify-center rounded-md border border-white bg-stone-900 text-[10px] text-white shadow-sm"
                   >
                     VID
                   </div>
@@ -192,6 +212,19 @@ export function StageCell({ shotId, stageId, stage, onChanged }: StageCellProps)
             >
               Редактировать
             </Link>
+            {stageId === "video_preview" || stageId === "final_render" ? (
+              <label className="grid gap-1 text-xs text-stone-600">
+                Воркфлоу
+                <select
+                  value={videoWorkflow}
+                  onChange={(event) => setVideoWorkflow(event.target.value === "flf" ? "flf" : "i2v")}
+                  className="h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900"
+                >
+                  <option value="i2v">Wan i2v — из первого кадра</option>
+                  <option value="flf">Wan FLF — первый и последний кадр</option>
+                </select>
+              </label>
+            ) : null}
             <Button disabled={busy} onClick={runAction}>
               Запустить
             </Button>

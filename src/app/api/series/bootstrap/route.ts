@@ -21,6 +21,7 @@ export async function POST(request: Request) {
       shotIds?: string[];
       overwriteDocs?: boolean;
       previewOnly?: boolean;
+      episodeId?: string;
     };
 
     if (body.previewOnly) {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       scenario: body.scenario,
       shotIds: body.shotIds,
       overwriteDocs: body.overwriteDocs,
+      episodeId: body.episodeId,
     });
     return NextResponse.json(result);
   } catch (error) {

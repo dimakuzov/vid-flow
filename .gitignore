@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local episodes. Many can sit under data/; none of them belong in the repo.
+/data/

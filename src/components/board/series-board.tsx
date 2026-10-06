@@ -1,69 +1,148 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
 import { StageCell } from "./stage-cell";
 
 export function SeriesBoard({
+  loadError = "",
   initialSeries,
   initialScenario,
+  initialRawScenario,
   initialPreview,
 }: {
+  loadError?: string;
   initialSeries: SeriesSummary;
   initialScenario: string;
+  initialRawScenario: string;
   initialPreview: BootstrapPreview;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [series, setSeries] = useState(initialSeries);
+  const [seenSeries, setSeenSeries] = useState(initialSeries);
+  const [newSeriesId, setNewSeriesId] = useState("");
+  const [headerMessage, setHeaderMessage] = useState("");
+  const episodeIdRef = useRef(series.episodeId);
+  const reloadInFlight = useRef(false);
+  episodeIdRef.current = series.episodeId;
+  if (seenSeries !== initialSeries) {
+    setSeenSeries(initialSeries);
+    setSeries(initialSeries);
+  }
+
+  async function openSeries(id: string) {
+    const episodeId = id.trim();
+    if (!episodeId) return;
+    setHeaderMessage("");
+    try {
+      const res = await fetch("/api/series/episode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId }),
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Не удалось открыть серию");
+      setNewSeriesId("");
+      reload();
+    } catch (error) {
+      setHeaderMessage(error instanceof Error ? error.message : "Ошибка");
+    }
+  }
+
+  function reload(options?: { quiet?: boolean }) {
+    const quiet = options?.quiet ?? false;
+    if (quiet && reloadInFlight.current) return;
+    reloadInFlight.current = true;
+    if (!quiet) setPending(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    fetch("/api/series", { cache: "no-store", signal: controller.signal })
+      .then(async (res) => {
+        const data = (await res.json()) as SeriesSummary & { error?: string };
+        if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
+        if (!data.episodeId && episodeIdRef.current) {
+          if (!quiet) {
+            setHeaderMessage("Серия на месте. Доска не успела прочитать папку, обнови ещё раз.");
+          }
+          return;
+        }
+        setSeries(data);
+        if (!quiet) setHeaderMessage("");
+      })
+      .catch(() => {
+        if (!quiet) setHeaderMessage("Доска не обновилась. Серия не сброшена.");
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        reloadInFlight.current = false;
+        if (!quiet) setPending(false);
+      });
+  }
 
   useEffect(() => {
-    setSeries(initialSeries);
-  }, [initialSeries]);
-
-  function reload() {
-    startTransition(async () => {
-      try {
-        const res = await fetch("/api/series", { cache: "no-store" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Не удалось загрузить серию");
-        setSeries(data);
-        router.refresh();
-      } catch {
-        router.refresh();
-      }
-    });
-  }
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      reload({ quiet: true });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <header className="relative overflow-hidden rounded-[28px] border border-teal-900/10 bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.18),_transparent_40%),linear-gradient(135deg,#f7f4ef_0%,#e7eef0_45%,#d9e7e4_100%)] px-6 py-8 sm:px-10">
         <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(28,57,56,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(28,57,56,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
-        <div className="relative max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-900/70">
-            Frameboard
-          </p>
-          <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-stone-950 sm:text-5xl">
-            {series.title}
-          </h1>
-          <p className="mt-4 max-w-2xl text-base text-stone-700">
-            {series.description}
-          </p>
-          <p className="mt-3 text-xs text-stone-500">
-            Корень серии:{" "}
-            <code className="rounded bg-white/70 px-1.5 py-0.5">{series.root}</code>
-          </p>
+        <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-900/70">
+              Frameboard
+            </p>
+            <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-stone-950 sm:text-5xl">
+              {series.episodeId ? series.episodeTitle : "Серия не выбрана"}
+            </h1>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-48 flex-col gap-1 text-xs font-medium text-stone-600">
+              Серия
+              <select
+                value={series.episodeId ?? ""}
+                onChange={(event) => openSeries(event.target.value)}
+                className="h-9 rounded-lg border border-stone-300 bg-white/90 px-2 text-sm text-stone-900"
+              >
+                <option value="" disabled>
+                  Выбери серию
+                </option>
+                {series.episodes.map((episode) => (
+                  <option key={episode.id} value={episode.id}>
+                    {episode.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex min-w-36 flex-col gap-1 text-xs font-medium text-stone-600">
+              Новая
+              <input
+                value={newSeriesId}
+                onChange={(event) => setNewSeriesId(event.target.value)}
+                placeholder="e02"
+                className="h-9 rounded-lg border border-stone-300 bg-white/90 px-2 font-mono text-sm text-stone-900"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => openSeries(newSeriesId)}
+              className="h-9 rounded-lg border border-stone-300 bg-white/90 px-3 text-sm text-stone-800"
+            >
+              Добавить
+            </button>
+          </div>
         </div>
+        {headerMessage ? (
+          <p className="relative mt-3 text-sm text-stone-700">{headerMessage}</p>
+        ) : null}
       </header>
-
-      <BootstrapPanel
-        initialScenario={initialScenario}
-        initialPreview={initialPreview}
-        onImported={reload}
-      />
 
       <section className="rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -79,13 +158,19 @@ export function SeriesBoard({
           </button>
         </div>
 
-        {series.shots.length === 0 ? (
+        {loadError ? (
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-red-300 bg-red-50 px-4 py-4 text-sm text-red-950">
+            {loadError}
+          </pre>
+        ) : null}
+
+        {series.shots.length === 0 && !loadError ? (
           <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
-            Кадров пока нет. Вставьте сценарий выше и нажмите «Создать выбранные»,
-            либо попросите агента собрать структуру из{" "}
-            <code>data/series/scenario.md</code>.
+            Кадров пока нет. Отметь их галкой в импорте сценария ниже.
           </p>
-        ) : (
+        ) : null}
+
+        {series.shots.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] border-separate border-spacing-2">
               <thead>
@@ -136,8 +221,24 @@ export function SeriesBoard({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
       </section>
+
+      <BootstrapPanel
+        key={`${initialSeries.episodeId ?? ""}::${initialRawScenario}::${initialScenario}`}
+        initialEpisodeId={series.episodeId ?? initialSeries.episodeId}
+        tableShots={series.shots.map((shot) => ({
+          id: shot.id,
+          title: shot.title,
+          characters: shot.characters,
+          location: shot.location,
+        }))}
+        initialScenario={initialScenario}
+        initialRawScenario={initialRawScenario}
+        initialPreview={initialPreview}
+        formatRequestStatus={series.formatRequestStatus}
+        onImported={reload}
+      />
     </div>
   );
 }

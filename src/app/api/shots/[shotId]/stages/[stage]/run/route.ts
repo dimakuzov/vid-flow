@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
+import { queueStageRun, type VideoWorkflow } from "@/lib/comfy/stage-run";
 import { STAGES, type StageId } from "@/lib/series/constants";
-import { setWaiting } from "@/lib/series/mutations";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
 
+function videoWorkflow(value: unknown): VideoWorkflow {
+  return value === "flf" ? "flf" : "i2v";
+}
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ shotId: string; stage: string }> },
 ) {
   try {
@@ -14,13 +18,20 @@ export async function POST(
     if (!STAGES.includes(stage as StageId)) {
       return NextResponse.json({ error: "Неизвестный этап" }, { status: 400 });
     }
+    let workflow: VideoWorkflow = "i2v";
+    if (stage === "video_preview" || stage === "final_render") {
+      try {
+        const body = (await request.json()) as { workflow?: unknown };
+        workflow = videoWorkflow(body.workflow);
+      } catch {
+        workflow = "i2v";
+      }
+    }
 
-    // Comfy adapter will replace this stub: mark waiting until artifacts arrive.
-    setWaiting(shotId, stage as StageId);
-
+    const queued = queueStageRun(shotId, stage as StageId, { videoWorkflow: workflow });
     return NextResponse.json({
-      message:
-        "Этап переведён в ожидание. Подключение локальной Comfy будет следующим шагом; пока положите результат в output/ вручную или через загрузку.",
+      message: queued.message,
+      jobId: queued.id,
       stage: getStageDetail(shotId, stage as StageId),
     });
   } catch (error) {
