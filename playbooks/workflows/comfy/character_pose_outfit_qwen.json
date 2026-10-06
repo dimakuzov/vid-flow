@@ -31,7 +31,7 @@
     "Node name for S&R": "UNETLoader"
    },
    "widgets_values": [
-    "qwen_image_edit_2511_bf16.safetensors",
+    "qwen_image_edit_2511_fp8mixed.safetensors",
     "default"
    ],
    "title": "Модель Qwen Edit (выбрать свою 2.1)"

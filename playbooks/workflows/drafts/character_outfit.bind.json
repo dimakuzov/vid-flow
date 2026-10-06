@@ -1,0 +1,62 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "character_outfit",
+  "graph": "character_outfit_qwen21.json",
+  "stage": "characters",
+  "label": "Персонаж: одежда кадра",
+  "description": "Правка одежды базы персонажа Qwen Image 2.1, по референсу одежды из refs/ или по тексту. Один прогон на персонажа.",
+  "playbook": "models/qwen_image.en.md",
+  "order": 10,
+  "aliases": [],
+  "forEach": "character",
+  "inputs": {
+    "base": {
+      "kind": "image",
+      "from": "library:character",
+      "pick": "first",
+      "uploadAs": "{shotId}_{character}_base{ext}",
+      "label": "База персонажа (data/characters/{character}/full_body.png)"
+    },
+    "clothes": {
+      "kind": "image",
+      "from": "refs",
+      "match": "{character}_clothes*",
+      "pick": "newest",
+      "min": 0,
+      "uploadAs": "{shotId}_{character}_clothes{ext}",
+      "label": "Референс одежды в refs/ ({character}_clothes.png), необязательно"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "section": "{character}",
+      "required": true,
+      "label": "prompt.md (раздел ## {character})"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "470", "field": "image" }],
+      "value": { "input": "base" }
+    },
+    {
+      "targets": [{ "node": "902", "field": "image" }],
+      "value": { "input": "clothes" },
+      "whenEmpty": {
+        "remove": [{ "node": "902" }, { "node": "488", "field": "images.image_2" }]
+      }
+    },
+    {
+      "targets": [{ "node": "477", "field": "value" }],
+      "value": { "input": "text" }
+    },
+    {
+      "targets": [{ "node": "485", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "461", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/characters/{shotId}_{character}_outfit" }
+    }
+  ]
+}
