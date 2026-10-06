@@ -32,8 +32,32 @@ function agentText(detail: StageDetail): string {
   return `Запрос ждёт исполнителя (${provider}).`;
 }
 
+const JOB_RESULT: Record<string, string> = {
+  done: "готово",
+  error: "ошибка",
+  cancelled: "отменён",
+  pending: "не отправлен",
+  running: "не завершён",
+};
+
+/** Этап свободен: одна строка о последнем прогоне — когда, чем и сколько файлов. */
+function LastJob({ job }: { job: NonNullable<StageDetail["job"]> }) {
+  const when = job.finishedAt || job.queuedAt;
+  const files = job.files.length;
+  return (
+    <p className="break-words text-xs text-stone-600">
+      Последний прогон: {JOB_RESULT[job.status] ?? job.status}
+      {when ? ` · ${formatClock(when)}` : ""}
+      {job.workflow ? ` · ${job.workflow}` : ""}
+      {files ? ` · файлов: ${files} (${job.files.join(", ")})` : ""}
+      {job.status === "error" && job.error ? ` · ${job.error}` : ""}
+    </p>
+  );
+}
+
 /**
  * Полоса состояния этапа: фаза из `state.phase` (не из `job.status`), время, очередь, ошибка.
+ * Этап свободен — строка о последнем прогоне.
  */
 export function StageStatusBar({
   detail,
@@ -46,7 +70,7 @@ export function StageStatusBar({
 }) {
   const now = useNow();
   const { state, job } = detail;
-  if (state.phase === "idle") return null;
+  if (state.phase === "idle") return job ? <LastJob job={job} /> : null;
 
   const since = state.phase === "running" && job?.submittedAt ? job.submittedAt : state.since;
   const elapsed = formatElapsed(since, now);

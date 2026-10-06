@@ -1,7 +1,7 @@
-// Контракт: docs/contracts/graph-binding.md. Только типы. Во время параллельной работы не менять.
+// Контракт: docs/contracts/graph-binding.md. Только типы.
 import type { StageId } from "../series/constants";
 
-/** Откуда берутся картинки входа. */
+/** Откуда берутся файлы входа. */
 export type ImageSource =
   /** refs/ этого этапа */
   | "refs"
@@ -13,12 +13,13 @@ export type ImageSource =
 export type ImagePick = "first" | "newest" | "all";
 
 export interface ImageInput {
-  kind: "image";
+  /** image — картинки (png, jpg, webp), video — ролики (mp4, webm, mov, mkv). */
+  kind: "image" | "video";
   /** Источники по порядку: берётся первый непустой. */
   from: ImageSource | ImageSource[];
-  /** first — первая по имени (числа по значению), newest — самая новая по mtime, all — все по имени. */
+  /** first — первый по имени (числа по значению), newest — самый новый по mtime, all — все по имени. */
   pick: ImagePick;
-  /** Сколько картинок нужно минимум. По умолчанию 1. 0 — вход необязательный. */
+  /** Сколько файлов нужно минимум. По умолчанию 1. 0 — вход необязательный. */
   min?: number;
   /** Сколько взять максимум (для pick: all). */
   max?: number;
@@ -30,17 +31,35 @@ export interface ImageInput {
 
 export interface TextInput {
   kind: "text";
-  /** Текст для модели — только prompt.md этапа, без фильтров. */
+  /** Текст для модели — только prompt.md, без фильтров. */
   from: "prompt";
+  /** Чей prompt.md: по умолчанию этого этапа. Например, финал берёт исходный Wan-промпт у video_preview. */
+  stage?: StageId;
   /** Пустой prompt.md — ошибка, если true. */
   required: boolean;
+  /**
+   * Разделы prompt.md: строки `## <имя>` делят текст. Разрешённые имена.
+   * Нет поля — разделов нет, весь текст один.
+   */
+  sections?: string[];
+  /**
+   * Куда идёт текст без заголовков: `all` — в каждый раздел (так работал prompt.md до разделов),
+   * имя раздела — только в него. По умолчанию `all`.
+   */
+  untitled?: string;
   label: string;
 }
 
 export interface NumberInput {
   kind: "number";
-  /** Секунды из текста prompt.md («5 сек», «5s»). Нет числа — значение графа не меняется. */
-  from: "prompt:seconds";
+  /**
+   * prompt:seconds — секунды из текста prompt.md («5 сек», «5s»);
+   * media:duration — длительность ролика из входа `of` (секунды, округление до целого).
+   * Нет числа — значение графа не меняется.
+   */
+  from: "prompt:seconds" | "media:duration";
+  /** Для media:duration: имя входа kind: video. */
+  of?: string;
   min?: number;
   max?: number;
   label: string;
@@ -53,6 +72,12 @@ export interface NodeTarget {
   node: string;
   /** Ключ в inputs ноды. Должен существовать в графе. */
   field: string;
+  /**
+   * Путь внутри поля, если поле — JSON-строка (как `creator_data` у MiniMaxH3Creator):
+   * ключи через точку, номера элементов массива — числом: `segments.0.refined.body`.
+   * Доска разбирает строку, пишет значение по пути и собирает строку обратно.
+   */
+  json?: string;
 }
 
 /** Правка текста перед подстановкой. Применяются по порядку. */
@@ -71,24 +96,38 @@ export interface TextTemplate {
 }
 
 export type SlotValue =
-  /** Картинка входа: имя загруженного файла. index — номер картинки во входе (по умолчанию 0). */
+  /** Картинка или ролик входа: имя загруженного файла. index — номер файла во входе (по умолчанию 0). */
   | { input: string; index?: number }
-  /** Текст входа после steps, затем первый подходящий шаблон (если есть). */
-  | { input: string; steps?: TextStep[]; templates?: TextTemplate[] }
+  /**
+   * Текст входа: раздел section (если у входа есть sections), затем steps, затем первый подходящий шаблон.
+   * required — пустой раздел даёт ошибку (без whenEmpty).
+   */
+  | { input: string; section?: string; required?: boolean; steps?: TextStep[]; templates?: TextTemplate[] }
   /** Новое случайное целое для каждого прогона. */
   | { seed: "random" }
   /** Строка-шаблон: {shotId}, {episodeId}, {stageId}, {workflow}. */
-  | { template: string };
+  | { template: string }
+  /** Готовое значение как есть: число, true/false, строка, объект. */
+  | { const: unknown };
+
+/** Что удалить из графа, если значения нет. */
+export interface Removal {
+  node: string;
+  /** Без field — удалить ноду целиком (ветка графа, которую она замыкала, не выполнится). */
+  field?: string;
+  /** Путь внутри JSON-строки поля: ключ удаляется, элемент массива вырезается. */
+  json?: string;
+}
 
 export interface BindingSlot {
   targets: NodeTarget[];
   value: SlotValue;
   /**
-   * Если значения нет (картинки с таким index нет, текст пуст, секунд нет):
+   * Если значения нет (файла с таким index нет, текст или раздел пуст, числа нет):
    * - не указано: для обязательного входа — ошибка, иначе оставить значение графа;
-   * - remove: эти ноды (field не указан) или ключи inputs (field указан) удалить из графа.
+   * - remove: удалить ноды, ключи inputs или пути внутри JSON-строки.
    */
-  whenEmpty?: { remove: Array<{ node: string; field?: string }> };
+  whenEmpty?: { remove: Removal[] };
 }
 
 /** Манифест `playbooks/workflows/comfy/<id>.bind.json`. */

@@ -135,6 +135,50 @@ playbooks/workflows/comfy/
 
 Направление (бриф 4): лучше, когда обвязка живёт в шаблоне `prompt.md` из плейбука модели, а манифест подставляет `{text}` как есть. `steps`/`templates` нужны, чтобы старое поведение было видно и менялось без кода.
 
+### Разделы `prompt.md`
+
+Когда графу нужно несколько текстов (4 ветки локации, разделы Refine у MiniMax H3), `prompt.md` делится заголовками `## <имя>`:
+
+```json
+"text": { "kind": "text", "from": "prompt", "required": true,
+          "sections": ["simple", "objects", "camera", "camera_objects"], "untitled": "all", "label": "prompt.md" }
+```
+```json
+{ "targets": [{ "node": "100", "field": "value" }], "value": { "input": "text", "section": "simple" },
+  "whenEmpty": { "remove": [{ "node": "104" }] } }
+```
+
+- `sections` — разрешённые имена (строчная латиница, цифры, `_`). Другое имя, повтор раздела, текст до первого заголовка — ошибка с понятным текстом.
+- `untitled` — куда идёт текст без заголовков: `all` — во все разделы (как было до разделов), имя — только в этот раздел.
+- Пустой раздел — `whenEmpty` (у локации: удалить ноду сохранения, ветка не выполняется). `required: true` у значения — пустой раздел даёт ошибку.
+- `stage` у текстового входа — взять `prompt.md` другого этапа (финал берёт исходный Wan-промпт у `video_preview`).
+
+### Пути внутри JSON-строки, константы
+
+Некоторые ноды получают всё одним JSON в строковом поле (`MiniMaxH3Creator.creator_data`). Target и removal принимают `json` — путь через точку, номер элемента массива — числом:
+
+```json
+{ "targets": [{ "node": "1", "field": "creator_data", "json": "segments.0.refined.body" }],
+  "value": { "input": "text", "section": "body", "required": true } }
+{ "targets": [{ "node": "1", "field": "creator_data", "json": "segments.0.assets.3.filename" }],
+  "value": { "input": "people", "index": 1 },
+  "whenEmpty": { "remove": [{ "node": "1", "field": "creator_data", "json": "segments.0.assets.3" }] } }
+{ "targets": [{ "node": "1", "field": "creator_data", "json": "short_edge" }], "value": { "const": 1152 } }
+```
+
+- Родитель пути обязан быть в графе (проверяется при загрузке).
+- Удаление элемента массива вырезает его; элементы одного массива удаляются с конца, номера не сдвигаются.
+- `const` — значение как есть: число, `true`/`false`, строка, объект.
+
+### Ролики и длительность
+
+- `kind: "video"` — как `image`, но файлы `mp4`, `webm`, `mov`, `mkv` (тот же `from`, `pick`, `uploadAs`). Загружаются в ComfyUI тем же `/upload/image`.
+- Число `from: "media:duration"`, `of: "<вход video>"` — длительность ролика по атому `mvhd` (mp4/mov), округление до секунды, в пределах `min..max`.
+
+### Язык текста
+
+Текст для модели проверяется перед запуском: строка инструкции доски («Собери …», «Правила: playbooks/…») или строка с русским текстом (5+ кириллических букв, не считая имён персонажей кадра и длительности «5 сек») — ошибка «перепиши prompt.md или отправь агенту». Старые `prompt.md` переводятся скриптом `npm run migrate-prompts` (без `--write` только показывает план).
+
 ## Метаданные
 
 Манифест не добавляет нод сохранения метаданных: ComfyUI сам пишет воркфлоу в PNG. Для видео нода сохранения должна писать метаданные (проверяет бриф 4).
@@ -154,6 +198,7 @@ playbooks/workflows/comfy/
 | `location_views` | location | `location_views_multiple_angles.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` |
+| `final_h3`, `final_h3_768` | final_render | `minimax_h3_creator_api.json` (MiniMax H3) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
 
 Составлены по `stage-run.ts` на момент контракта: собранный по ним prompt должен совпадать с текущим (кроме случайных seed).

@@ -46,6 +46,26 @@ floor and the edge of the green-blue rug at the bottom. No people.
 
 Пустой латент 768×1344, выход 9:16. Четыре варианта за запуск. Лишние пустые ветки не запускать.
 
+### В `prompt.md` на доске
+
+Каждая ветка — свой раздел, заголовок `## <ветка>`. Доска отдаёт раздел в свою ветку графа. Ветку без раздела не запускает.
+
+```md
+## simple
+Medium shot of the bed from the front, eye level. Same bedroom, no people.
+
+## objects
+The narrow bed along the wall seen from the front: white sheet, flat white pillow, the blue-beige patchwork wallpaper behind. No people.
+
+## camera
+Rotate the camera 45 degrees to the right. Keep the same room, no people.
+
+## camera_objects
+Rotate the camera 45 degrees to the right. In frame: the narrow bed, white sheet, the patchwork wallpaper. Keep the same room, no people.
+```
+
+Разделы: `simple`, `objects`, `camera`, `camera_objects`. Без заголовков весь текст уходит во все четыре ветки (старое поведение: четыре варианта отличаются только seed). Текст до первого заголовка и другие имена разделов — ошибка.
+
 ## Сложный ракурс
 
 image 1 — наша локация. image 2 — любое фото с нужной камерой. Локация переносится в чужую композицию. Содержимое image 2 запрещается.

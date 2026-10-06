@@ -55,6 +55,13 @@ for (const name of manifests) {
           target.field in node.inputs!,
           `${binding.id}: у ноды ${target.node} (${node.class_type}) нет поля ${target.field}`,
         );
+        if (target.json) {
+          const parsed = JSON.parse(String(node.inputs![target.field]));
+          const keys = target.json.split(".").map((key) => (/^\d+$/.test(key) ? Number(key) : key));
+          let parent: unknown = parsed;
+          for (const key of keys.slice(0, -1)) parent = (parent as Record<string | number, unknown>)?.[key];
+          assert.ok(parent && typeof parent === "object", `${binding.id}: в ${target.node}.${target.field} нет пути ${target.json}`);
+        }
       }
       for (const removal of slot.whenEmpty?.remove ?? []) {
         const node = graph[removal.node];
@@ -76,8 +83,8 @@ for (const name of manifests) {
         }
       } else {
         assert.ok(
-          value.seed === "random" || typeof value.template === "string",
-          `${binding.id}: значение слота должно быть input, seed или template`,
+          value.seed === "random" || typeof value.template === "string" || "const" in value,
+          `${binding.id}: значение слота должно быть input, seed, template или const`,
         );
       }
     }
