@@ -1,3 +1,4 @@
+import { abortAgentRun, isAgentRunLive, startAgentRun } from "../agent/runner";
 import { registerLoop } from "../background";
 import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
@@ -18,6 +19,7 @@ import {
   type StageState,
 } from "./stage-state";
 
+export const RESTARTED_ERROR = "Доска перезапущена, пока работал агент. Отправь запрос заново.";
 
 function errorText(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -56,7 +58,8 @@ function queueAfterAgent(episodeId: string, shotId: string, stageId: StageId): v
 
 /**
  * Единственное место, где фазы меняются сами по себе:
- * agent → comfy (агент поставил done) / idle (агент сам гонял Comfy) / error (таймаут),
+ * agent → comfy (агент поставил done) / idle (агент сам гонял Comfy) / error (запрос error, таймаут,
+ * перезапуск доски во время running); pending у провайдера доски — запуск исполнителя;
  * comfy → idle (задание done) / error (задание упало или пропало).
  */
 export function reconcileStage(episodeId: string, shotId: string, stageId: StageId): void {
@@ -80,9 +83,26 @@ export function reconcileStage(episodeId: string, shotId: string, stageId: Stage
       setIdle(episodeId, shotId, stageId);
       return;
     }
+    const provider = request.provider ?? "manual";
+    // Провайдер доски ещё работает (CLI-агент мог сам поставить done раньше выхода): ждём исполнителя.
+    // Таймаут режима держит исполнитель, а не этот цикл.
+    if (provider !== "manual" && isAgentRunLive(episodeId, request.id)) return;
     if (request.status === "done") {
       if (file.agentRunsComfy) setIdle(episodeId, shotId, stageId);
       else queueAfterAgent(episodeId, shotId, stageId);
+      return;
+    }
+    if (request.status === "error") {
+      setError(episodeId, shotId, stageId, request.error || "Агент вернул ошибку");
+      return;
+    }
+    if (provider !== "manual") {
+      if (request.status === "running") {
+        setError(episodeId, shotId, stageId, RESTARTED_ERROR);
+        return;
+      }
+      // pending без исполнителя: отправлен до перезапуска или запуск не успел начаться.
+      void startAgentRun(episodeId, shotId, stageId);
       return;
     }
     const since = Date.parse(file.since);
@@ -129,7 +149,11 @@ export function reconcileAllStages(): void {
 /** Кнопка «Отменить»: снимает запрос агенту и задание в очереди, возвращает этап в покой. */
 export async function cancelStage(episodeId: string, shotId: string, stageId: StageId): Promise<void> {
   const file = readStageStateFile(episodeId, shotId, stageId);
-  if (file?.phase === "agent" || file?.phase === "error") cancelAgentRequest(episodeId, shotId, stageId);
+  if (file?.phase === "agent" || file?.phase === "error") {
+    // Сначала cancelled на диске, потом abort: исполнитель после обрыва видит отмену и ничего не пишет.
+    const cancelled = cancelAgentRequest(episodeId, shotId, stageId);
+    if (cancelled) abortAgentRun(episodeId, cancelled.id);
+  }
   if (file?.jobId && (file.phase === "comfy" || file.phase === "error")) {
     await cancelComfyJob(file.jobId);
   }
