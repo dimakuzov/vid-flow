@@ -1,32 +1,49 @@
 # Бриф 5. Связь с агентом
 
-Сначала прочитай `docs/briefs/00-overview.md`.
+Сначала прочитай `docs/briefs/00-overview.md`, затем `docs/contracts/agent-request.md`, `docs/contracts/stage-folder.md`, `docs/contracts/graph-binding.md` (разделы про выбор варианта).
 
-## Зона
-`src/lib/series/{agent-request,agent-dispatch,format-request}.ts`, `src/app/api/shots/[shotId]/stages/[stage]/agent-request/route.ts`, `src/app/api/series/format-request/route.ts`, `AGENTS.md`, `CLAUDE.md`, `docs/AGENT_BOOTSTRAP.md`, `agent-mail/`.
+Ветка `agent-bridge`, worktree `../vid-flow-agent`, `DATA_ROOT=$TEMP/frameboard-agent`, порт 3465, `COMFY_URL=http://127.0.0.1:9`.
 
-## Как работает сейчас
-1. UI → `submitAgentRequest()`: пишет сообщение пользователя в `llm_notes.md`, создаёт `agent_request.json`, `agent_request.md`, `llm_task.md`, `agent_dispatch.json` (`wait` если доска потом сама запустит Comfy, `agent` если запускает агент), перестраивает `agent_inbox.md` эпизода.
-2. **Сам агент доска не вызывает.** Агент (Cursor/Claude в отдельном чате) должен сам читать `agent_inbox.md`. В `AGENTS.md` написано «пока чат открыт, проверяй каждые 20 секунд» — на практике чат-агент так не умеет, поэтому он не знает, когда включиться.
-3. `agent-dispatch` каждые 3 с ищет `state: wait` + `request.status: done` и ставит прогон в очередь.
+## Твои файлы (правишь только их)
 
-## Найденные проблемы
+- `src/lib/series/agent-request.ts`, `src/lib/series/agent-dispatch.ts`, `src/lib/series/format-request.ts`
+- `src/lib/series/stage-state.test.ts` (тесты переходов бриф 1 — обновляй, если меняешь поведение запроса)
+- новая папка `src/lib/agent/**` (провайдеры, исполнитель, тесты)
+- `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/agent-request/route.ts`, `.../cancel/route.ts`
+- `src/app/api/series/format-request/route.ts`
+- новая папка `src/app/api/agent/**` (`GET /api/agent/providers`)
+- `AGENTS.md`, `CLAUDE.md`, `docs/AGENT_BOOTSTRAP.md`, `agent-mail/**`
 
-1. **Нет триггера.** Главная причина «агент не понимает, когда включиться»: доска агента не вызывает, а чат-агент сам опрашивать файлы не умеет. Сделай вызов агента самой доской через настраиваемого «провайдера» (переменная окружения / настройка):
-   - **текстовый** — для этапов, где агент только переписывает `prompt.md` (location, first_frame, video): доска сама собирает контекст (сообщение, текущий промпт, плейбук модели `.en.md`, имена refs) и делает один запрос к LLM. Провайдеры: Ollama (`POST http://127.0.0.1:11434/api/chat`), `claude -p --output-format json` (подписка пользователя), при желании OpenAI-совместимый API. Ответ — новый `prompt.md`, затем доска сама ставит `done`;
-   - **агентный** — для `characters` и сложных случаев: доска запускает CLI-агента в папке проекта (`claude -p "<задача>" --allowedTools ... --output-format stream-json`), пишет вывод в `run_log.md`, по выходу процесса ставит `done`/`error`.
-   Ручной режим (агент в отдельном чате читает `agent_inbox.md`) оставь как запасной.
-2. **Слишком много параллельных описаний одной задачи.** `agent_request.md`, `llm_task.md`, `agent_inbox.md`, `AGENTS.md`, `AGENT_BOOTSTRAP.md`, плейбуки, `agent-mail/` — они местами противоречат (например, «очисти `llm_notes.md`» против «`llm_notes.md` — только рекомендация пользователя»; «ставь `status.json` done» против модели статусов). Оставь один документ задачи на запрос (самодостаточный) и короткий `AGENTS.md`, который только говорит, где его взять.
-3. **Агент не видит результат (низкий приоритет).** Обычно и не нужно. Оставь возможность: по кнопке «Попросить агента оценить» агент получает пути результатов из `output/` (воркфлоу уже в метаданных PNG) и пишет оценку в `run_log.md`.
-4. **Агент упал или забыл ответить.** Таймаут и отмену сделал бриф 1. С провайдером из п. 1 доска сама видит завершение процесса — используй это вместо ожидания файла.
-5. Фазы этапа, блокировку, отмену и очистку `llm_notes.md` сделал бриф 1. Твой код только переводит запрос в `done`/`error`/`cancelled`, статусы этапа не пишет.
-6. **`agent-mail/` через git (облако ↔ локальная машина)** — третий канал связи, вне доски. Реши: оставить как ручной инструмент для отладки или встроить в доску. Задокументируй.
-7. **Dispatch только по открытому эпизоду** (бриф 2, п. 1). Перейди на явный `episodeId` после мержа модуля 2.
+Не трогаешь: `src/lib/comfy/**` (только вызываешь `queueStageRun`, `cancelComfyJob`, `listWorkflowChoices`, `resolveWorkflowId`), `src/lib/contracts/**`, остальное `src/lib/series/**`, UI, `playbooks/**`.
 
-## Результат
-- `docs/contracts/agent-request.md`: состояния запроса, кто и когда пишет каждое поле, таймауты.
-- Рабочий триггер хотя бы для одного типа этапа, проверенный на тестовом кадре во временной `DATA_ROOT`.
-- Один шаблон задачи на запрос; `AGENTS.md` сокращён и без противоречий.
+## Что уже есть
 
-## Не трогать
-`src/lib/comfy/*`, `playbooks/` (только предложения), UI.
+- Фазы, блокировка, отмена, таймаут ручного агента, очистка `llm_notes.md` — бриф 1.
+- Явный `episodeId` везде; цикл `reconcileAllStages` обходит все эпизоды; `agent_request.json` хранит `episodeId` — бриф 2.
+- Типы `AgentRequestFile` (со статусами `running`/`error`, полями `provider`, `mode`, `startedAt`, `finishedAt`, `error`, `suggestedWorkflow`), `AgentProvider`, `AgentTask`, `AgentResult`, `AgentProviderInfo` — `src/lib/contracts/agent-request.ts`. `StageDetail.agentRequest` уже отдаёт `provider`, `error`, `suggestedWorkflow`.
+- `agent_dispatch.json` хранит `workflow` (id манифеста); маршрут принимает `runWorkflow` (и старое `videoWorkflow`). `queueAfterAgent` передаёт его в `queueStageRun`.
+- Цикл регистрируется через `registerLoop` (`startAgentDispatch`) — горячая перезагрузка подменяет функцию.
+- На машине пользователя запущен Ollama (`127.0.0.1:11434`). `claude` в PATH этой оболочки нет — провайдер `claude` должен честно показывать «не найден», путь задаётся `FRAMEBOARD_CLAUDE_BIN`.
+
+## Задачи
+
+1. **Провайдеры** (`src/lib/agent/`): `manual`, `ollama` (text), `claude` (text и agent) по контракту. `check()` — доступность без побочных эффектов. Настройка — переменные из контракта.
+2. **Исполнитель.** После `submitAgentRequest` (или из цикла для `pending`) запускает провайдера в фоне: `pending → running → done | error`, `AbortController` на запрос, таймауты режимов. text: сборка `AgentTask.system` из плейбука выбранного воркфлоу (`WorkflowChoice.playbook`; нет — `stages/<stage>.en.md`) и `user` (сообщение, текущий `prompt.md`, действие из `shot.md`, имена `refs/`, персонажи); ответ → `prompt.md` через `updateStageDocs` (история промпта), `agent_baseline.json`, `done`. agent: `claude -p` в корне репо с `llm_task.md`, вывод в `run_log.md`, код выхода → `done`/`error`. Результат после отмены не писать.
+3. **Цикл.** `reconcileStage`: запрос `error` → фаза `error` с текстом; `running` без живого исполнителя в этом процессе → `error` «доска перезапущена, пока работал агент»; остальное как сейчас.
+4. **Отмена.** `cancelStage` прерывает исполнителя (HTTP к Ollama, процесс `claude` вместе с дочерними).
+5. **Когда доска запускает этап сама.** `stageBoardQueues` → «у этапа есть доступный вариант» (`listWorkflowChoices(...).some(c => c.available)`), а не список этапов в коде. Режим запроса: text, если доска запускает; иначе agent (или manual).
+6. **Один документ задачи.** `llm_task.md` — самодостаточный текст задачи (для agent и manual). Убери `agent_request.md` или сведи его к ссылке. Включи действие кадра из `shot.md` (сейчас его в задаче нет). Шаблоны без противоречий с контрактом (ни слова про `status.json`, `stage_state.json`, очистку `llm_notes.md`).
+7. **`AGENTS.md` короче.** Только: где взять задачу (`agent_inbox.md` → `llm_task.md`), единственный сигнал — `done`, что не трогать, где плейбуки. Убери «проверяй каждые 20 секунд», устаревшие ссылки на `SERIES_ROOT` как «текущий эпизод», и раздел про ветку `cursor/episode-folders-7482`, если решишь, что `agent-mail/` — ручной инструмент. Решение по `agent-mail/` запиши. Блок `<!-- BEGIN:nextjs-agent-rules -->…<!-- END:nextjs-agent-rules -->` оставь дословно: `next dev` в других worktree дописывает его заново, и любая правка блока даст им изменённый `AGENTS.md`.
+8. **API.** `GET /api/agent/providers` → `AgentProviderInfo[]`. `POST .../agent-request` принимает `provider` (нет — `FRAMEBOARD_AGENT_PROVIDER`), `runWorkflow`; неподходящий провайдер для режима → 400 с понятным текстом.
+9. Низкий приоритет, только если останется время: «Попросить агента оценить результат» — не делай в этом раунде, запиши предложение в отчёт.
+
+## Проверка
+
+- Тесты (`src/lib/agent/*.test.ts`) с подменёнными провайдерами: text-режим переписывает `prompt.md` и ведёт к `queued`; ошибка провайдера → фаза `error`; отмена во время `running` прерывает и не пишет результат; таймаут; перезапуск (running без исполнителя) → `error`; неподходящий режим → 400.
+- Вживую на порту 3465: провайдер `ollama` на location одного тестового кадра (модель — любая уже скачанная, `ollama list`; не скачивай новых без спроса) → `prompt.md` переписан, этап в «Ожидает очереди». ComfyUI не трогать.
+- `npm test`, `npx tsc --noEmit` чистые.
+
+## Нужно от других
+
+- Бриф 3 заменяет тело `listWorkflowChoices` на манифесты; до мержа работает временный список с тем же поведением.
+- Бриф 6 показывает выбор провайдера (`GET /api/agent/providers`), статус и ошибку запроса, `suggestedWorkflow`.

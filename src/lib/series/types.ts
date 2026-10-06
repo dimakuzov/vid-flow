@@ -61,6 +61,8 @@ export interface StageDetail {
   episodeId: string;
   shotId: string;
   shotTitle: string;
+  /** Действие кадра из shot.md (раздел Summary). Только для чтения. */
+  shotSummary: string;
   stageId: StageId;
   stageLabel: string;
   status: StageStatus;

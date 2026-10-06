@@ -51,6 +51,8 @@ pending / running ──«Отменить»──> cancelled   (prompt сним
 
 `StageDetail.job: JobSummary | null` — последнее задание этапа (`stage_state.jobId`), читается `readJobSummary()` без записи. Поля: `status`, `workflow`, `queuedAt`, `submittedAt`, `finishedAt`, `queuePosition`, `files`, `error`, `nodeErrors`.
 
+Фазу клетки берите из `StageDetail.state.phase` / `StageSummary.status`, а не из `job.status`: `running` без `submittedAt` — очередь только пытается отправить, для пользователя это ещё «Ожидает очереди».
+
 ## Процесс
 
 Очередь и цикл агента работают внутри процесса Next (`src/instrumentation.ts` → `src/lib/background.ts`, один таймер на имя, горячая перезагрузка подменяет функцию цикла). Отдельного воркера нет. `npm run comfy-queue` — отладочный запуск той же очереди без доски; вместе с `npm run dev` не запускать (не сломается из-за `.lock`, но два процесса опрашивают ComfyUI). `FRAMEBOARD_LOOPS=off` выключает циклы (тесты).

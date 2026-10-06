@@ -125,4 +125,6 @@ export interface WorkflowChoice {
   missing: string[];
   /** Вариант по умолчанию для этого этапа сейчас. */
   isDefault: boolean;
+  /** Плейбук модели (поле playbook манифеста), путь от playbooks/. Его читает агент в text-режиме. */
+  playbook: string | null;
 }

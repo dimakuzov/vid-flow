@@ -221,6 +221,7 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     episodeId,
     shotId,
     shotTitle: meta.title,
+    shotSummary: meta.summary,
     stageId,
     stageLabel: STAGE_LABELS[stageId],
     status,

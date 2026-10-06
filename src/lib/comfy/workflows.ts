@@ -19,6 +19,7 @@ interface StaticWorkflow {
   label: string;
   description: string;
   order: number;
+  playbook: string | null;
   aliases?: string[];
   needs: Array<{ label: string; ok: (episodeId: string, shotId: string) => boolean }>;
 }
@@ -52,6 +53,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Локация: 4 ракурса по общему виду",
     description: "Общий вид локации без людей, четыре варианта ракурса.",
     order: 10,
+    playbook: "models/qwen_location.en.md",
     needs: [],
   },
   {
@@ -60,6 +62,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Первый кадр: персонажи в локации",
     description: "Вписать утверждённых персонажей (1–2) в утверждённую локацию.",
     order: 10,
+    playbook: "models/qwen_first_frame.en.md",
     needs: [
       approved("location", "Утверждённая локация"),
       approved("characters", "Утверждённые персонажи"),
@@ -71,6 +74,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Видео от первого кадра (i2v)",
     description: "Движение от утверждённого первого кадра.",
     order: 10,
+    playbook: "models/wan_video.md",
     aliases: ["i2v"],
     needs: [approved("first_frame", "Утверждённый первый кадр")],
   },
@@ -80,6 +84,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Видео между первым и последним кадром (FLF)",
     description: "Переход от первого кадра к последнему из refs/.",
     order: 20,
+    playbook: "models/wan_video.md",
     aliases: ["flf"],
     needs: [
       approved("first_frame", "Утверждённый первый кадр"),
@@ -92,6 +97,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Финал от первого кадра (i2v, как превью)",
     description: "Пока тот же граф, что и превью.",
     order: 10,
+    playbook: "models/wan_video.md",
     aliases: ["i2v"],
     needs: [approved("first_frame", "Утверждённый первый кадр")],
   },
@@ -101,6 +107,7 @@ const STATIC: StaticWorkflow[] = [
     label: "Финал между кадрами (FLF, как превью)",
     description: "Пока тот же граф, что и превью.",
     order: 20,
+    playbook: "models/wan_video.md",
     aliases: ["flf"],
     needs: [
       approved("first_frame", "Утверждённый первый кадр"),
@@ -126,6 +133,7 @@ export function listWorkflowChoices(
         available: missing.length === 0,
         missing,
         isDefault: false,
+        playbook: item.playbook,
       };
     });
   const fallback = choices.find((choice) => choice.available) ?? choices[0];
