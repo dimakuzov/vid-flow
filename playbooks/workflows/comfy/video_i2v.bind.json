@@ -4,8 +4,8 @@
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "video_preview",
   "label": "Видео от первого кадра (i2v)",
-  "description": "Движение от утверждённого первого кадра.",
-  "playbook": "models/wan_video.md",
+  "description": "Движение от утверждённого первого кадра. По умолчанию.",
+  "playbook": "models/wan_video.en.md",
   "order": 10,
   "aliases": [
     "i2v"
@@ -52,24 +52,7 @@
         }
       ],
       "value": {
-        "input": "text",
-        "steps": [
-          {
-            "namesTo": "the person"
-          },
-          {
-            "ensure": "Static shot, fixed camera.",
-            "at": "start",
-            "unless": "\b(camera|shot|static|pan|dolly|zoom|трек|камер)\b",
-            "separator": " "
-          },
-          {
-            "ensure": "Realistic, natural movement.",
-            "at": "end",
-            "unless": "realistic, natural movement",
-            "separator": " "
-          }
-        ]
+        "input": "text"
       }
     },
     {

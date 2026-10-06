@@ -3,9 +3,9 @@
   "id": "final_flf",
   "graph": "wan22_flf_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал между кадрами (FLF, как превью)",
-  "description": "Пока тот же граф, что и превью. Решение по финалу — бриф 4.",
-  "playbook": "models/wan_video.md",
+  "label": "Финал между кадрами (FLF)",
+  "description": "Финал пока = превью: тот же граф FLF, последний кадр из refs/ этого этапа. См. stages/final_render.md.",
+  "playbook": "models/wan_video.en.md",
   "order": 20,
   "aliases": [
     "flf"
@@ -70,24 +70,7 @@
         }
       ],
       "value": {
-        "input": "text",
-        "steps": [
-          {
-            "namesTo": "the person"
-          },
-          {
-            "ensure": "Static shot, fixed camera.",
-            "at": "start",
-            "unless": "\b(camera|shot|static|pan|dolly|zoom|трек|камер)\b",
-            "separator": " "
-          },
-          {
-            "ensure": "Realistic, natural movement.",
-            "at": "end",
-            "unless": "realistic, natural movement",
-            "separator": " "
-          }
-        ]
+        "input": "text"
       }
     },
     {
