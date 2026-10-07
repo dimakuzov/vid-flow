@@ -26,7 +26,8 @@ import {
   readStatusFile,
 } from "./status";
 import { readAgentRequestSummary } from "./agent-request";
-import { listWorkflowChoices } from "../comfy/workflows";
+import { stageDuration } from "../comfy/binding";
+import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import { readRunSettings } from "./run-settings";
 import { stageInputs } from "./stage-inputs";
 import { readJobSummary, readStageState } from "./stage-state";
@@ -220,6 +221,20 @@ function playbooksForStage(stageId: StageId): string[] {
     .map((rel) => toPosix(rel));
 }
 
+/** Воркфлоу, который уйдёт в запуск: выбор этапа, а неизвестный или пустой — вариант по умолчанию. */
+export function effectiveWorkflowId(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  requested: string | null | undefined,
+): string | null {
+  try {
+    return resolveWorkflowId(episodeId, shotId, stageId, requested);
+  } catch {
+    return resolveWorkflowId(episodeId, shotId, stageId, null);
+  }
+}
+
 export function getStageDetail(episodeId: string, shotId: string, stageId: StageId): StageDetail {
   const meta = readShotMeta(episodeId, shotId);
   const dir = stageDir(episodeId, shotId, stageId);
@@ -227,6 +242,8 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
   const status = deriveStageStatus(episodeId, shotId, stageId, meta.characters);
   const stored = readStatusFile(episodeId, shotId, stageId);
   const state = readStageState(episodeId, shotId, stageId);
+  const settings = readRunSettings(episodeId, shotId, stageId);
+  const duration = stageDuration({ episodeId, shotId, stageId }, effectiveWorkflowId(episodeId, shotId, stageId, settings.workflow));
 
   return {
     episodeId,
@@ -254,8 +271,10 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
     state,
-    workflow: readRunSettings(episodeId, shotId, stageId).workflow ?? null,
+    workflow: settings.workflow ?? null,
     workflows: listWorkflowChoices(episodeId, shotId, stageId),
+    durationSec: duration.durationSec,
+    durationRange: duration.range,
     job: readJobSummary(state.jobId),
     agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
     watch: readShotWatch(episodeId, shotId),

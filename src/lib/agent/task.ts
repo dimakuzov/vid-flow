@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { AgentMode, AgentRequestFile, AgentTask } from "../contracts/agent-request";
 import type { WorkflowChoice } from "../contracts/graph-binding";
+import { stageDuration } from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
@@ -34,6 +35,21 @@ export function selectedWorkflow(episodeId: string, shotId: string, stageId: Sta
     id = resolveWorkflowId(episodeId, shotId, stageId, null);
   }
   return choices.find((choice) => choice.id === id) ?? choices.find((choice) => choice.isDefault) ?? null;
+}
+
+/** Длительность, выбранная в меню этапа для воркфлоу. null — «по умолчанию» или у воркфлоу нет меню. */
+export function chosenDurationSec(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  workflowId: string | null | undefined,
+): number | null {
+  return stageDuration({ episodeId, shotId, stageId }, workflowId ?? null).durationSec;
+}
+
+/** Строка для llm_task.md: длительность выбрана в меню, `N sec` в prompt.md не нужен. */
+export function durationTaskLine(seconds: number): string {
+  return `Длительность клипа: ${seconds} с. Действие должно уложиться в это время.`;
 }
 
 /** Плейбук для модели: поле playbook манифеста (сначала .en.md), иначе stages/<stage>.en.md. */
@@ -76,6 +92,7 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   const prompt = readTextIfExists(path.join(dir, "prompt.md")).trim();
   const refsNote = readTextIfExists(path.join(dir, "refs.md")).trim();
   const refs = listFiles(path.join(dir, "refs"));
+  const seconds = chosenDurationSec(episodeId, shotId, stageId, workflow?.id);
   const lines = [
     "## User request",
     "",
@@ -89,6 +106,11 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     `- location: ${meta.location || "(none)"}`,
     `- stage: ${stageId}`,
     `- workflow: ${workflow ? `${workflow.id} — ${workflow.label}` : "(none)"}`,
+    ...(seconds != null
+      ? [
+          `- clip duration: ${seconds} s, chosen by the user in the board menu. The action must fit into this time. The board sets the duration itself: do not write "N sec" in prompt.md.`,
+        ]
+      : []),
     "",
     "## Current prompt.md",
     "",

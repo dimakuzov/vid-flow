@@ -4,6 +4,7 @@ import type { ApiPrompt } from "../contracts/comfy-job";
 import type {
   BindingInput,
   BindingSlot,
+  DurationRange,
   GraphBinding,
   ImageInput,
   ImageSource,
@@ -17,6 +18,7 @@ import type {
 import { STAGES, type StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
 import { getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
+import { readRunSettings } from "../series/run-settings";
 import { readShotMeta } from "../series/shot-meta";
 
 /*
@@ -106,8 +108,18 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
     } else if (input.kind === "number") {
       if (input.from === "media:duration") {
         if (!input.of || inputs[input.of]?.kind !== "video") fail(`вход ${name}: of должен указывать на вход kind: video`);
+      } else if (input.from === "settings:seconds") {
+        if (!Number.isInteger(input.min) || !Number.isInteger(input.max) || input.min! > input.max!) {
+          fail(`вход ${name}: для settings:seconds нужны целые min <= max`);
+        }
+        if (input.fallback !== undefined && input.fallback !== "prompt:seconds") {
+          fail(`вход ${name}: fallback может быть только prompt:seconds`);
+        }
       } else if (input.from !== "prompt:seconds") {
-        fail(`вход ${name}: число берётся из prompt:seconds или media:duration`);
+        fail(`вход ${name}: число берётся из prompt:seconds, media:duration или settings:seconds`);
+      }
+      if (input.fallback !== undefined && input.from !== "settings:seconds") {
+        fail(`вход ${name}: fallback только у settings:seconds`);
       }
     } else {
       fail(`вход ${name}: неизвестный kind ${(input as { kind: string }).kind}`);
@@ -550,17 +562,81 @@ function removalOrder(a: Removal, b: Removal): number {
 
 // ---------- сборка ----------
 
-function numberValue(input: NumberInput, promptMd: string, files: Record<string, string[]>): number | null {
+function inRange(value: number, input: NumberInput): boolean {
+  return (input.min == null || value >= input.min) && (input.max == null || value <= input.max);
+}
+
+function numberValue(
+  input: NumberInput,
+  promptMd: string,
+  files: Record<string, string[]>,
+  durationSec: number | undefined,
+): number | null {
+  if (input.from === "settings:seconds") {
+    if (typeof durationSec === "number" && Number.isFinite(durationSec) && inRange(durationSec, input)) return durationSec;
+    return input.fallback === "prompt:seconds" ? secondsInText(promptMd, input) : null;
+  }
   if (input.from === "media:duration") {
     const file = files[input.of!]?.[0];
     const seconds = file ? videoDurationSeconds(file) : null;
     if (seconds == null) return null;
     const rounded = Math.round(seconds);
-    if (input.min != null && rounded < input.min) return null;
-    if (input.max != null && rounded > input.max) return null;
-    return rounded;
+    return inRange(rounded, input) ? rounded : null;
   }
   return secondsInText(promptMd, input);
+}
+
+/** Вход-число с источником settings:seconds (меню длительности). null — у манифеста его нет. */
+export function settingsSecondsInput(binding: GraphBinding): { name: string; input: NumberInput } | null {
+  for (const [name, input] of Object.entries(binding.inputs)) {
+    if (input.kind === "number" && input.from === "settings:seconds") return { name, input };
+  }
+  return null;
+}
+
+/**
+ * Меню длительности для манифеста: min..max входа settings:seconds и число «по умолчанию»
+ * (секунды из prompt.md, если fallback, иначе значение графа в первом target). null — меню нет.
+ */
+export function durationRange(binding: GraphBinding, graph: ApiPrompt, ctx: ShotContext): DurationRange | null {
+  const found = settingsSecondsInput(binding);
+  if (!found) return null;
+  const { name, input } = found;
+  const target = binding.slots.find((slot) => "input" in slot.value && slot.value.input === name)?.targets[0];
+  let graphValue: unknown = target ? graph[target.node]?.inputs[target.field] : undefined;
+  if (target?.json && typeof graphValue === "string") {
+    try {
+      const keys = jsonKeys(target.json);
+      const parent = containerAt(JSON.parse(graphValue), keys.slice(0, -1)) as Record<string | number, unknown> | undefined;
+      graphValue = parent?.[keys[keys.length - 1]];
+    } catch {
+      graphValue = undefined;
+    }
+  }
+  const promptMd =
+    input.fallback === "prompt:seconds"
+      ? readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "prompt.md")).trim()
+      : "";
+  const fromPrompt = promptMd ? secondsInText(promptMd, input) : null;
+  const fallback = fromPrompt ?? (typeof graphValue === "number" ? graphValue : input.min!);
+  return { min: input.min!, max: input.max!, default: fallback };
+}
+
+/**
+ * Длительность этапа для воркфлоу `workflowId`: меню (`range`) и выбор из run_settings.json (`durationSec`).
+ * Выбор вне min..max этого воркфлоу не считается: уйдёт число по умолчанию.
+ */
+export function stageDuration(
+  ctx: ShotContext,
+  workflowId: string | null,
+): { range: DurationRange | null; durationSec: number | null } {
+  const found = workflowId ? stageBindings(ctx.stageId).find((item) => item.id === workflowId) : undefined;
+  if (!found?.binding || !found.graph || found.error) return { range: null, durationSec: null };
+  const range = durationRange(found.binding, found.graph, ctx);
+  if (!range) return { range: null, durationSec: null };
+  const stored = readRunSettings(ctx.episodeId, ctx.shotId, ctx.stageId).durationSec;
+  const valid = typeof stored === "number" && stored >= range.min && stored <= range.max;
+  return { range, durationSec: valid ? stored : null };
 }
 
 export interface BuiltPrompt {
@@ -598,6 +674,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   const readPrompt = (stage: StageId) =>
     readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "prompt.md")).trim();
   const promptMd = readPrompt(ctx.stageId);
+  const durationSec = readRunSettings(ctx.episodeId, ctx.shotId, ctx.stageId).durationSec;
   const texts: Record<string, string> = {};
 
   const images: Record<string, string[]> = {};
@@ -686,7 +763,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
         empty(slot, input, required);
       } else write(slot, text);
     } else {
-      const seconds = numberValue(input as NumberInput, promptMd, images);
+      const seconds = numberValue(input as NumberInput, promptMd, images, durationSec);
       if (seconds == null) empty(slot, input, false);
       else write(slot, seconds);
     }

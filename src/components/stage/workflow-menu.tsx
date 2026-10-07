@@ -1,6 +1,6 @@
 "use client";
 
-import type { WorkflowChoice } from "@/lib/series/types";
+import type { DurationRange, WorkflowChoice } from "@/lib/series/types";
 
 /** Воркфлоу, который уйдёт в запуск: выбор этапа или вариант по умолчанию. */
 export function effectiveWorkflow(
@@ -19,9 +19,54 @@ function optionText(choice: WorkflowChoice): string {
   return choice.available ? choice.label : `${choice.label} — нет: ${choice.missing.join(", ")}`;
 }
 
+function secondsRange(range: DurationRange): number[] {
+  const values: number[] = [];
+  for (let value = Math.ceil(range.min); value <= range.max; value += 1) values.push(value);
+  return values;
+}
+
+/**
+ * Длительность клипа (`StageDetail.durationRange`). Значение `""` — по умолчанию: `N sec` из prompt.md или граф.
+ * Выбор уходит в `PATCH` этапа полем `runDuration`.
+ */
+export function DurationMenu({
+  id,
+  range,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  id: string;
+  range: DurationRange;
+  selected: number | null;
+  disabled?: boolean;
+  onSelect: (seconds: string) => void;
+}) {
+  return (
+    <div className="grid min-w-0 gap-1 text-xs text-stone-600">
+      <label htmlFor={id}>Длительность клипа</label>
+      <select
+        id={id}
+        value={selected == null ? "" : String(selected)}
+        disabled={disabled}
+        onChange={(event) => onSelect(event.target.value)}
+        className="h-9 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900 disabled:opacity-60"
+      >
+        <option value="">По умолчанию ({range.default} с)</option>
+        {secondsRange(range).map((value) => (
+          <option key={value} value={String(value)}>
+            {value} с
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /**
  * Меню воркфлоу этапа (`StageDetail.workflows`). Значение `""` — вариант по умолчанию.
  * Недоступные варианты выбрать можно (входы могут появиться позже), подпись говорит, чего нет.
+ * С `duration` и `onDuration` под ним — меню длительности, если у воркфлоу есть такой вход.
  */
 export function WorkflowMenu({
   id,
@@ -29,12 +74,16 @@ export function WorkflowMenu({
   selected,
   disabled,
   onSelect,
+  duration,
+  onDuration,
 }: {
   id: string;
   workflows: WorkflowChoice[];
   selected: string | null;
   disabled?: boolean;
   onSelect: (workflowId: string) => void;
+  duration?: { range: DurationRange | null; selected: number | null };
+  onDuration?: (seconds: string) => void;
 }) {
   if (!workflows.length) return null;
   const fallback = workflows.find((item) => item.isDefault) ?? workflows[0];
@@ -65,6 +114,15 @@ export function WorkflowMenu({
             <span className="text-amber-800"> Не хватает: {current.missing.join(", ")}.</span>
           )}
         </p>
+      ) : null}
+      {duration?.range && onDuration ? (
+        <DurationMenu
+          id={`${id}-duration`}
+          range={duration.range}
+          selected={duration.selected}
+          disabled={disabled}
+          onSelect={onDuration}
+        />
       ) : null}
     </div>
   );

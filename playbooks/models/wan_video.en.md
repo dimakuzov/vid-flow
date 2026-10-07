@@ -178,7 +178,7 @@ FLF describes only the movement between the frames. Do not describe what is on e
 4. Only movement and camera. No interior, light, clothes, style words, sound, lines, voice-over. A line at most as `says something short`.
 5. Strength as a measure (section 3.3). Stillness as a positive state (3.5). Every moving object has a doer (3.4).
 6. The start state must match the first frame from `first_frame/approve/`. If the message contradicts the frame, write the action from what is on the frame (she pulls the tights up, not puts them on).
-7. Duration. Default is 5 s from the graph. Write a duration only when the shot needs another one: put `N sec` (2–8) as the very last words, after the tail, for example `Realistic, natural movement. 3 sec`. The board reads the first such number. That text also reaches the model; keep it to these two words. Do not write other numbers followed by `s` or `sec`.
+7. Duration. If the task gives a clip duration chosen in the board menu (`clip duration: N s`, in `llm_task.md`: «Длительность клипа: N с»), the board sets it in the graph itself: do not write `N sec` in `prompt.md`, and pace the action to fit exactly that time (fewer phases for 2–3 s, a calmer pace and a held end state for 7–8 s). Without a menu choice the default is 5 s from the graph. Write a duration then only when the shot needs another one: put `N sec` (2–8) as the very last words, after the tail, for example `Realistic, natural movement. 3 sec`. The board reads the first such number. That text also reaches the model; keep it to these two words. Do not write other numbers followed by `s` or `sec`.
 8. Write the template of the workflow you were given (i2v or FLF). Choosing between them: `playbooks/stages/video_preview.en.md`.
 
 ### Example (i2v)

@@ -10,6 +10,8 @@ import { stageDir } from "./paths";
 export interface RunSettings {
   /** id манифеста графа (docs/contracts/graph-binding.md). */
   workflow?: string;
+  /** Длительность клипа в секундах (вход settings:seconds манифеста). Нет — по умолчанию. */
+  durationSec?: number;
   updatedAt?: string;
 }
 
@@ -24,6 +26,7 @@ export function readRunSettings(episodeId: string, shotId: string, stageId: Stag
   }
 }
 
+/** Пишет файл целиком. Пустые поля (`workflow: ""`, `durationSec` не число) удаляются. */
 export function writeRunSettings(
   episodeId: string,
   shotId: string,
@@ -32,8 +35,22 @@ export function writeRunSettings(
 ): RunSettings {
   const next: RunSettings = { ...settings, updatedAt: new Date().toISOString() };
   if (!next.workflow) delete next.workflow;
+  if (typeof next.durationSec !== "number" || !Number.isFinite(next.durationSec)) delete next.durationSec;
   const file = path.join(stageDir(episodeId, shotId, stageId), FILE);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(next, null, 2) + "\n", "utf8");
   return next;
+}
+
+/** Меняет только переданные поля, остальной выбор сохраняется. `null` — сбросить поле. */
+export function updateRunSettings(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  patch: { workflow?: string | null; durationSec?: number | null },
+): RunSettings {
+  const next: RunSettings = { ...readRunSettings(episodeId, shotId, stageId) };
+  if (patch.workflow !== undefined) next.workflow = patch.workflow ?? undefined;
+  if (patch.durationSec !== undefined) next.durationSec = patch.durationSec ?? undefined;
+  return writeRunSettings(episodeId, shotId, stageId, next);
 }

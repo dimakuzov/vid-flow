@@ -121,6 +121,16 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       stage.merge(data);
     });
 
+  const chooseDuration = (seconds: string) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { runDuration: seconds },
+        fallbackError: "Не удалось выбрать длительность",
+      });
+      stage.merge(data);
+    });
+
   const cancelStage = () =>
     act(async () => {
       const data = await requestJson<{ message: string; stage?: StageDetail }>(
@@ -303,6 +313,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               selected={detail.workflow}
               disabled={busy || stageBusy}
               onSelect={chooseWorkflow}
+              duration={{ range: detail.durationRange, selected: detail.durationSec }}
+              onDuration={chooseDuration}
             />
           </div>
           {!stageBusy ? (

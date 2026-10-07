@@ -1,10 +1,10 @@
 import type { AgentProviderId, AgentRequestStatus } from "../contracts/agent-request";
 import type { JobSummary } from "../contracts/comfy-job";
-import type { WorkflowChoice } from "../contracts/graph-binding";
+import type { DurationRange, WorkflowChoice } from "../contracts/graph-binding";
 import type { StageId, StageStatus } from "./constants";
 import type { StageState } from "./stage-state";
 
-export type { JobSummary, WorkflowChoice };
+export type { DurationRange, JobSummary, WorkflowChoice };
 
 export type MediaKind = "image" | "video" | "other";
 
@@ -107,6 +107,10 @@ export interface StageDetail {
   workflow: string | null;
   /** Воркфлоу этапа для меню, по order. Пусто — доска этот этап не запускает. */
   workflows: WorkflowChoice[];
+  /** Выбранная длительность клипа, с (run_settings.json, в пределах durationRange). null — по умолчанию. */
+  durationSec: number | null;
+  /** Меню длительности для воркфлоу, который уйдёт в запуск. null — у него нет входа settings:seconds. */
+  durationRange: DurationRange | null;
   /** Последнее задание очереди этапа (stage_state.jobId). */
   job: JobSummary | null;
   agentRequest: {

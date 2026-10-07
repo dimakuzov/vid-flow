@@ -65,7 +65,7 @@ playbooks/workflows/comfy/
 "view":     { "kind": "image", "from": ["refs", "library:location"], "pick": "first", "label": "Общий вид" },
 "end":      { "kind": "image", "from": "refs", "pick": "newest", "uploadAs": "{shotId}_end{ext}", "label": "Последний кадр в refs/" },
 "text":     { "kind": "text", "from": "prompt", "required": true, "label": "prompt.md" },
-"seconds":  { "kind": "number", "from": "prompt:seconds", "min": 2, "max": 8, "label": "Длительность" }
+"seconds":  { "kind": "number", "from": "settings:seconds", "fallback": "prompt:seconds", "min": 2, "max": 8, "label": "Длительность клипа" }
 ```
 
 Картинки (`kind: image`):
@@ -84,6 +84,21 @@ playbooks/workflows/comfy/
 `prompt.md` из старых кадров может начинаться с инструкции доски («Собери shot-вариант…», «Правила: playbooks/…»). Такой текст в модель не отправляется: запуск падает с понятной ошибкой «перепиши prompt.md» (вместо прежнего тихого вырезания строк регэкспами).
 
 Число (`kind: number`, `from: prompt:seconds`): секунды из `prompt.md` («5 сек», «5s», «5 с»), в пределах `min..max`. Нет числа — значение графа не меняется.
+
+### Длительность из меню: `settings:seconds`
+
+Число `from: "settings:seconds"` — выбор пользователя в меню этапа: `durationSec` из `run_settings.json`. Выбрано, но вне `min..max` этого манифеста — считается «не выбрано».
+
+- Не выбрано — источник `fallback`. Сейчас допустим только `"prompt:seconds"` (секунды из `prompt.md`, как выше). Нет `fallback` или и там числа нет — значение графа не меняется.
+- `min` и `max` обязательны, целые, `min <= max`: по ним доска строит меню (целые секунды, шаг 1). `fallback` у других источников — ошибка манифеста.
+- Выбран отдельный источник с запасным, а не новый смысл у `prompt:seconds`: старые манифесты (`prompt:seconds`, `final_*`) работают как раньше, порядок «меню → prompt.md → граф» виден в самом манифесте.
+- У манифеста не больше одного такого входа: меню одно на этап.
+
+Меню (`StageDetail.durationRange: { min, max, default } | null`) строится по воркфлоу, который уйдёт в запуск (выбор этапа или вариант по умолчанию). `default` — что уйдёт без выбора: секунды из `prompt.md` (если `fallback`), иначе значение графа в первом target слота этого входа. `null` — у воркфлоу нет входа `settings:seconds`, меню не показывается. `StageDetail.durationSec` — выбор (в пределах этого меню) или `null`.
+
+Выбор пишет только доска: `PATCH .../stages/{stage}` с полем `runDuration` — целое секунд (число или строка из селекта); пустая строка или `null` — сбросить на «по умолчанию». Вне `min..max`, не целое, у воркфлоу нет меню — 400. `runWorkflow` и `runDuration` меняют только своё поле `run_settings.json`.
+
+Агенту выбор уходит строкой в задаче: в `llm_task.md` — «Длительность клипа: N с. Действие должно уложиться в это время.», в text-режиме (`AgentTask.user`) — `clip duration: N s …`. Плейбук модели (`wan_video`, раздел 8, правило 7): `N sec` в `prompt.md` тогда не писать.
 
 ### `slots` — куда в графе
 
@@ -197,7 +212,7 @@ playbooks/workflows/comfy/
 |---|---|---|
 | `location_views` | location | `location_views_multiple_angles.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
-| `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` |
+| `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
 | `final_h3`, `final_h3_768` | final_render | `minimax_h3_creator_api.json` (MiniMax H3) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
 

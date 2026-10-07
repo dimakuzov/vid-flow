@@ -54,15 +54,27 @@ export interface NumberInput {
   kind: "number";
   /**
    * prompt:seconds — секунды из текста prompt.md («5 сек», «5s»);
-   * media:duration — длительность ролика из входа `of` (секунды, округление до целого).
+   * media:duration — длительность ролика из входа `of` (секунды, округление до целого);
+   * settings:seconds — выбор в меню этапа (`durationSec` в run_settings.json), нет выбора — `fallback`.
    * Нет числа — значение графа не меняется.
    */
-  from: "prompt:seconds" | "media:duration";
+  from: "prompt:seconds" | "media:duration" | "settings:seconds";
   /** Для media:duration: имя входа kind: video. */
   of?: string;
+  /** Для settings:seconds: откуда число, если в меню выбрано «По умолчанию». Нет — значение графа. */
+  fallback?: "prompt:seconds";
+  /** Для settings:seconds обязательны: по ним строится меню длительности. */
   min?: number;
   max?: number;
   label: string;
+}
+
+/** Выбор длительности в меню этапа: целые секунды min..max, default — что уйдёт без выбора. */
+export interface DurationRange {
+  min: number;
+  max: number;
+  /** Число по умолчанию: fallback (секунды из prompt.md), иначе значение графа. */
+  default: number;
 }
 
 export type BindingInput = ImageInput | TextInput | NumberInput;
