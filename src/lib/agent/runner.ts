@@ -1,7 +1,8 @@
 import type { AgentRequestFile, AgentResult } from "../contracts/agent-request";
 import type { StageId } from "../series/constants";
 import { updateStageDocs } from "../series/mutations";
-import { formatMinutes, modeTimeoutMs } from "./config";
+import type { AgentProviderId } from "../contracts/agent-request";
+import { formatMinutes, modeTimeoutMs, providerParallel } from "./config";
 import { appendRunLog, captureBaseline, readAgentRequest, writeAgentRequest } from "./files";
 import { cleanPromptText, getAgentProvider } from "./providers";
 import { buildAgentTask } from "./task";
@@ -14,6 +15,7 @@ import { buildAgentTask } from "./task";
 
 interface LiveRun {
   requestId: string;
+  provider: AgentProviderId;
   controller: AbortController;
   promise: Promise<void>;
   cancelled: boolean;
@@ -42,6 +44,13 @@ function liveRuns(): Map<string, LiveRun> {
 
 function runKey(episodeId: string, requestId: string): string {
   return `${episodeId}/${requestId}`;
+}
+
+/** Сколько запросов этого провайдера сейчас идут в процессе доски. */
+export function liveRunCount(provider: AgentProviderId): number {
+  let count = 0;
+  for (const run of liveRuns().values()) if (run.provider === provider) count += 1;
+  return count;
 }
 
 export function isAgentRunLive(episodeId: string, requestId: string): boolean {
@@ -170,6 +179,8 @@ export function startAgentRun(episodeId: string, shotId: string, stageId: StageI
     writeError(request, `${provider.label} не умеет режим ${mode}. Выбери другого провайдера.`);
     return null;
   }
+  // Все места заняты: запрос остаётся pending, фоновый цикл запустит его, когда место освободится.
+  if (liveRunCount(providerId) >= providerParallel(providerId)) return null;
 
   const running: AgentRequestFile = {
     ...request,
@@ -183,6 +194,7 @@ export function startAgentRun(episodeId: string, shotId: string, stageId: StageI
   const key = runKey(episodeId, request.id);
   const run: LiveRun = {
     requestId: request.id,
+    provider: providerId,
     controller: new AbortController(),
     cancelled: false,
     promise: Promise.resolve(),

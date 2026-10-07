@@ -24,6 +24,17 @@ export function ollamaModel(): string | null {
   return process.env.FRAMEBOARD_OLLAMA_MODEL?.trim() || null;
 }
 
+/**
+ * Сколько запросов одного провайдера идут одновременно. Остальные ждут в pending,
+ * фоновый цикл запускает их по мере освобождения. FRAMEBOARD_AGENT_PARALLEL — для всех провайдеров.
+ * По умолчанию: Ollama — 1 (модель одна на видеокарте), Claude — 2.
+ */
+export function providerParallel(id: AgentProviderId): number {
+  const value = Number(process.env.FRAMEBOARD_AGENT_PARALLEL);
+  if (Number.isFinite(value) && value >= 1) return Math.floor(value);
+  return id === "claude" ? 2 : 1;
+}
+
 export function claudeBin(): string {
   return process.env.FRAMEBOARD_CLAUDE_BIN?.trim() || "claude";
 }

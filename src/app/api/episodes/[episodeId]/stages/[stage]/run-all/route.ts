@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import { runStageForAllShots } from "@/lib/series/bulk";
+import { STAGES, type StageId } from "@/lib/series/constants";
+import { normalizeEpisodeId } from "@/lib/series/paths";
+
+export const runtime = "nodejs";
+
+/**
+ * Кнопка над столбцом этапа: агент на этом этапе у всех кадров.
+ * Тело `{ provider?, includeApproved? }`. Ответ `{ started, skipped }` — по кадрам, с причинами.
+ */
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ episodeId: string; stage: string }> },
+) {
+  try {
+    const params = await context.params;
+    const episodeId = normalizeEpisodeId(params.episodeId);
+    if (!STAGES.includes(params.stage as StageId)) throw new Error("Неизвестный этап");
+    let body: { provider?: unknown; includeApproved?: unknown } = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+    const result = runStageForAllShots(episodeId, params.stage as StageId, {
+      provider: typeof body.provider === "string" ? body.provider : undefined,
+      includeApproved: body.includeApproved === true,
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось запустить этап на всех кадрах";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}

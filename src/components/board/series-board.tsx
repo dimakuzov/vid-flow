@@ -6,6 +6,7 @@ import { episodePagePath, errorText, requestJson } from "@/components/stage/api"
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
+import { BulkMenu } from "./bulk-menu";
 import { StageCell } from "./stage-cell";
 
 function ShotHeader({ shot }: { shot: ShotSummary }) {
@@ -194,7 +195,16 @@ export function SeriesBoard({
 
         {series.shots.length > 0 && episodeId ? (
           <>
-            {/* Телефон: кадр — карточка, этапы списком. */}
+            {/* Телефон: кадр — карточка, этапы списком. Кнопки «для всех кадров» — строкой сверху. */}
+            <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
+              <BulkMenu episodeId={episodeId} target="next" shotCount={series.shots.length} onDone={onChanged} />
+              {STAGES.map((stageId) => (
+                <div key={stageId} className="flex items-center gap-1 text-[11px] text-stone-500">
+                  <span>{STAGE_LABELS[stageId]}</span>
+                  <BulkMenu episodeId={episodeId} target={stageId} shotCount={series.shots.length} onDone={onChanged} />
+                </div>
+              ))}
+            </div>
             <div className="space-y-6 md:hidden">
               {series.shots.map((shot) => (
                 <div key={shot.id} className="space-y-2">
@@ -222,15 +232,17 @@ export function SeriesBoard({
               <table className="w-full min-w-[960px] border-separate border-spacing-2">
                 <thead>
                   <tr>
-                    <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                    <th className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                       Кадр
+                      <BulkMenu episodeId={episodeId} target="next" shotCount={series.shots.length} onDone={onChanged} />
                     </th>
                     {STAGES.map((stageId) => (
                       <th
                         key={stageId}
-                        className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-[0.18em] text-stone-500"
+                        className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500"
                       >
                         {STAGE_LABELS[stageId]}
+                        <BulkMenu episodeId={episodeId} target={stageId} shotCount={series.shots.length} onDone={onChanged} />
                       </th>
                     ))}
                   </tr>
