@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { listAgentRuns, stopAgentRuns } from "@/lib/series/agent-dispatch";
-import { parseStageParams } from "@/lib/series/route-params";
+import { parseShotParams, parseStageParams } from "@/lib/series/route-params";
 
 export const runtime = "nodejs";
 
 /**
  * Остановка агентов доски, как «Отменить» на этапе.
- * Тело `{ episodeId, shotId, stageId }` — один прогон, `{ episodeId, format: true }` — разметка
+ * Тело `{ episodeId, shotId, stageId }` — один прогон, `{ episodeId, shotId }` — все этапы кадра
+ * («Остановить» в меню агента кадра), `{ episodeId, format: true }` — разметка
  * сценария эпизода, `{ all: true }` — все работающие и ждущие.
  */
 export async function POST(request: Request) {
@@ -25,10 +26,13 @@ export async function POST(request: Request) {
       if (typeof body.episodeId !== "string" || !body.episodeId) throw new Error("Нужен episodeId");
       target = { episodeId: body.episodeId, format: true };
     } else {
-      if (typeof body.episodeId !== "string" || typeof body.shotId !== "string" || typeof body.stageId !== "string") {
-        throw new Error("Нужно { episodeId, shotId, stageId }, { episodeId, format: true } или { all: true }");
+      if (typeof body.episodeId !== "string" || typeof body.shotId !== "string") {
+        throw new Error("Нужно { episodeId, shotId, stageId? }, { episodeId, format: true } или { all: true }");
       }
-      target = parseStageParams({ episodeId: body.episodeId, shotId: body.shotId, stage: body.stageId });
+      target =
+        body.stageId === undefined
+          ? parseShotParams({ episodeId: body.episodeId, shotId: body.shotId })
+          : parseStageParams({ episodeId: body.episodeId, shotId: body.shotId, stage: String(body.stageId) });
     }
     const stopped = await stopAgentRuns(target);
     return NextResponse.json({ stopped, ...listAgentRuns() });

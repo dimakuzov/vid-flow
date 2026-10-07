@@ -6,8 +6,9 @@ import { normalizeEpisodeId } from "@/lib/series/paths";
 export const runtime = "nodejs";
 
 /**
- * Кнопка над столбцом этапа: агент на этом этапе у всех кадров.
- * Тело `{ provider?, model?, redo? }`. redo — переделать и там, где этап уже пройден. Ответ `{ started, skipped }` — по кадрам, с причинами.
+ * Кнопка над столбцом этапа: этот этап на всех кадрах, каждый кадр — своим агентом.
+ * Тело `{ provider?, model?, redo? }`: provider и model — агент для кадров без своего агента, назначается им.
+ * redo — переделать и там, где этап уже пройден. Ответ `{ started, skipped, assigned }` — по кадрам, с причинами.
  */
 export async function POST(
   request: Request,

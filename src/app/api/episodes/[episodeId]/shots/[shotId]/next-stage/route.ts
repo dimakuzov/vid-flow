@@ -5,8 +5,9 @@ import { parseShotParams, type ShotRouteContext } from "@/lib/series/route-param
 export const runtime = "nodejs";
 
 /**
- * Кнопка на кадре: агент на следующий неутверждённый этап этого кадра.
- * Тело `{ provider?, model? }`. Ответ `{ started, skipped }` (один кадр).
+ * Меню агента кадра, «Запустить следующий этап»: агент кадра на следующий неутверждённый этап.
+ * Тело `{ provider?, model? }`: с provider этот выбор сначала сохраняется агентом кадра (agent.json).
+ * Ответ `{ started, skipped, assigned }` (один кадр).
  */
 export async function POST(request: Request, context: ShotRouteContext) {
   try {
@@ -20,6 +21,7 @@ export async function POST(request: Request, context: ShotRouteContext) {
     const result = runNextStageForShot(episodeId, shotId, {
       provider: typeof body.provider === "string" ? body.provider : undefined,
       model: typeof body.model === "string" ? body.model : undefined,
+      assign: "always",
     });
     return NextResponse.json(result);
   } catch (error) {

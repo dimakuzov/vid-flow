@@ -67,32 +67,77 @@ function usable(provider: AgentProviderInfo | undefined, mode: AgentMode): boole
   return Boolean(provider && provider.available && supports(provider, mode));
 }
 
+/** Провайдеры живут недолго (Ollama могли включить): один запрос на все меню таблицы, потом заново. */
+const PROVIDERS_TTL_MS = 30_000;
+let providersCache: { at: number; promise: Promise<AgentProviderInfo[] | null> } | null = null;
+
+function loadProviders(): Promise<AgentProviderInfo[] | null> {
+  if (providersCache && Date.now() - providersCache.at < PROVIDERS_TTL_MS) return providersCache.promise;
+  const promise = fetch("/api/agent/providers", { cache: "no-store" })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const data = (await res.json()) as unknown;
+      return Array.isArray(data) ? (data as AgentProviderInfo[]) : null;
+    })
+    .catch(() => null);
+  providersCache = { at: Date.now(), promise };
+  return promise;
+}
+
+/** Список провайдеров для подписей (агент в заголовке кадра). null — ещё не загружен или маршрута нет. */
+export function useProviderList(): AgentProviderInfo[] | null {
+  const [providers, setProviders] = useState<AgentProviderInfo[] | null>(null);
+  useEffect(() => {
+    let stopped = false;
+    loadProviders().then((data) => {
+      if (!stopped && data) setProviders(data);
+    });
+    return () => {
+      stopped = true;
+    };
+  }, []);
+  return providers;
+}
+
+/** «Claude Code · Sonnet 5.5». Без списка провайдеров — id. */
+export function agentLabel(
+  providers: AgentProviderInfo[] | null,
+  agent: { provider: string; model: string | null },
+): string {
+  const provider = providers?.find((item) => item.id === agent.provider);
+  const name = provider?.label || PROVIDER_LABELS[agent.provider as AgentProviderId] || agent.provider;
+  const modelId = agent.model ?? provider?.defaultModel ?? null;
+  if (!modelId) return name;
+  const model = provider?.models?.find((item) => item.id === modelId)?.label ?? modelId;
+  return `${name} · ${model}`;
+}
+
 /**
  * Провайдеры агента (`GET /api/agent/providers`). Нет маршрута — `providers: null`,
  * селектор не показывается, запрос уходит без `provider`.
  * `mode` — что нужно этапу: text, если у него есть доступный воркфлоу доски, иначе agent.
+ * `initial` — агент кадра: выбран сразу, пока в этом меню не выбрали другого.
+ * Без него — последний выбор в браузере.
  */
-export function useAgentProviders(mode: AgentMode) {
+export function useAgentProviders(mode: AgentMode, initial?: { provider: string; model: string | null } | null) {
   const [providers, setProviders] = useState<AgentProviderInfo[] | null>(null);
   const [preferred, setPreferred] = useState<string | null>(null);
   const [storedModels, setStoredModels] = useState<Record<string, string | null>>({});
+  // Выбор в этом меню. Пока пусто — агент кадра, иначе запомненный в браузере.
+  const [picked, setPicked] = useState<{ provider: string | null; models: Record<string, string> }>({
+    provider: null,
+    models: {},
+  });
 
   useEffect(() => {
     let stopped = false;
-    fetch("/api/agent/providers", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = (await res.json()) as unknown;
-        if (stopped || !Array.isArray(data)) return;
-        setProviders(data as AgentProviderInfo[]);
-        setPreferred(readStored());
-        setStoredModels(
-          Object.fromEntries((data as AgentProviderInfo[]).map((item) => [item.id, readStoredModel(item.id)])),
-        );
-      })
-      .catch(() => {
-        // Маршрута нет — селектор не показываем.
-      });
+    loadProviders().then((data) => {
+      // Маршрута нет — селектор не показываем.
+      if (stopped || !data) return;
+      setProviders(data);
+      setPreferred(readStored());
+      setStoredModels(Object.fromEntries(data.map((item) => [item.id, readStoredModel(item.id)])));
+    });
     return () => {
       stopped = true;
     };
@@ -101,6 +146,8 @@ export function useAgentProviders(mode: AgentMode) {
   const byId = (id: string | null | undefined) => providers?.find((item) => item.id === id);
   const selected = providers
     ? ([
+        byId(picked.provider),
+        byId(initial?.provider),
         byId(preferred),
         providers.find((item) => item.isDefault),
         byId("manual"),
@@ -108,19 +155,31 @@ export function useAgentProviders(mode: AgentMode) {
       ].find((item) => usable(item, mode)) ?? null)
     : null;
 
-  const model = pickModel(selected ?? undefined, selected ? storedModels[selected.id] ?? null : null);
+  const fromShot = selected && selected.id === initial?.provider ? initial.model : null;
+  const model = selected
+    ? pickModel(selected, picked.models[selected.id] ?? fromShot ?? storedModels[selected.id] ?? null)
+    : null;
 
   return {
     providers,
     selected: selected?.id ?? null,
     /** Модель выбранного провайдера. null — у провайдера нет выбора модели. */
     model,
+    /** Выбор совпадает с агентом кадра. */
+    isInitial: Boolean(
+      initial && selected?.id === initial.provider && pickModel(selected, initial.model) === model,
+    ),
     choose(id: string) {
+      setPicked((current) => ({ ...current, provider: id }));
       setPreferred(id);
       writeStored(id);
     },
     chooseModel(id: string) {
       if (!selected) return;
+      setPicked((current) => ({
+        provider: current.provider ?? selected.id,
+        models: { ...current.models, [selected.id]: id },
+      }));
       setStoredModels((current) => ({ ...current, [selected.id]: id }));
       writeStoredModel(selected.id, id);
     },

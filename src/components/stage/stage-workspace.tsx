@@ -38,7 +38,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
   const agentMode = detail.workflows.some((item) => item.available) ? "text" : "agent";
-  const agent = useAgentProviders(agentMode);
+  const agent = useAgentProviders(agentMode, detail.shotAgent);
+  // Кадр без агента получает того, кому отдали этап; у кадра с агентом другой выбор — только на этот раз.
+  const [rememberChoice, setRememberChoice] = useState<boolean | null>(null);
+  const rememberForShot = rememberChoice ?? !detail.shotAgent;
   const stageBusy = detail.state.busy;
   const canRun = detail.workflows.length > 0;
 
@@ -94,6 +97,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
             ...(agent.selected ? { provider: agent.selected } : {}),
             ...(agent.model ? { model: agent.model } : {}),
+            ...(agent.selected && rememberForShot && !agent.isInitial ? { rememberForShot: true } : {}),
           },
           fallbackError: "Не отправлено",
         },
@@ -438,6 +442,9 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onChooseProvider={agent.choose}
               model={agent.model}
               onChooseModel={agent.chooseModel}
+              isShotAgent={agent.isInitial}
+              rememberForShot={rememberForShot}
+              onRememberForShot={setRememberChoice}
               onSend={sendToAgent}
             />
           </div>

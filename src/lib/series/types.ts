@@ -48,6 +48,16 @@ export interface ShotSummary {
   characters: string[];
   location: string;
   stages: Record<StageId, StageSummary>;
+  /** Агент кадра (`agent.json`). null — не назначен. */
+  agent: ShotAgentChoice | null;
+  /** Что сейчас делает агент на кадре; provider — кем идёт запрос. null — свободен. */
+  agentActivity: { stageId: StageId; status: "running" | "queued"; since: string; provider: AgentProviderId } | null;
+}
+
+/** Провайдер и модель агента кадра. model null — модель провайдера по умолчанию. */
+export interface ShotAgentChoice {
+  provider: AgentProviderId;
+  model: string | null;
 }
 
 export interface SeriesChoice {
@@ -134,6 +144,8 @@ export interface StageDetail {
     stoppedAt: string | null;
     videoDone: boolean;
   };
+  /** Агент кадра: «Отправить агенту» берёт его по умолчанию. null — не назначен. */
+  shotAgent: ShotAgentChoice | null;
 }
 
 export interface BootstrapShotDraft {

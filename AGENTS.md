@@ -26,7 +26,7 @@ Before other stage work, read `data/episodes/{episodeId}/agent_inbox.md`. Each p
 
 - Rewrite that stage's `prompt.md` from the user message. The previous prompt is kept by the board in `prompt_history.json` when the file changes.
 - The user message is in `agent_request.md` / `llm_task.md`. `prompt.md` is the exact text that goes to the model.
-- Do not touch `llm_notes.md`, `status.json`, `stage_state.json` or `agent_dispatch.json`. The board owns them: it clears the recommendation field when the request is sent and sets every stage status itself. Append a run note to `run_log.md` only if you ran a generation.
+- Do not touch `llm_notes.md`, `status.json`, `stage_state.json`, `agent_dispatch.json` or the shot's `agent.json` (the shot's agent: provider and model). The board owns them: it clears the recommendation field when the request is sent and sets every stage status itself. Append a run note to `run_log.md` only if you ran a generation.
 - Rebuild refs only when `refsChangedByUser` is false and the message means the references are wrong. When it is true, leave `refs/` untouched.
 - Then write `agent_baseline.json` (`capturedAt`, `prompt`, `refsNote`, `workflowNote`, `refs` with `name`, `sha256`, `bytes`), set `agent_touch.json` to `{ "refsTouchedByUser": false }`, and set `"status": "done"` in `agent_request.json`.
 

@@ -295,18 +295,21 @@ export function listAgentRuns(): AgentRunsSummary {
 
 export type AgentRunTarget =
   | { episodeId: string; shotId: string; stageId: StageId }
+  | { episodeId: string; shotId: string }
   | { episodeId: string; format: true };
 
 function matches(entry: AgentRunEntry, target: AgentRunTarget | "all"): boolean {
   if (target === "all") return true;
   if (entry.episodeId !== target.episodeId) return false;
   if ("format" in target) return entry.kind === "format";
-  return entry.kind === "stage" && entry.shotId === target.shotId && entry.stageId === target.stageId;
+  if (entry.kind !== "stage" || entry.shotId !== target.shotId) return false;
+  return !("stageId" in target) || entry.stageId === target.stageId;
 }
 
 /**
- * Остановка из CLI (`POST /api/agent/runs/stop`): для этапа — то же, что «Отменить» на этапе,
- * для разметки сценария — `abortFormatRun`. Один прогон или все работающие и ждущие.
+ * Остановка из CLI и меню агента кадра (`POST /api/agent/runs/stop`): для этапа — то же, что
+ * «Отменить» на этапе, для разметки сценария — `abortFormatRun`. Один прогон, все прогоны кадра
+ * или все работающие и ждущие.
  * Возвращает остановленные прогоны; цель без прогона агента — пустой список, ничего не трогается.
  */
 export async function stopAgentRuns(target: AgentRunTarget | "all"): Promise<AgentRunEntry[]> {

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import type { AgentMode, AgentProviderInfo } from "@/lib/contracts/agent-request";
 import type { StageDetail } from "@/lib/series/types";
-import { PROVIDER_LABELS, ProviderSelect } from "./agent-provider";
+import { agentLabel, PROVIDER_LABELS, ProviderSelect } from "./agent-provider";
 
 function requestStatusText(request: NonNullable<StageDetail["agentRequest"]>): string {
   const provider = PROVIDER_LABELS[request.provider ?? "manual"];
@@ -31,6 +31,9 @@ export function AgentPanel({
   onChooseProvider,
   model,
   onChooseModel,
+  isShotAgent,
+  rememberForShot,
+  onRememberForShot,
   onSend,
 }: {
   detail: StageDetail;
@@ -41,9 +44,15 @@ export function AgentPanel({
   onChooseProvider: (id: string) => void;
   model: string | null;
   onChooseModel: (id: string) => void;
+  /** Выбор совпадает с агентом кадра. */
+  isShotAgent: boolean;
+  /** Галка «запомнить для кадра»: выбор станет агентом кадра (agent.json). */
+  rememberForShot: boolean;
+  onRememberForShot: (value: boolean) => void;
   onSend: () => void;
 }) {
   const request = detail.agentRequest;
+  const shotAgent = detail.shotAgent ? agentLabel(providers, detail.shotAgent) : null;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
@@ -65,6 +74,23 @@ export function AgentPanel({
           Отправить агенту
         </Button>
       </div>
+      {providers?.length ? (
+        <div className="space-y-1 text-xs text-stone-600">
+          <p>Агент кадра: {shotAgent ?? "не назначен"}.</p>
+          {provider && !isShotAgent ? (
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={rememberForShot}
+                disabled={disabled || detail.state.busy}
+                onChange={(event) => onRememberForShot(event.target.checked)}
+              />
+              {shotAgent ? "Запомнить этот выбор агентом кадра (иначе — только на этот раз)" : "Запомнить агентом кадра"}
+            </label>
+          ) : null}
+        </div>
+      ) : null}
       <p className="text-xs leading-5 text-stone-500">
         Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле. Пока
         агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап в Comfy. На

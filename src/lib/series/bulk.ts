@@ -5,13 +5,14 @@ import { submitAgentRequest } from "./agent-request";
 import { STAGE_LABELS, STAGES, type StageId } from "./constants";
 import { readTextIfExists } from "./media";
 import { listShotIds, stageDir } from "./paths";
+import { checkShotAgent, readShotAgent, writeShotAgent } from "./shot-agent";
 import { readShotMeta, type ShotMeta } from "./shot-meta";
 import { PHASE_LABELS, readStageState } from "./stage-state";
 import { deriveStageStatus } from "./status";
 
 /*
  * Действия «для всех кадров» над таблицей: каждый кадр получает запрос агенту, как будто
- * пользователь нажал «Отправить агенту» на нужном этапе. Дальше всё как обычно: агент пишет
+ * пользователь нажал «Отправить агенту» на нужном этапе. Запрос уходит агенту кадра (agent.json). Дальше всё как обычно: агент пишет
  * prompt.md, доска ставит прогон в ComfyUI (или агент делает этап сам — персонажи).
  * Сколько агентов идёт одновременно, решает исполнитель (FRAMEBOARD_AGENT_PARALLEL).
  */
@@ -32,13 +33,20 @@ export interface BulkSkip extends BulkItem {
 export interface BulkResult {
   started: BulkItem[];
   skipped: BulkSkip[];
+  /** Кадры, которым этот запуск назначил агента (agent.json). */
+  assigned: string[];
 }
 
 export interface BulkOptions {
-  /** manual | ollama | claude. Нет — FRAMEBOARD_AGENT_PROVIDER. */
+  /**
+   * Агент для кадров без своего агента (manual | ollama | claude): назначается им в agent.json.
+   * Кадры со своим агентом запускаются им. Нет — у кадра без агента FRAMEBOARD_AGENT_PROVIDER, без назначения.
+   */
   provider?: AgentProviderId | string;
   /** Модель провайдера. Нет — по умолчанию. */
   model?: string;
+  /** missing (по умолчанию) — назначить только кадрам без агента; always — и кадрам со своим агентом. */
+  assign?: "missing" | "always";
   /**
    * Переделать и там, где этап уже пройден: утверждён или есть результат в output/.
    * По умолчанию нет — пройденное не трогается, даже если его делали вручную или агентом на кадре.
@@ -79,8 +87,24 @@ function blocked(
   return null;
 }
 
+/**
+ * Назначает агента из меню кадрам (по умолчанию — только без своего агента).
+ * Провайдер и модель проверяются до записи: неверный выбор — ошибка всего запуска.
+ */
+function assignAgents(result: BulkResult, episodeId: string, shotIds: string[], options: BulkOptions): void {
+  if (!options.provider) return;
+  const agent = checkShotAgent(options.provider, options.model);
+  for (const shotId of shotIds) {
+    if (options.assign !== "always" && readShotAgent(episodeId, shotId)) continue;
+    writeShotAgent(episodeId, shotId, agent);
+    result.assigned.push(shotId);
+  }
+}
+
 function sendToAgent(episodeId: string, shotId: string, stageId: StageId, options: BulkOptions): void {
   const dir = stageDir(episodeId, shotId, stageId);
+  // Агент кадра; у кадра без агента — выбор меню или агент доски по умолчанию.
+  const own = readShotAgent(episodeId, shotId);
   // Документы этапа уходят как есть: массовый запуск ничего в них не меняет.
   submitAgentRequest({
     episodeId,
@@ -90,8 +114,8 @@ function sendToAgent(episodeId: string, shotId: string, stageId: StageId, option
     prompt: readTextIfExists(path.join(dir, "prompt.md")),
     refsNote: readTextIfExists(path.join(dir, "refs.md")),
     workflowNote: readTextIfExists(path.join(dir, "workflow.md")),
-    provider: options.provider,
-    model: options.model,
+    provider: own ? own.provider : options.provider,
+    model: own ? (own.model ?? undefined) : options.model,
   });
 }
 
@@ -112,8 +136,10 @@ function tryStart(
 
 /** Кнопка над столбцом этапа: этот этап на всех кадрах эпизода. */
 export function runStageForAllShots(episodeId: string, stageId: StageId, options: BulkOptions = {}): BulkResult {
-  const result: BulkResult = { started: [], skipped: [] };
-  for (const shotId of listShotIds(episodeId)) {
+  const result: BulkResult = { started: [], skipped: [], assigned: [] };
+  const shotIds = listShotIds(episodeId);
+  assignAgents(result, episodeId, shotIds, options);
+  for (const shotId of shotIds) {
     const meta = readShotMeta(episodeId, shotId);
     const reason = blocked(episodeId, shotId, stageId, meta, options.redo === true);
     if (reason) result.skipped.push({ shotId, stageId, reason });
@@ -149,14 +175,20 @@ function startNextStage(result: BulkResult, episodeId: string, shotId: string, o
 
 /** Кнопка над столбцом «Кадр»: каждому кадру — агент на его следующий этап. */
 export function runNextStageForAllShots(episodeId: string, options: BulkOptions = {}): BulkResult {
-  const result: BulkResult = { started: [], skipped: [] };
-  for (const shotId of listShotIds(episodeId)) startNextStage(result, episodeId, shotId, options);
+  const result: BulkResult = { started: [], skipped: [], assigned: [] };
+  const shotIds = listShotIds(episodeId);
+  assignAgents(result, episodeId, shotIds, options);
+  for (const shotId of shotIds) startNextStage(result, episodeId, shotId, options);
   return result;
 }
 
-/** Кнопка на кадре: агент (свой провайдер и модель) на следующий этап этого кадра. */
+/**
+ * Кнопка на кадре: агент кадра на следующий этап. С `provider` и `assign: "always"` — сначала
+ * сохранить этот выбор агентом кадра.
+ */
 export function runNextStageForShot(episodeId: string, shotId: string, options: BulkOptions = {}): BulkResult {
-  const result: BulkResult = { started: [], skipped: [] };
+  const result: BulkResult = { started: [], skipped: [], assigned: [] };
+  assignAgents(result, episodeId, [shotId], options);
   startNextStage(result, episodeId, shotId, options);
   return result;
 }

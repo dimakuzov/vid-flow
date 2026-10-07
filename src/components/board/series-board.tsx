@@ -8,6 +8,7 @@ import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/
 import { BootstrapPanel } from "./bootstrap-panel";
 import { BulkMenu } from "./bulk-menu";
 import { NewEpisodeDialog } from "./new-episode-dialog";
+import { ShotAgentLine, ShotAgentMenu } from "./shot-agent-menu";
 import { StageCell } from "./stage-cell";
 
 function ShotHeader({
@@ -28,7 +29,8 @@ function ShotHeader({
         <br />
         {shot.location || "локация не задана"}
       </div>
-      <BulkMenu episodeId={episodeId} target={{ kind: "shot", shotId: shot.id }} shotCount={1} onDone={onChanged} />
+      <ShotAgentLine shot={shot} />
+      <ShotAgentMenu episodeId={episodeId} shot={shot} onDone={onChanged} />
     </div>
   );
 }
@@ -109,6 +111,7 @@ export function SeriesBoard({
   );
 
   const onChanged = useCallback(() => reload(), [reload]);
+  const withoutAgent = series.shots.filter((shot) => !shot.agent).length;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -216,11 +219,11 @@ export function SeriesBoard({
           <>
             {/* Телефон: кадр — карточка, этапы списком. Кнопки «для всех кадров» — строкой сверху. */}
             <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
-              <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} onDone={onChanged} />
+              <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
               {STAGES.map((stageId) => (
                 <div key={stageId} className="flex items-center gap-1 text-[11px] text-stone-500">
                   <span>{STAGE_LABELS[stageId]}</span>
-                  <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} onDone={onChanged} />
+                  <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
                 </div>
               ))}
             </div>
@@ -253,7 +256,7 @@ export function SeriesBoard({
                   <tr>
                     <th className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                       Кадр
-                      <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} onDone={onChanged} />
+                      <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
                     </th>
                     {STAGES.map((stageId) => (
                       <th
@@ -261,7 +264,7 @@ export function SeriesBoard({
                         className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500"
                       >
                         {STAGE_LABELS[stageId]}
-                        <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} onDone={onChanged} />
+                        <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
                       </th>
                     ))}
                   </tr>

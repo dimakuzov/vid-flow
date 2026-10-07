@@ -4,6 +4,7 @@ import { submitAgentRequest } from "@/lib/series/agent-request";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { getStageDetail } from "@/lib/series/scanner";
+import { writeShotAgent } from "@/lib/series/shot-agent";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,8 @@ export async function POST(request: Request, context: StageRouteContext) {
       model?: unknown;
       /** Прямая речь кадра (speech.md): сохраняется до задачи, чтобы агент её увидел. */
       speech?: unknown;
+      /** «Запомнить для кадра»: provider и model становятся агентом кадра (agent.json). */
+      rememberForShot?: unknown;
     };
     if (typeof body.speech === "string" && stageHasSpeech(stageId)) writeShotSpeech(episodeId, shotId, body.speech);
     const submitted = submitAgentRequest({
@@ -51,6 +54,11 @@ export async function POST(request: Request, context: StageRouteContext) {
       provider: typeof body.provider === "string" ? body.provider : undefined,
       model: typeof body.model === "string" ? body.model : undefined,
     });
+
+    // Агент кадра меняется только вместе с принятым запросом.
+    if (body.rememberForShot === true && submitted.provider) {
+      writeShotAgent(episodeId, shotId, { provider: submitted.provider, model: submitted.model });
+    }
 
     return NextResponse.json({
       message: submittedMessage(submitted.mode),

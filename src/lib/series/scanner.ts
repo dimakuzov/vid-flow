@@ -19,6 +19,7 @@ import {
   stageDir,
   toPosix,
 } from "./paths";
+import { readShotAgent, readShotAgentActivity } from "./shot-agent";
 import { readShotMeta } from "./shot-meta";
 import {
   deriveStageStatus,
@@ -114,6 +115,11 @@ function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
   };
 }
 
+function shotAgentChoice(episodeId: string, shotId: string): ShotSummary["agent"] {
+  const agent = readShotAgent(episodeId, shotId);
+  return agent ? { provider: agent.provider, model: agent.model } : null;
+}
+
 /**
  * Сводка эпизода для таблицы. Чтение без записей (кроме истории промпта на странице этапа).
  * Без episodeId — открытый эпизод из `current_episode.txt`.
@@ -148,6 +154,8 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
         characters: meta.characters,
         location: meta.location,
         stages,
+        agent: shotAgentChoice(episodeId, shotId),
+        agentActivity: readShotAgentActivity(episodeId, shotId),
       });
     } catch {
       // A file in this shot is still being written. Keep the rest of the series.
@@ -282,5 +290,6 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     job: readJobSummary(state.jobId),
     agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
     watch: readShotWatch(episodeId, shotId),
+    shotAgent: shotAgentChoice(episodeId, shotId),
   };
 }

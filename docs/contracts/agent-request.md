@@ -81,13 +81,27 @@
 
 | Метод и путь | Тело / ответ |
 |---|---|
-| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
+| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
 | `POST .../stages/{stage}/cancel` | отмена (общая с прогоном) |
+| `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }` — агент кадра и что он делает |
+| `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }` — «Сохранить» в меню агента кадра. Неизвестный провайдер или модель — 400 |
+| `POST /api/episodes/{ep}/shots/{shot}/next-stage` | `{ provider?, model? }` — с provider выбор сначала записывается агентом кадра, затем следующий этап идёт агентом кадра. Ответ `{ started, skipped, assigned }` |
+| `POST /api/episodes/{ep}/next-stage`, `POST /api/episodes/{ep}/stages/{stage}/run-all` | `{ provider?, model? }` (+ `redo?` у run-all) — агент для кадров **без своего агента**, назначается им; кадры с агентом идут своим. Ответ `{ started, skipped, assigned }` |
 | `GET /api/agent/providers` | `AgentProviderInfo[]`: `id`, `label`, `modes`, `available`, `reason`, `isDefault` |
 | `GET /api/agent/runs` | `{ running, queued }` по всем эпизодам — см. «Агенты доски в CLI» |
-| `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }` или `{ all: true }`. Ответ `{ stopped, running, queued }` |
+| `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }`, `{ episodeId, shotId }` (все этапы кадра), `{ episodeId, format: true }` или `{ all: true }`. Ответ `{ stopped, running, queued }` |
 
-`StageDetail.agentRequest` отдаёт `status`, `provider`, `error`, `suggestedWorkflow` (поля уже в `types.ts`).
+`StageDetail.agentRequest` отдаёт `status`, `provider`, `error`, `suggestedWorkflow` (поля уже в `types.ts`). `StageDetail.shotAgent` — агент кадра.
+
+## Агент кадра
+
+`shots/{shotId}/agent.json` → `{ provider, model, updatedAt }` (`model: null` — модель провайдера по умолчанию). Пишет **только доска** (`writeShotAgent` в `src/lib/series/shot-agent.ts`; провайдер и модель проверяются как в запросе). Агент файл не трогает.
+
+- Все запуски кадра — «▶ Агент» на кадре, «▶ Агенты по кадрам», «▶ Все кадры» — идут агентом кадра. У кадра без агента — агент, выбранный в меню; он назначается кадру. Выбора нет — `FRAMEBOARD_AGENT_PROVIDER` (иначе manual), без назначения.
+- «Агенты по кадрам» и «Все кадры» назначают выбор **всем кадрам без агента** (и тем, что будут пропущены), кадры с агентом не меняют. Меню спрашивает агента, только если такие кадры есть.
+- Страница этапа: «Отправить агенту» по умолчанию берёт агента кадра; другой выбор уходит на один запуск, с галкой «запомнить» — становится агентом кадра. У кадра без агента галка включена.
+- `agent_request.json` хранит, кем фактически выполнен запуск (`provider`, `model`).
+- `ShotSummary.agent` — `{ provider, model } | null`; `ShotSummary.agentActivity` — `{ stageId, status: running | queued, since, provider } | null`: работающий запрос этапов кадра, иначе ждущий (`pending`, этап в фазе `agent` с этим запросом, включая manual — «ждёт агента в чате»).
 
 ## Агенты доски в CLI
 

@@ -126,6 +126,8 @@ test("кнопка на кадре: только этот кадр; кнопка
   // Освобождаем s04 для следующего теста.
   fs.rmSync(path.join(stageDir(EP, "s04", "characters"), "stage_state.json"), { force: true });
   fs.rmSync(path.join(stageDir(EP, "s01", "characters"), "stage_state.json"), { force: true });
+  // Прошлые запуски назначили кадрам агента «в чате»; дальше кадры без агента получают Claude.
+  for (const shotId of ["s01", "s02", "s03", "s04"]) fs.rmSync(path.join(shotDir(EP, shotId), "agent.json"), { force: true });
 });
 
 test("агенты по кадрам: следующий этап каждого кадра, очередь из одного места", async () => {
