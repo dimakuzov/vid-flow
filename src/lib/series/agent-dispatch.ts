@@ -1,5 +1,7 @@
+import type { AgentProviderId } from "../contracts/agent-request";
+import { defaultClaudeModel, ollamaModel } from "../agent/config";
 import { isFormatRunLive, startFormatRun } from "../agent/format-runner";
-import { abortAgentRun, isAgentRunLive, startAgentRun } from "../agent/runner";
+import { abortAgentRun, isAgentRunLive, listLiveAgentRuns, startAgentRun } from "../agent/runner";
 import { registerLoop } from "../background";
 import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
@@ -183,4 +185,134 @@ export async function cancelStage(episodeId: string, shotId: string, stageId: St
 
 export function startAgentDispatch(): void {
   registerLoop("agent-dispatch", 3000, reconcileAllStages);
+}
+
+/**
+ * Прогон агента доски для `GET /api/agent/runs`. kind "format" — разметка сценария эпизода
+ * (кнопка «Добавить»), у неё нет кадра и этапа.
+ */
+export interface AgentRunEntry {
+  kind: "stage" | "format";
+  episodeId: string;
+  shotId: string | null;
+  stageId: StageId | null;
+  provider: AgentProviderId;
+  /** Модель провайдера; без выбора в запросе — модель провайдера по умолчанию. */
+  model: string | null;
+  /** running — с какого времени работает, queued — с какого времени ждёт. */
+  since: string;
+}
+
+export interface AgentRunsSummary {
+  running: AgentRunEntry[];
+  queued: AgentRunEntry[];
+}
+
+function modelOf(provider: AgentProviderId, model: string | undefined | null): string | null {
+  if (model) return model;
+  if (provider === "claude") return defaultClaudeModel();
+  if (provider === "ollama") return ollamaModel();
+  return null;
+}
+
+function bySince(a: AgentRunEntry, b: AgentRunEntry): number {
+  return a.since.localeCompare(b.since);
+}
+
+/**
+ * Агенты доски по всем эпизодам. running — живые прогоны этого процесса (исполнитель и разметка).
+ * queued — pending у провайдера доски, которые фоновый цикл запустит, когда освободится место.
+ * Ручной режим сюда не входит: его исполняет агент в чате, а не доска.
+ */
+export function listAgentRuns(): AgentRunsSummary {
+  const running: AgentRunEntry[] = listLiveAgentRuns().map((run) => ({
+    kind: "stage",
+    episodeId: run.episodeId,
+    shotId: run.shotId,
+    stageId: run.stageId,
+    provider: run.provider,
+    model: modelOf(run.provider, run.model),
+    since: run.startedAt,
+  }));
+  const queued: AgentRunEntry[] = [];
+
+  for (const episodeId of listEpisodeIds()) {
+    try {
+      const format = readFormatRequest(episodeRoot(episodeId));
+      const provider = format?.provider ?? "manual";
+      if (format && provider !== "manual") {
+        const live = isFormatRunLive(episodeId);
+        const entry: AgentRunEntry = {
+          kind: "format",
+          episodeId,
+          shotId: null,
+          stageId: null,
+          provider,
+          model: modelOf(provider, format.model),
+          since: format.startedAt || format.createdAt,
+        };
+        if (live && format.status === "running") running.push(entry);
+        else if (!live && format.status === "pending") queued.push({ ...entry, since: format.createdAt });
+      }
+    } catch {
+      // format_request.json ещё пишется.
+    }
+
+    let shotIds: string[];
+    try {
+      shotIds = listShotIds(episodeId);
+    } catch {
+      continue;
+    }
+    for (const shotId of shotIds) {
+      for (const stageId of STAGES) {
+        try {
+          const request = readAgentRequest(episodeId, shotId, stageId);
+          const provider = request?.provider ?? "manual";
+          if (!request || request.status !== "pending" || provider === "manual") continue;
+          if (isAgentRunLive(episodeId, request.id)) continue;
+          // Цикл запускает pending только у этапа в фазе agent с этим же запросом.
+          const file = readStageStateFile(episodeId, shotId, stageId);
+          if (file?.phase !== "agent" || (file.requestId && file.requestId !== request.id)) continue;
+          queued.push({
+            kind: "stage",
+            episodeId,
+            shotId,
+            stageId,
+            provider,
+            model: modelOf(provider, request.model),
+            since: request.createdAt,
+          });
+        } catch {
+          // Файл этапа ещё пишется.
+        }
+      }
+    }
+  }
+
+  return { running: running.sort(bySince), queued: queued.sort(bySince) };
+}
+
+export type AgentRunTarget = { episodeId: string; shotId: string; stageId: StageId };
+
+/**
+ * Остановка из CLI (`POST /api/agent/runs/stop`): то же, что «Отменить» на этапе, для одного
+ * прогона или для всех работающих и ждущих. Разметку сценария отсюда не остановить: у неё нет
+ * отмены. Возвращает остановленные прогоны; цель без прогона агента — пустой список, этап не трогается.
+ */
+export async function stopAgentRuns(target: AgentRunTarget | "all"): Promise<AgentRunEntry[]> {
+  const { running, queued } = listAgentRuns();
+  const stopped: AgentRunEntry[] = [];
+  for (const entry of [...running, ...queued]) {
+    if (entry.kind !== "stage" || !entry.shotId || !entry.stageId) continue;
+    if (
+      target !== "all" &&
+      (entry.episodeId !== target.episodeId || entry.shotId !== target.shotId || entry.stageId !== target.stageId)
+    ) {
+      continue;
+    }
+    await cancelStage(entry.episodeId, entry.shotId, entry.stageId);
+    stopped.push(entry);
+  }
+  return stopped;
 }

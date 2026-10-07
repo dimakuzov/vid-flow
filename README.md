@@ -41,6 +41,38 @@ DATA_ROOT=/tmp/frameboard COMFY_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 1
 
 Отдельного воркера нет. Очередь ComfyUI (раз в 2 с) и цикл агента (раз в 3 с, все эпизоды) работают внутри процесса Next: `src/instrumentation.ts` → `src/lib/background.ts`. Пока запущен `npm run dev`, задания уходят в ComfyUI сами. `npm run comfy-queue` — отладочный запуск очереди без доски, вместе с `npm run dev` не запускать.
 
+### Агенты доски в Claude Code
+
+Агенты, которых запускает доска (`claude -p`, запросы к Ollama), видны в строке состояния Claude Code CLI: `Frameboard: 2 работают · 3 в очереди`, `Frameboard: агентов нет` или `Frameboard: доска выключена`.
+
+Строка состояния — поле `statusLine` в `~/.claude/settings.json` ([документация](https://code.claude.com/docs/en/statusline)). Путь — с прямыми слэшами (на Windows Claude Code запускает команду через Git Bash):
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node C:/Users/dimak/Documents/vera/soviet_story/vid-flow/scripts/frameboard-status.mjs",
+    "refreshInterval": 5
+  }
+}
+```
+
+`refreshInterval` нужен: без него строка обновляется только на событиях сессии, а агенты доски меняются, пока сессия молчит. Доска не на 3456 — добавь в начало команды `FRAMEBOARD_PORT=3474 ` (так пишется в Git Bash; без Git Bash Claude Code запускает команду в PowerShell, там переменную так не задать). Проверка:
+
+```bash
+echo '{}' | node scripts/frameboard-status.mjs
+```
+
+Список и остановка — тот же API, что у кнопки «Отменить»:
+
+```bash
+npm run agents -- list
+npm run agents -- stop e01/s03/location
+npm run agents -- stop --all
+```
+
+В сессии Claude Code — с `!` в начале: `! npm run agents -- list`. Или слэш-командой `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Разметку сценария (кнопка «Добавить») так не остановить — она закончится сама или по таймауту.
+
 ## Что умеет доска
 
 - таблица кадр × этап; на телефоне — карточки кадров. Клик по клетке — меню: загрузить, утвердить, выбрать воркфлоу, запустить, отменить, «Редактировать»

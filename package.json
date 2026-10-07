@@ -10,7 +10,9 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "bootstrap:sample": "node --import tsx scripts/bootstrap-sample.ts",
     "comfy-queue": "node --import tsx scripts/comfy-queue.ts",
-    "migrate-prompts": "node --import tsx scripts/migrate-prompts.ts"
+    "migrate-prompts": "node --import tsx scripts/migrate-prompts.ts",
+    "agents": "node scripts/frameboard-agents.mjs",
+    "status-line": "node scripts/frameboard-status.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
