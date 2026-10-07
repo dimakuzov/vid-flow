@@ -18,12 +18,12 @@
 
 Shot-этапы `characters` и `location` собирают вариант кадра из этих баз. Контракт этапа тот же: `refs/`, `output/`, `approve/` и пять документов.
 
-Сейчас заполнены правила shot-персонажа (по умолчанию Qwen Image Edit одежды; скелет только по явной просьбе взять позу с референса; сборка проверена на teaser s07):
+Сейчас заполнены правила shot-персонажа (правка одежды Qwen Image 2.1 по образцу, проверено на teaser s07):
 
 - `stages/characters.md` — оригинал на русском, для модели `stages/characters.en.md`
 - `models/qwen_image.md` — оригинал на русском, для модели `models/qwen_image.en.md`
 - `workflows/characters_comfy.md` — оригинал на русском, для модели `workflows/characters_comfy.en.md`
-- `workflows/comfy/character_pose_outfit_qwen.json`
+- `workflows/comfy/character_outfit_qwen21.json`
 
 Ракурсы локации (проверено на прошлом проекте: ветка objects чаще всего идёт в работу):
 

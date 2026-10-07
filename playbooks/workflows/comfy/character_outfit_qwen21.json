@@ -1,0 +1,176 @@
+{
+  "10": {
+    "inputs": {
+      "image": "person.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "image 1: персонаж (база или прошлый проход)"
+    }
+  },
+  "11": {
+    "inputs": {
+      "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "12": {
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "13": {
+    "inputs": {
+      "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "14": {
+    "inputs": {
+      "lora_name": "qwen2.1\\lenovo_qwen21.safetensors",
+      "strength_model": 0.6,
+      "model": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "15": {
+    "inputs": {
+      "device": "auto",
+      "dtype": "default",
+      "model": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "QwenImage21Cache",
+    "_meta": {
+      "title": "Qwen Image 2.1 Cache"
+    }
+  },
+  "16": {
+    "inputs": {
+      "value": "Image 1 is the standing girl. Image 2 is the garment to copy. Change <the garment> in <image1> so it matches <image2>: <colour, pattern, cut, length>. <the layer underneath, if it shows>. The same shoes stay fully visible. Her face, hair, standing pose, framing, lighting and plain light background stay exactly as in <image1>."
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "PROMPT (правка одежды)"
+    }
+  },
+  "17": {
+    "inputs": {
+      "prompt": [
+        "16",
+        0
+      ],
+      "negative_prompt": "",
+      "resolution": 1024,
+      "clip": [
+        "12",
+        0
+      ],
+      "images.image_1": [
+        "10",
+        0
+      ],
+      "images.image_2": [
+        "22",
+        0
+      ],
+      "vae": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImage21",
+    "_meta": {
+      "title": "Text Encode Qwen Image 2.1"
+    }
+  },
+  "19": {
+    "inputs": {
+      "seed": 0,
+      "steps": 25,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "15",
+        0
+      ],
+      "positive": [
+        "17",
+        0
+      ],
+      "negative": [
+        "17",
+        1
+      ],
+      "latent_image": [
+        "17",
+        2
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "20": {
+    "inputs": {
+      "samples": [
+        "19",
+        0
+      ],
+      "vae": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "21": {
+    "inputs": {
+      "filename_prefix": "frameboard/characters/outfit",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "22": {
+    "inputs": {
+      "image": "outfit_ref.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "image 2: образец одежды"
+    }
+  }
+}

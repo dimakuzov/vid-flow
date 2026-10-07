@@ -198,7 +198,7 @@ function playbooksForStage(stageId: StageId): string[] {
   }
   if (stageId === "characters") {
     candidates.push(
-      path.join("workflows", "comfy", "character_pose_outfit_qwen.json"),
+      path.join("workflows", "comfy", "character_outfit_qwen21.json"),
     );
   }
   const withEnglish = candidates.flatMap((rel) =>

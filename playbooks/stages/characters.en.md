@@ -1,31 +1,27 @@
 # Stage: characters
 
-English copy for the model. Russian original: `playbooks/stages/characters.md`.
+English copy for the agent. Russian original: `playbooks/stages/characters.md`.
 
-Shot-specific character: the outfit and pose of this shot. Face and body come from the base asset, not from the prompt text.
+A shot variant of a character: the clothes of this shot. Face and body come from the base asset, the clothes from a reference in `refs/` or from text. The character stands straight, full length, on a light background: the pose and the place in the frame are set by the `first_frame` stage, not this one.
 
-By default the agent only edits the outfit, using the Command section in `playbooks/workflows/characters_comfy.en.md`. The skeleton and the assembly of one figure, a skeleton, and a face stay off until the user explicitly asks for a specific pose from a reference. That assembly was already verified on teaser s07. Do not break the rules below.
+The run is a Qwen Image 2.1 outfit edit per the “Command” section of `playbooks/workflows/characters_comfy.en.md`, graph `playbooks/workflows/comfy/character_outfit_qwen21.json`. The teaser s07 characters were made this way.
 
-## Depends on the identity library
+## Dependency on the base
 
 The character canon lives outside the shot:
 
 ```text
 data/characters/{name}/
-  portrait.png     # front face (source notes: portret.png)
-  side.png         # profile face (portret_side.png)
-  full_body.png    # full body, light background
+  portrait.png     # face, front (portret.png in the source notes)
+  side.png         # face, profile (portret_side.png)
+  full_body.png    # full length, light background
 ```
 
-The shot variant is built from that library into `data/episodes/{episodeId}/shots/{shotId}/characters/`. If a canonical name is missing, use an existing png in that character folder: the sheet, or `body.png` / `portret.png`. Skip `_old/` and files with `Copy` in the name. Do not invent a person who has no picture. Do not mix old pictures from subfolders into the pass.
-
-Do not crop a face out of a three-panel sheet, and do not use that sheet as the pose sample. DWPose will see several bodies. The pose sample is one full-body figure, the right panel. Assembly image 1 is also one figure, already wearing the shot outfit.
-
-`portrait` / `side` are only the “face” role, in the same angle as the pose. If the figure is small in frame, put a tight crop in `refs/`: forehead to chin, as little hair as possible.
+The variant in `data/episodes/{episodeId}/shots/{shotId}/characters/` is built from this base. If there is no canonical name, take an existing png in the character's folder: a sheet (the right panel, one figure) or `body.png`. Do not take the `_old/` folder or files with `Copy` in the name. Do not invent a character without their own picture. Do not mix in old pictures from subfolders.
 
 ## Shot contract
 
-Stage folders and documents stay as they are:
+The stage folders and documents do not change:
 
 ```text
 shots/{shotId}/characters/
@@ -35,75 +31,56 @@ shots/{shotId}/characters/
 
 `workflow.md` is an optional note for this shot. It can stay empty.
 
-Approved file: `approve/{name}_{shotId}.png` (example: `lena_s01.png`).
+The approved file: `approve/{name}_{shotId}.png` (example: `lena_s01.png`). It is the character reference for `first_frame`, `video_preview` and `final_render`.
 
-That file is the character reference for `video_preview` and `final_render`. There is no `env/` folder in the series.
+## What goes into refs/
 
-## What goes in refs/
-
-| File | Role | Source |
+| File | Role | From |
 | --- | --- | --- |
-| `{name}_outfit.png` | Outfit sheet | An edit of `full_body.png` when the shot outfit differs from the base |
-| `{name}_pose.png` | Pose only | Any frame where every limb is visible. Aspect ratio matches the output |
-| `{name}_face.png` | Face | `portrait.png` or `side.png`; a tight crop when the figure is small |
+| garment reference (`{name}_outfit.png`, `green_dress.jpg` …) | image 2 — the shot's clothes | a photo or picture of the needed clothes: fully visible, with shoes if they change |
+| `{name}_face.png` | the face for later stages | `portrait.png` or a tight crop when the figure in the shot is small |
 
-Outfit sheet: full body, standing straight, light background, shoes and bag fully visible, clothes not blowing. If the shot needs a garment that is hidden on the sheet (a dress under a jacket), fix the sheet itself in a separate edit pass first. Do not change the pose on that pass.
-
-No more than two characters per pass, or the surroundings drift.
+One item — one reference. A layer that is not visible on the reference (a dress under a jacket) is made in a separate pass.
 
 ## Order
 
-1. Take one source image from `data/characters/{name}/`.
-2. Make the shot outfit in a separate Qwen Image 2.1 edit. The pose graph does not change clothes. Do not change the pose on that pass.
-3. If the base lower garment still shows under the new clothes, replace it in a second edit. Write what is worn. Do not write “no trousers”.
+1. Take one full-length figure from `data/characters/{name}/` — image 1.
+2. Outfit edit: image 2 is the garment reference; the text names the layer that changes and keeps the face, hair, pose, framing and background.
+3. If the base's lower garment shows under the new clothes, replace it with the requested layer in a second pass. Write what is worn, not “without trousers”.
 4. If the feet are missing because the frame is cropped, extend the same figure downward.
-5. Best frames go to `output/`. The chosen file goes to `approve/{name}_{shotId}.png`. Set `"status": "done"` in `agent_request.json` only when every character in the shot has that file. Do not write `status.json`: the board sets the stage status.
-6. Run the skeleton and `playbooks/workflows/comfy/character_pose_outfit_qwen.json` only when the user explicitly asks for a specific pose from a reference. Otherwise skip these steps. Then image 1 is one outfit figure, image 2 is the skeleton, image 3 is the face, and the skeleton must show both arms, both hands, both legs, and both feet.
+5. The best results go to `output/`, the chosen one to `approve/{name}_{shotId}.png`. Set `"status": "done"` in `agent_request.json` only when every character in the shot has such a file. Do not touch `status.json`: the board sets the stage status.
 
-Prompt and parameters: `playbooks/models/qwen_image.en.md`. How to run the graph: `playbooks/workflows/characters_comfy.en.md`.
+Prompt and parameters: `playbooks/models/qwen_image.en.md`. Running the graph: `playbooks/workflows/characters_comfy.en.md`.
 
-## Verified
+## Checked (teaser s07)
 
-- One character source per pass. Light background, framing matches the shot.
-- Lightning 4-step LoRA is on in Qwen Image Edit.
-- Reference roles come first in the prompt, then only where and how the character stands or moves. Do not describe appearance or clothing in text.
-- No negations in the positive prompt. Write only what should be there.
-- Qwen does not invent hidden detail well. Anything not visible on the reference must be shown in an image or stated explicitly.
-- No more than two characters per pass.
-- A separate face crop when the figure is small.
-- Fix the source image. Do not patch the prompt.
-- The shot outfit is stored as its own approved file and is the reference for video and the final render.
-- On teaser s07 the assembly kept the pose, the face, and the layers when image 1 was one figure after the edit and the skeleton showed both feet.
-- The base grey trousers under the sarafan went away in a second edit that described the skirt covering the legs. The ban “no trousers” was not used.
-- A frame cropped at the hips was extended downward with the same edit and a taller canvas. The skeleton then showed both feet.
+- One character source per pass. Light background, full-length figure.
+- A garment reference as a separate picture (image 2) carries colour, pattern and cut better than text. The text names details that must not be lost: neckline, waist tie, length, the layer under the dress.
+- No negations in the positive prompt. Write only what must be there.
+- Qwen guesses badly. Show everything that is not visible on the reference, or name it explicitly.
+- The base's grey trousers under the sarafan went away in a second pass that described the skirt as a layer covering the legs. No “without trousers” ban was used.
+- A frame cropped at the hips was extended downward by the same edit with a taller canvas.
+- Fix the source, do not patch it with the prompt.
 
 ## Failed
 
-Combining a pose from one frame and clothing from another image in a single pass. The model receives two signals about clothing.
+Combining the pose from the shot and clothes from another picture in one pass: the model gets two signals about the clothes.
 
-| Approach | Result | Cause |
+| Approach | Result | Reason |
 | --- | --- | --- |
-| image 1 = desired pose, image 2 = desired outfit, prompt “change the clothes” | High heels; two jackets at once | Shoes on image 2 are hard to see; a blowing jacket on image 1 leaks through |
-| image 1 = desired outfit, pose written out from a sample image | A cloak appeared that is not on image 1 | A phrase about a blowing coat overrode the image |
-| Same, without the cloak, banned in the negative | Not confirmed | At cfg 1.0 the negative has no effect |
+| image 1 = the needed pose, image 2 = the needed clothes, prompt “change clothes” | High heels; two jackets at once | Shoes on image 2 poorly visible; the flying jacket from image 1 leaks in |
+| image 1 = the needed clothes, pose described in text | A cloak appeared that is not on image 1 | Text about a flying coat overrode the picture |
+| The same without the cloak, ban via negative | Not confirmed | At cfg 1.0 the negative has no effect |
 
-Removing visible base trousers by writing “no trousers” in the assembly prompt does not work. The assembly pass does not change clothes. A separate edit that describes the skirt worked on teaser s07.
-
-## Locked by the run
-
-Clothing comes only from the outfit sheet. A pose is taken from a skeleton only when the user explicitly asks for a specific pose from a reference. On teaser s07, in that case, the skeleton held in `character_pose_outfit_qwen.json` at 4 steps and cfg 1. ControlNet was not needed.
-
-Prompt templates are in the model playbook. The assembly text does not name clothes. The outfit-edit text names only the layer that changes, and it keeps the face, hair, pose, and shoes.
+So here the character only changes clothes and stands. The shot's pose belongs to `first_frame`.
 
 ## Do not
 
-- Do not use a pose reference as a clothing source. Clothing leaks from it in pieces.
-- Do not describe, in text, the clothing on the pose sample.
+- Do not feed as image 1 a picture where the person wears other clothes in the needed pose: the clothes leak in parts.
 - Do not write negations in the positive prompt.
-- Do not expect the model to guess what is hidden: cropped shoes become heels, a covered dress top becomes a random bodice.
-- Do not solve pose, clothing, and face with one sentence. Each image has one role.
-- Do not feed two images of the same character in different poses. The model mixes poses and faces.
+- Do not hope the model guesses the invisible: cropped shoes become high heels, a covered dress top becomes a random bodice.
+- Do not feed two images of the same character in different poses: the model mixes poses and faces.
 
-## Where to write the test result
+## Where to write the run result
 
-Write the run result in `run_log.md`. Do not touch `llm_notes.md`: the board clears it when the request is sent. Do not roll back settings that are already locked because a new shot is different.
+The run summary goes to `run_log.md`. Do not touch `llm_notes.md`: the board clears it when the request is sent. Do not roll back settings that are already fixed because of a new shot.

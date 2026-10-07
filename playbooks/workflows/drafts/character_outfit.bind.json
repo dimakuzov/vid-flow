@@ -36,26 +36,26 @@
   },
   "slots": [
     {
-      "targets": [{ "node": "470", "field": "image" }],
+      "targets": [{ "node": "10", "field": "image" }],
       "value": { "input": "base" }
     },
     {
-      "targets": [{ "node": "902", "field": "image" }],
+      "targets": [{ "node": "22", "field": "image" }],
       "value": { "input": "clothes" },
       "whenEmpty": {
-        "remove": [{ "node": "902" }, { "node": "488", "field": "images.image_2" }]
+        "remove": [{ "node": "22" }, { "node": "17", "field": "images.image_2" }]
       }
     },
     {
-      "targets": [{ "node": "477", "field": "value" }],
+      "targets": [{ "node": "16", "field": "value" }],
       "value": { "input": "text" }
     },
     {
-      "targets": [{ "node": "485", "field": "seed" }],
+      "targets": [{ "node": "19", "field": "seed" }],
       "value": { "seed": "random" }
     },
     {
-      "targets": [{ "node": "461", "field": "filename_prefix" }],
+      "targets": [{ "node": "21", "field": "filename_prefix" }],
       "value": { "template": "frameboard/characters/{shotId}_{character}_outfit" }
     }
   ]

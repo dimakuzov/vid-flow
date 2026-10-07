@@ -9,7 +9,7 @@
 | `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
 | `final_h3`, `final_h3_768` | `final_render` | `minimax_h3_creator_api.json` (MiniMax H3, ComfyUI-Continuity) | доска; разделы `## body/...` в `prompt.md` |
 | `final_i2v`, `final_flf` | `final_render` | графы Wan превью | доска, запасной вариант |
-| — | `characters` | `character_pose_outfit_qwen.json` (поза со скелетом) | агент по `characters_comfy.md`, только по явной просьбе |
+| — | `characters` | `character_outfit_qwen21.json` (правка одежды, image 1 — персонаж, image 2 — образец) | агент по `characters_comfy.md`; манифест — черновик в `drafts/` |
 
 Черновики, которые ещё не проверены в ComfyUI: `playbooks/workflows/drafts/`.
 
