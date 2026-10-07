@@ -97,7 +97,7 @@
 - `queued` — `pending` у `ollama` / `claude`, которые фоновый цикл запустит, когда у провайдера освободится место (`providerParallel`): этап в фазе `agent` с этим же запросом, плюс разметка `pending`. `since` — `createdAt`.
 - `manual` в список не входит: его исполняет агент в чате, а не доска.
 
-`POST /api/agent/runs/stop` (`stopAgentRuns`) вызывает `cancelStage` — ровно то же, что «Отменить» на этапе — для одного этапа или для всех `stage`-записей из обоих списков. Этап без прогона агента доски не трогается (`stopped: []`). Разметку сценария отсюда не остановить: у неё нет отмены.
+`POST /api/agent/runs/stop` (`stopAgentRuns`): тело `{ episodeId, shotId, stageId }`, `{ episodeId, format: true }` или `{ all: true }`. Для этапа вызывает `cancelStage` — ровно то же, что «Отменить» на этапе. Для разметки сценария — `abortFormatRun` (`src/lib/agent/format-runner.ts`): живой прогон получает abort, ждущий больше не запустится, `format_request.json` становится `error` с текстом «Разметка остановлена», ответ модели, пришедший после остановки, не применяется. `{ all: true }` останавливает все записи из обоих списков. Цель без прогона агента доски не трогается (`stopped: []`). CLI: `npm run agents -- stop e01/format`.
 
 Скрипты без зависимостей: `scripts/frameboard-status.mjs` — строка состояния Claude Code (таймаут 500 мс, код выхода всегда 0), `scripts/frameboard-agents.mjs` — `npm run agents -- list | stop <ep>/<shot>/<stage> | stop --all`. Порт — `FRAMEBOARD_PORT` (3456). Настройка — README, «Агенты доски в Claude Code».
 

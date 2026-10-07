@@ -68,10 +68,11 @@ echo '{}' | node scripts/frameboard-status.mjs
 ```bash
 npm run agents -- list
 npm run agents -- stop e01/s03/location
+npm run agents -- stop e01/format
 npm run agents -- stop --all
 ```
 
-В сессии Claude Code — с `!` в начале: `! npm run agents -- list`. Или слэш-командой `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Разметку сценария (кнопка «Добавить») так не остановить — она закончится сама или по таймауту.
+В сессии Claude Code — с `!` в начале: `! npm run agents -- list`. Или слэш-командой `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Разметка сценария (кнопка «Добавить») останавливается как `e01/format`.
 
 ## Что умеет доска
 

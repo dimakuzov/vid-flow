@@ -1,6 +1,6 @@
 ---
 description: Агенты доски Frameboard — список и остановка
-argument-hint: list | stop <эпизод>/<кадр>/<этап> | stop --all
+argument-hint: list | stop <эпизод>/<кадр>/<этап> | stop <эпизод>/format | stop --all
 allowed-tools: Bash(node scripts/frameboard-agents.mjs:*)
 ---
 

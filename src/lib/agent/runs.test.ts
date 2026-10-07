@@ -22,8 +22,8 @@ import { GET as getRuns } from "../../app/api/agent/runs/route";
 import { POST as postStop } from "../../app/api/agent/runs/stop/route";
 import { cancelStage, type AgentRunEntry, type AgentRunsSummary } from "../series/agent-dispatch";
 import { readAgentRequest, submitAgentRequest } from "../series/agent-request";
-import { writeFormatRequest } from "../series/format-request";
-import { createEpisode, ensureStageDirs, shotDir } from "../series/paths";
+import { readFormatRequest, writeFormatRequest } from "../series/format-request";
+import { createEpisode, episodeRoot, ensureStageDirs, shotDir } from "../series/paths";
 import { readStageState, readStageStateFile } from "../series/stage-state";
 import { agentRunPromise } from "./runner";
 import { overrideAgentProvider } from "./providers";
@@ -251,4 +251,23 @@ test("frameboard-status.mjs: числа, «агентов нет», таймау
     server.close();
   }
   assert.equal((await statusLine(server.port)).stdout, "Frameboard: доска выключена\n");
+});
+
+test("POST /api/agent/runs/stop { episodeId, format: true } снимает ждущую разметку, этапы остаются", async () => {
+  send("s01");
+  writeFormatRequest({ status: "pending", createdAt: new Date().toISOString(), episodeId: EP, provider: "claude" });
+  const { status, body } = await stop({ episodeId: EP, format: true });
+  assert.equal(status, 200);
+  assert.deepEqual(body.stopped.map((run) => run.kind), ["format"]);
+  assert.equal(readFormatRequest(episodeRoot(EP))?.status, "error");
+  assert.deepEqual(body.running.map((run) => run.shotId), ["s01"], "этап не тронут");
+  assert.equal((await stop({ format: true })).status, 400);
+});
+
+test("POST /api/agent/runs/stop { all: true } снимает и разметку", async () => {
+  writeFormatRequest({ status: "pending", createdAt: new Date().toISOString(), episodeId: EP, provider: "claude" });
+  const { body } = await stop({ all: true });
+  assert.ok(body.stopped.some((run) => run.kind === "format"));
+  assert.equal(readFormatRequest(episodeRoot(EP))?.status, "error");
+  assert.deepEqual(body.queued, []);
 });

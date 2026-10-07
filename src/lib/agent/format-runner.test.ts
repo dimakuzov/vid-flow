@@ -15,19 +15,22 @@ delete process.env.FRAMEBOARD_AGENT_PROVIDER;
 
 import type { AgentResult, AgentTask } from "../contracts/agent-request";
 import { POST as postNewEpisode } from "../../app/api/series/new-episode/route";
-import { readFormatRequest } from "../series/format-request";
+import { readFormatRequest, writeFormatRequest } from "../series/format-request";
 import { episodeRoot, listShotIds, prepareDataRoot, readCurrentEpisodeId } from "../series/paths";
+import { readTextIfExists } from "../series/media";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech } from "../series/speech";
 import { readRunSettings } from "../series/run-settings";
 import { readAgentRequest, submitAgentRequest } from "../series/agent-request";
 import { createEpisode, ensureStageDirs, shotDir } from "../series/paths";
 import { agentRunPromise } from "./runner";
-import { buildFormatPrompt, isFormatRunLive, startFormatRun } from "./format-runner";
+import { abortFormatRun, buildFormatPrompt, FORMAT_STOPPED, isFormatRunLive, startFormatRun } from "./format-runner";
 import { listAgentProviders, overrideAgentProvider } from "./providers";
 
 const calls: AgentTask[] = [];
 let reply: AgentResult = { status: "done", prompt: "" };
+/** Держит ответ модели, пока тест не отпустит. hearsAbort — провайдер падает по abort, как настоящий. */
+let hold: { gate: Promise<void>; hearsAbort: boolean } | null = null;
 
 before(() => {
   prepareDataRoot();
@@ -41,8 +44,15 @@ before(() => {
     async check() {
       return { available: true, models: [{ id: "claude-sonnet-5-5", label: "Sonnet 5.5" }], defaultModel: "claude-sonnet-5-5" };
     },
-    async run(task) {
+    async run(task, signal) {
       calls.push(task);
+      const current = hold;
+      if (current) {
+        await new Promise<void>((resolve, reject) => {
+          current.gate.then(resolve);
+          if (current.hearsAbort) signal.addEventListener("abort", () => reject(signal.reason));
+        });
+      }
       return reply;
     },
   });
@@ -152,4 +162,66 @@ test("разметка с репликами и длительностью: spee
   assert.equal(readShotSpeech("e10", "s02"), "", "без реплик файла нет");
   assert.equal(readRunSettings("e10", "s02", "video_preview").durationSec, 12, "больше 12 — до предела");
   assert.match(buildFormatPrompt("x").system, /- speech: /);
+});
+
+const ONE_SHOT = "## s01 Кафе\n- characters: katya\n- location: cafe\nКатя входит.";
+
+function holdModel(hearsAbort: boolean): () => void {
+  let open!: () => void;
+  hold = { gate: new Promise<void>((resolve) => (open = resolve)), hearsAbort };
+  return () => {
+    hold = null;
+    open();
+  };
+}
+
+function pendingFormat(episodeId: string) {
+  createEpisode(episodeId);
+  fs.writeFileSync(path.join(episodeRoot(episodeId), "scenario_raw.md"), "Катя входит в кафе.");
+  writeFormatRequest({ status: "pending", createdAt: new Date().toISOString(), episodeId, provider: "claude" });
+}
+
+test("остановка разметки: живой прогон получает abort, запрос — error, таблица пустая", async () => {
+  const release = holdModel(true);
+  try {
+    reply = { status: "done", prompt: ONE_SHOT };
+    pendingFormat("e11");
+    const run = startFormatRun("e11");
+    assert.ok(run);
+    assert.equal(readFormatRequest(episodeRoot("e11"))?.status, "running");
+    assert.equal(abortFormatRun("e11"), true);
+    assert.equal(isFormatRunLive("e11"), false, "сразу уходит из живых");
+    await run;
+    const request = readFormatRequest(episodeRoot("e11"));
+    assert.equal(request?.status, "error");
+    assert.equal(request?.error, FORMAT_STOPPED);
+    assert.deepEqual(listShotIds("e11"), []);
+    assert.equal(abortFormatRun("e11"), false, "второй раз останавливать нечего");
+  } finally {
+    release();
+  }
+});
+
+test("остановка разметки: ответ модели после остановки не применяется", async () => {
+  const release = holdModel(false);
+  reply = { status: "done", prompt: ONE_SHOT };
+  pendingFormat("e12");
+  const run = startFormatRun("e12");
+  assert.equal(abortFormatRun("e12"), true);
+  release();
+  await run;
+  assert.equal(readFormatRequest(episodeRoot("e12"))?.error, FORMAT_STOPPED);
+  assert.deepEqual(listShotIds("e12"), [], "таблица не собрана");
+  assert.doesNotMatch(readTextIfExists(path.join(episodeRoot("e12"), "scenario.md")), /## s01/);
+});
+
+test("остановка разметки: ждущий запрос больше не запустится, manual не трогается", () => {
+  pendingFormat("e13");
+  assert.equal(abortFormatRun("e13"), true);
+  assert.equal(readFormatRequest(episodeRoot("e13"))?.status, "error");
+  assert.equal(startFormatRun("e13"), null);
+
+  writeFormatRequest({ status: "pending", createdAt: new Date().toISOString(), episodeId: "e13", provider: "manual" });
+  assert.equal(abortFormatRun("e13"), false);
+  assert.equal(readFormatRequest(episodeRoot("e13"))?.status, "pending");
 });

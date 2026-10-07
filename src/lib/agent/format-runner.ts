@@ -25,6 +25,34 @@ export function isFormatRunLive(episodeId: string): boolean {
   return liveRuns().has(episodeId);
 }
 
+export const FORMAT_STOPPED = "Разметка остановлена";
+
+/**
+ * Остановка разметки (`npm run agents -- stop`): живой прогон получает abort, ждущий у провайдера
+ * доски больше не запустится. Запрос становится `error` с FORMAT_STOPPED — «Добавить» можно нажать снова.
+ * false — останавливать нечего (нет запроса, manual, уже закончен).
+ */
+function stoppedByUser(controller: AbortController): boolean {
+  const reason: unknown = controller.signal.reason;
+  return controller.signal.aborted && reason instanceof Error && reason.message === FORMAT_STOPPED;
+}
+
+export function abortFormatRun(episodeId: string): boolean {
+  const request = readFormatRequest(episodeRoot(episodeId));
+  const controller = liveRuns().get(episodeId);
+  const waiting =
+    request && (request.provider ?? "manual") !== "manual" && (request.status === "pending" || request.status === "running");
+  if (!controller && !waiting) return false;
+  if (controller) {
+    liveRuns().delete(episodeId);
+    controller.abort(new Error(FORMAT_STOPPED));
+  }
+  if (request && (request.status === "pending" || request.status === "running")) {
+    writeFormatRequest({ ...request, status: "error", error: FORMAT_STOPPED, finishedAt: new Date().toISOString() });
+  }
+  return true;
+}
+
 const SYSTEM = `Ты размечаешь сырой сценарий видео на кадры для доски Frameboard.
 Ответь только текстом файла scenario.md: без вступления, пояснений и обрамления \`\`\`.
 
@@ -122,7 +150,8 @@ export function startFormatRun(episodeId: string): Promise<void> | null {
       const reason = controller.signal.aborted ? controller.signal.reason : error;
       return { status: "error", error: reason instanceof Error ? reason.message : "Модель упала" };
     })
-    .then((result) => applyFormatResult(running, result))
+    // Остановили, пока модель отвечала: ответ не применяем, запрос уже `error`.
+    .then((result) => (stoppedByUser(controller) ? undefined : applyFormatResult(running, result)))
     .catch((error: unknown) => {
       finish(running, { status: "error", error: error instanceof Error ? error.message : "Не удалось собрать таблицу" });
     })

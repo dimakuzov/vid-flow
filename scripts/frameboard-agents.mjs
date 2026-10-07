@@ -4,6 +4,7 @@
  *
  *   npm run agents -- list                     таблица: кто работает, кто ждёт
  *   npm run agents -- stop e01/s03/location    остановить один прогон (как «Отменить»)
+ *   npm run agents -- stop e01/format         остановить разметку сценария эпизода
  *   npm run agents -- stop --all               остановить все работающие и ждущие
  *
  * Порт доски — FRAMEBOARD_PORT (по умолчанию 3456). Без зависимостей.
@@ -13,6 +14,7 @@ const TIMEOUT_MS = 5000;
 const USAGE = `Использование:
   npm run agents -- list
   npm run agents -- stop <эпизод>/<кадр>/<этап>
+  npm run agents -- stop <эпизод>/format
   npm run agents -- stop --all`;
 
 function base() {
@@ -72,22 +74,22 @@ async function main(argv) {
     if (arg === "--all") body = { all: true };
     else {
       const parts = (arg || "").split("/");
-      if (parts.length !== 3 || parts.some((part) => !part)) {
+      if (parts.length === 2 && parts[0] && parts[1] === "format") body = { episodeId: parts[0], format: true };
+      else if (parts.length !== 3 || parts.some((part) => !part)) {
         console.error(USAGE);
         return 2;
+      } else {
+        const [episodeId, shotId, stageId] = parts;
+        body = { episodeId, shotId, stageId };
       }
-      const [episodeId, shotId, stageId] = parts;
-      body = { episodeId, shotId, stageId };
     }
     const result = await call("/api/agent/runs/stop", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (result.stopped.length === 0) console.log("Останавливать нечего: этот этап не ждёт и не работает с агентом доски.");
+    if (result.stopped.length === 0) console.log("Останавливать нечего: здесь агент доски не ждёт и не работает.");
     for (const run of result.stopped) console.log(`Остановлен: ${where(run)} (${run.provider})`);
-    const formats = [...result.running, ...result.queued].filter((run) => run.kind === "format");
-    if (formats.length) console.log("Разметку сценария отсюда не остановить: она закончится сама или по таймауту.");
     console.log("");
     printRuns(result);
     return 0;

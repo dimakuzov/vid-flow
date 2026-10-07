@@ -1,6 +1,6 @@
 import type { AgentProviderId } from "../contracts/agent-request";
 import { defaultClaudeModel, ollamaModel } from "../agent/config";
-import { isFormatRunLive, startFormatRun } from "../agent/format-runner";
+import { abortFormatRun, isFormatRunLive, startFormatRun } from "../agent/format-runner";
 import { abortAgentRun, isAgentRunLive, listLiveAgentRuns, startAgentRun } from "../agent/runner";
 import { registerLoop } from "../background";
 import { cancelComfyJob } from "../comfy/queue";
@@ -293,24 +293,32 @@ export function listAgentRuns(): AgentRunsSummary {
   return { running: running.sort(bySince), queued: queued.sort(bySince) };
 }
 
-export type AgentRunTarget = { episodeId: string; shotId: string; stageId: StageId };
+export type AgentRunTarget =
+  | { episodeId: string; shotId: string; stageId: StageId }
+  | { episodeId: string; format: true };
+
+function matches(entry: AgentRunEntry, target: AgentRunTarget | "all"): boolean {
+  if (target === "all") return true;
+  if (entry.episodeId !== target.episodeId) return false;
+  if ("format" in target) return entry.kind === "format";
+  return entry.kind === "stage" && entry.shotId === target.shotId && entry.stageId === target.stageId;
+}
 
 /**
- * Остановка из CLI (`POST /api/agent/runs/stop`): то же, что «Отменить» на этапе, для одного
- * прогона или для всех работающих и ждущих. Разметку сценария отсюда не остановить: у неё нет
- * отмены. Возвращает остановленные прогоны; цель без прогона агента — пустой список, этап не трогается.
+ * Остановка из CLI (`POST /api/agent/runs/stop`): для этапа — то же, что «Отменить» на этапе,
+ * для разметки сценария — `abortFormatRun`. Один прогон или все работающие и ждущие.
+ * Возвращает остановленные прогоны; цель без прогона агента — пустой список, ничего не трогается.
  */
 export async function stopAgentRuns(target: AgentRunTarget | "all"): Promise<AgentRunEntry[]> {
   const { running, queued } = listAgentRuns();
   const stopped: AgentRunEntry[] = [];
   for (const entry of [...running, ...queued]) {
-    if (entry.kind !== "stage" || !entry.shotId || !entry.stageId) continue;
-    if (
-      target !== "all" &&
-      (entry.episodeId !== target.episodeId || entry.shotId !== target.shotId || entry.stageId !== target.stageId)
-    ) {
+    if (!matches(entry, target)) continue;
+    if (entry.kind === "format") {
+      if (abortFormatRun(entry.episodeId)) stopped.push(entry);
       continue;
     }
+    if (!entry.shotId || !entry.stageId) continue;
     await cancelStage(entry.episodeId, entry.shotId, entry.stageId);
     stopped.push(entry);
   }
