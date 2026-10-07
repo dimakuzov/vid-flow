@@ -5,6 +5,7 @@ import type {
   AgentProviderInfo,
   AgentResult,
   AgentTask,
+  AgentUsage,
 } from "../contracts/agent-request";
 import fs from "fs";
 import os from "os";
@@ -197,6 +198,7 @@ const ollamaProvider: BoardAgentProvider = {
   async run(task, signal) {
     const model = task.request?.model || ollamaModel();
     if (!model) return { status: "error", error: "Для Ollama не выбрана модель" };
+    const started = Date.now();
     const response = await fetch(`${ollamaUrl()}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -221,22 +223,62 @@ const ollamaProvider: BoardAgentProvider = {
       }
       return { status: "error", error: `Ollama: ${response.status} ${detail}`.trim() };
     }
-    const data = JSON.parse(body) as { message?: { content?: string } };
+    const data = JSON.parse(body) as {
+      message?: { content?: string };
+      prompt_eval_count?: number;
+      eval_count?: number;
+      total_duration?: number;
+    };
+    const usage: AgentUsage = { durationMs: Date.now() - started };
+    if (typeof data.prompt_eval_count === "number") usage.inputTokens = data.prompt_eval_count;
+    if (typeof data.eval_count === "number") usage.outputTokens = data.eval_count;
+    if (typeof data.total_duration === "number") usage.apiDurationMs = Math.round(data.total_duration / 1e6);
     const prompt = cleanPromptText(data.message?.content ?? "");
-    if (!prompt) return { status: "error", error: "Ollama вернул пустой ответ" };
-    return { status: "done", prompt };
+    if (!prompt) return { status: "error", error: "Ollama вернул пустой ответ", usage };
+    return { status: "done", prompt, usage };
   },
 };
 
-/** Короткий итог stream-json: тексты ассистента и финальный результат. */
-function summarizeStream(stdout: string): { log: string; isError: boolean; result: string } {
+interface ClaudeResultFields {
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+  total_cost_usd?: number;
+  duration_api_ms?: number;
+  num_turns?: number;
+}
+
+/**
+ * Расход из итогового JSON claude. durationMs — всё время процесса по часам доски (с запуском CLI),
+ * apiDurationMs — сколько из него claude ждал модель.
+ */
+export function claudeUsage(data: ClaudeResultFields | null | undefined, wallMs: number): AgentUsage {
+  const usage: AgentUsage = { durationMs: Math.round(wallMs) };
+  if (!data) return usage;
+  const u = data.usage ?? {};
+  if (typeof u.input_tokens === "number") usage.inputTokens = u.input_tokens;
+  if (typeof u.cache_creation_input_tokens === "number") usage.cacheWriteTokens = u.cache_creation_input_tokens;
+  if (typeof u.cache_read_input_tokens === "number") usage.cacheReadTokens = u.cache_read_input_tokens;
+  if (typeof u.output_tokens === "number") usage.outputTokens = u.output_tokens;
+  if (typeof data.total_cost_usd === "number") usage.costUsd = data.total_cost_usd;
+  if (typeof data.duration_api_ms === "number") usage.apiDurationMs = data.duration_api_ms;
+  if (typeof data.num_turns === "number") usage.turns = data.num_turns;
+  return usage;
+}
+
+/** Короткий итог stream-json: тексты ассистента, финальный результат и его поля расхода. */
+function summarizeStream(stdout: string): { log: string; isError: boolean; result: string; final: ClaudeResultFields | null } {
   const parts: string[] = [];
   let result = "";
   let isError = false;
+  let final: ClaudeResultFields | null = null;
   for (const line of stdout.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
-      const event = JSON.parse(line) as {
+      const event = JSON.parse(line) as ClaudeResultFields & {
         type?: string;
         is_error?: boolean;
         result?: string;
@@ -250,12 +292,13 @@ function summarizeStream(stdout: string): { log: string; isError: boolean; resul
       } else if (event.type === "result") {
         result = event.result ?? "";
         isError = event.is_error === true;
+        final = event;
       }
     } catch {
       parts.push(line);
     }
   }
-  return { log: parts.join("\n"), isError, result };
+  return { log: parts.join("\n"), isError, result, final };
 }
 
 const claudeProvider: BoardAgentProvider = {
@@ -279,27 +322,32 @@ const claudeProvider: BoardAgentProvider = {
     }
 
     const call = claudeInvocation(task, process.platform === "win32" && /\.(cmd|bat)$/i.test(bin));
+    const started = Date.now();
     if (task.mode === "text") {
       const out = await runProcess(bin, call.args, { cwd: call.cwd, stdin: call.stdin, signal });
-      if (out.code !== 0) return { status: "error", error: claudeFailure(out.code, out.stdout, out.stderr) };
-      let data: { result?: string; is_error?: boolean };
+      let data: (ClaudeResultFields & { result?: string; is_error?: boolean }) | null = null;
       try {
         data = JSON.parse(out.stdout);
       } catch {
-        return { status: "error", error: "claude вернул не JSON" };
+        data = null;
       }
-      if (data.is_error) return { status: "error", error: `claude: ${data.result || "ошибка"}` };
+      const usage = claudeUsage(data, Date.now() - started);
+      if (out.code !== 0) return { status: "error", error: claudeFailure(out.code, out.stdout, out.stderr), usage };
+      if (!data) return { status: "error", error: "claude вернул не JSON", usage };
+      if (data.is_error) return { status: "error", error: `claude: ${data.result || "ошибка"}`, usage };
       const prompt = cleanPromptText(data.result ?? "");
-      return prompt ? { status: "done", prompt } : { status: "error", error: "claude вернул пустой ответ" };
+      return prompt ? { status: "done", prompt, usage } : { status: "error", error: "claude вернул пустой ответ", usage };
     }
 
     const out = await runProcess(bin, call.args, { cwd: call.cwd, signal });
     const summary = summarizeStream(out.stdout);
+    const usage = claudeUsage(summary.final, Date.now() - started);
     const log = [summary.log, summary.result, out.stderr.trim()].filter(Boolean).join("\n\n");
-    if (out.code === 0 && !summary.isError) return { status: "done", log };
+    if (out.code === 0 && !summary.isError) return { status: "done", log, usage };
     return {
       status: "error",
       log,
+      usage,
       error: `claude вышел с кодом ${out.code}${summary.result ? `: ${summary.result.slice(0, 300)}` : ""}`,
     };
   },

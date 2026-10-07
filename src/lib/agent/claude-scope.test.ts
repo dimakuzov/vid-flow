@@ -13,7 +13,7 @@ delete process.env.SERIES_ROOT;
 
 import type { AgentRequestFile, AgentTask } from "../contracts/agent-request";
 import { getCharactersRoot, getComfyQueueRoot, getLocationsRoot, getPlaybooksRoot, shotDir, stageDir } from "../series/paths";
-import { claudeInvocation } from "./providers";
+import { claudeInvocation, claudeUsage } from "./providers";
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
@@ -54,6 +54,29 @@ test("текст: длинный плейбук и claude.cmd — всё в stdi
   const viaCmd = claudeInvocation(task("text", "first_frame", 'Say "hi".\nLine two.'), true);
   assert.ok(!flag(viaCmd.args, "--system-prompt")?.includes('"'));
   assert.ok(viaCmd.stdin?.includes('Say "hi".'));
+});
+
+test("расход из ответа claude: токены, стоимость, время модели; время процесса — по часам доски", () => {
+  const usage = claudeUsage(
+    {
+      usage: { input_tokens: 10, cache_creation_input_tokens: 5000, cache_read_input_tokens: 0, output_tokens: 120 },
+      total_cost_usd: 0.012,
+      duration_api_ms: 3100,
+      num_turns: 1,
+    },
+    48_765.4,
+  );
+  assert.deepEqual(usage, {
+    durationMs: 48_765,
+    inputTokens: 10,
+    cacheWriteTokens: 5000,
+    cacheReadTokens: 0,
+    outputTokens: 120,
+    costUsd: 0.012,
+    apiDurationMs: 3100,
+    turns: 1,
+  });
+  assert.deepEqual(claudeUsage(null, 2000), { durationMs: 2000 }, "не JSON — только время");
 });
 
 test("агент: только папки кадра и этапа, рамки одного этапа, без настроек и MCP", () => {

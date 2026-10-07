@@ -44,6 +44,8 @@ export interface AgentRequestFile {
   error?: string;
   /** Агент предлагает другой воркфлоу (id манифеста). Доска показывает, но сама не переключает. */
   suggestedWorkflow?: string;
+  /** Расход прогона (доска, после ответа провайдера). */
+  usage?: AgentUsage;
   changes: {
     prompt: "changed" | "unchanged" | "no-baseline";
     refsNote: "changed" | "unchanged" | "no-baseline";
@@ -86,6 +88,27 @@ export interface AgentResult {
   log?: string;
   error?: string;
   suggestedWorkflow?: string;
+  /** Расход прогона, если провайдер его сообщил. Доска пишет его в run_log.md и agent_request.json. */
+  usage?: AgentUsage;
+}
+
+/** Расход одного прогона агента. Поля, которых провайдер не сообщил, отсутствуют. */
+export interface AgentUsage {
+  /** Входные токены без кэша. */
+  inputTokens?: number;
+  /** Входные токены, записанные в кэш. */
+  cacheWriteTokens?: number;
+  /** Входные токены, прочитанные из кэша. */
+  cacheReadTokens?: number;
+  outputTokens?: number;
+  /** Оценка по ценам API (claude: total_cost_usd). По подписке деньги не списываются, но лимит тратится так же. */
+  costUsd?: number;
+  /** Весь прогон, мс. */
+  durationMs?: number;
+  /** Из них ожидание ответа модели, мс. */
+  apiDurationMs?: number;
+  /** Ходов модели (агентный режим). */
+  turns?: number;
 }
 
 /** Модель провайдера в меню: id уходит провайдеру как есть (`claude --model`, модель Ollama). */

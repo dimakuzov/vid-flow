@@ -133,6 +133,35 @@ test("text: ответ провайдера → prompt.md, история, basel
   assert.equal(readStageState(EP, "s01", "location").phase, "queued");
 });
 
+test("расход прогона: в run_log.md и agent_request.json, и при ошибке тоже", async () => {
+  await cancelStage(EP, "s01", "location");
+  const usage = {
+    inputTokens: 1200,
+    cacheReadTokens: 300,
+    outputTokens: 180,
+    costUsd: 0.0021,
+    durationMs: 49_000,
+    apiDurationMs: 4_200,
+    turns: 1,
+  };
+  fake("claude", async () => ({ status: "done", prompt: "Night over the cafe.", usage }));
+  const request = send("s01", "location", "claude");
+  await settle(request.id);
+  assert.deepEqual(readAgentRequest(EP, "s01", "location")?.usage, usage);
+  const log = fs.readFileSync(file("s01", "location", "run_log.md"), "utf8");
+  assert.match(log, /claude · text · done/);
+  assert.match(log, /- токены: вход 1200, из кэша 300, выход 180/);
+  assert.match(log, /- стоимость по ценам API: \$0\.0021/);
+  assert.match(log, /- время: всего 49\.0 с, ответ модели 4\.2 с, запуск и прочее 44\.8 с/);
+
+  await cancelStage(EP, "s01", "location");
+  fake("claude", async () => ({ status: "error", error: "limit", usage: { durationMs: 2000, outputTokens: 0 } }));
+  const failed = send("s01", "location", "claude");
+  await settle(failed.id);
+  assert.equal(readAgentRequest(EP, "s01", "location")?.usage?.durationMs, 2000);
+  assert.match(fs.readFileSync(file("s01", "location", "run_log.md"), "utf8"), /claude · text · error\n\n- токены: выход 0/);
+});
+
 test("ошибка провайдера → запрос error → фаза error с текстом", async () => {
   fake("ollama", async () => {
     throw new Error("connection refused");
@@ -294,7 +323,14 @@ test("провайдер ollama: POST /api/chat, ответ из message.content
       }
       body = JSON.parse(raw);
       if (hang) return;
-      res.end(JSON.stringify({ message: { content: "Night cafe, rain." } }));
+      res.end(
+        JSON.stringify({
+          message: { content: "Night cafe, rain." },
+          prompt_eval_count: 900,
+          eval_count: 40,
+          total_duration: 2_500_000_000,
+        }),
+      );
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -309,7 +345,12 @@ test("провайдер ollama: POST /api/chat, ответ из message.content
     });
     const task = { system: "S", user: "U", mode: "text" } as AgentTask;
     const result = await ollama.run(task, new AbortController().signal);
-    assert.deepEqual(result, { status: "done", prompt: "Night cafe, rain." });
+    assert.equal(result.status, "done");
+    assert.equal(result.prompt, "Night cafe, rain.");
+    assert.equal(result.usage?.inputTokens, 900);
+    assert.equal(result.usage?.outputTokens, 40);
+    assert.equal(result.usage?.apiDurationMs, 2500);
+    assert.equal(typeof result.usage?.durationMs, "number");
     assert.equal(body.model, "fake-model");
     assert.equal(body.stream, false);
     assert.deepEqual(body.messages?.map((m) => m.role), ["system", "user"]);

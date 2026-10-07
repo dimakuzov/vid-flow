@@ -1,4 +1,4 @@
-import type { AgentRequestFile, AgentResult } from "../contracts/agent-request";
+import type { AgentRequestFile, AgentResult, AgentUsage } from "../contracts/agent-request";
 import type { StageId } from "../series/constants";
 import { updateStageDocs } from "../series/mutations";
 import type { AgentProviderId } from "../contracts/agent-request";
@@ -119,6 +119,31 @@ function abortPromise(signal: AbortSignal): Promise<never> {
   });
 }
 
+function seconds(ms: number): string {
+  return `${(ms / 1000).toFixed(1)} с`;
+}
+
+/** Строки расхода для run_log.md: токены, оценка стоимости, время (всего и у модели), ходы. */
+export function formatUsage(usage: AgentUsage): string {
+  const lines: string[] = [];
+  const tokens: string[] = [];
+  if (usage.inputTokens != null) tokens.push(`вход ${usage.inputTokens}`);
+  if (usage.cacheWriteTokens) tokens.push(`запись в кэш ${usage.cacheWriteTokens}`);
+  if (usage.cacheReadTokens) tokens.push(`из кэша ${usage.cacheReadTokens}`);
+  if (usage.outputTokens != null) tokens.push(`выход ${usage.outputTokens}`);
+  if (tokens.length) lines.push(`- токены: ${tokens.join(", ")}`);
+  if (usage.costUsd != null) lines.push(`- стоимость по ценам API: $${usage.costUsd.toFixed(4)}`);
+  const time: string[] = [];
+  if (usage.durationMs != null) time.push(`всего ${seconds(usage.durationMs)}`);
+  if (usage.apiDurationMs != null) time.push(`ответ модели ${seconds(usage.apiDurationMs)}`);
+  if (usage.durationMs != null && usage.apiDurationMs != null) {
+    time.push(`запуск и прочее ${seconds(Math.max(0, usage.durationMs - usage.apiDurationMs))}`);
+  }
+  if (time.length) lines.push(`- время: ${time.join(", ")}`);
+  if (usage.turns != null) lines.push(`- ходов: ${usage.turns}`);
+  return lines.join("\n");
+}
+
 /** Сам запрос всё ещё этот и не отменён: результат можно писать. */
 function stillCurrent(request: AgentRequestFile): AgentRequestFile | null {
   const current = readAgentRequest(request.episodeId, request.shotId, request.stageId);
@@ -131,17 +156,21 @@ function writeError(request: AgentRequestFile, error: string): void {
   writeAgentRequest({ ...request, status: "error", error, finishedAt: new Date().toISOString() });
 }
 
-function applyResult(request: AgentRequestFile, result: AgentResult): void {
+function applyResult(started: AgentRequestFile, result: AgentResult): void {
+  const request: AgentRequestFile = result.usage ? { ...started, usage: result.usage } : started;
   const { episodeId, shotId, stageId } = request;
   const mode = request.mode;
   const now = new Date().toISOString();
 
-  if (mode === "agent" && result.log?.trim()) {
+  const agentLog = mode === "agent" && result.log?.trim() ? `\n\n${result.log.trim()}` : "";
+  if (agentLog || result.usage) {
+    const model = request.model ? ` · ${request.model}` : "";
+    const usage = result.usage ? `\n\n${formatUsage(result.usage)}` : "";
     appendRunLog(
       episodeId,
       shotId,
       stageId,
-      `\n## ${now} · ${request.provider} · ${result.status}\n\n${result.log.trim()}\n`,
+      `\n## ${now} · ${request.provider}${model} · ${mode} · ${result.status}${usage}${agentLog}\n`,
     );
   }
 
