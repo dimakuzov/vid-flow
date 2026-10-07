@@ -7,7 +7,10 @@ import type {
   GraphBinding,
   ImageInput,
   ImageSource,
+  NodeTarget,
   NumberInput,
+  Removal,
+  TextInput,
   TextStep,
   TextTemplate,
 } from "../contracts/graph-binding";
@@ -23,6 +26,8 @@ import { readShotMeta } from "../series/shot-meta";
 
 const FORMAT = "frameboard.graph-binding/1";
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const VIDEO_EXT = new Set([".mp4", ".webm", ".mov", ".mkv"]);
+const SECTION_NAME = /^[a-z0-9_]+$/;
 
 export function comfyWorkflowsDir(): string {
   return path.join(getPlaybooksRoot(), "workflows", "comfy");
@@ -77,7 +82,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
 
   const inputs = binding.inputs || {};
   for (const [name, input] of Object.entries(inputs)) {
-    if (input.kind === "image") {
+    if (input.kind === "image" || input.kind === "video") {
       const sources = Array.isArray(input.from) ? input.from : [input.from];
       if (!sources.length) fail(`вход ${name}: пустой from`);
       for (const source of sources) {
@@ -88,32 +93,67 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       if (!["first", "newest", "all"].includes(input.pick)) fail(`вход ${name}: pick ${input.pick}`);
     } else if (input.kind === "text") {
       if (input.from !== "prompt") fail(`вход ${name}: текст берётся только из prompt`);
+      if (input.stage !== undefined && !STAGES.includes(input.stage)) fail(`вход ${name}: неизвестный этап ${input.stage}`);
+      if (input.sections !== undefined) {
+        if (!input.sections.length) fail(`вход ${name}: пустой sections`);
+        for (const section of input.sections) {
+          if (!SECTION_NAME.test(section)) fail(`вход ${name}: имя раздела ${section} — строчная латиница, цифры, _`);
+        }
+        if (input.untitled !== undefined && input.untitled !== "all" && !input.sections.includes(input.untitled)) {
+          fail(`вход ${name}: untitled ${input.untitled} — не раздел`);
+        }
+      }
     } else if (input.kind === "number") {
-      if (input.from !== "prompt:seconds") fail(`вход ${name}: число берётся только из prompt:seconds`);
+      if (input.from === "media:duration") {
+        if (!input.of || inputs[input.of]?.kind !== "video") fail(`вход ${name}: of должен указывать на вход kind: video`);
+      } else if (input.from !== "prompt:seconds") {
+        fail(`вход ${name}: число берётся из prompt:seconds или media:duration`);
+      }
     } else {
       fail(`вход ${name}: неизвестный kind ${(input as { kind: string }).kind}`);
     }
   }
 
-  const nodeRef = (node: string, field: string | undefined, what: string) => {
+  const nodeRef = (node: string, field: string | undefined, what: string, json?: string) => {
     const target = graph[node];
     if (!target) fail(`${what}: ноды ${node} нет в графе ${binding.graph}`);
     if (field !== undefined && !(field in target.inputs)) {
       fail(`${what}: у ноды ${node} (${target.class_type}) нет поля ${field} в графе ${binding.graph}`);
+    }
+    if (json !== undefined) {
+      if (field === undefined) fail(`${what}: json без field`);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(String(target.inputs[field!]));
+      } catch {
+        fail(`${what}: поле ${node}.${field} не JSON-строка в графе ${binding.graph}`);
+      }
+      const keys = jsonKeys(json);
+      if (!keys.length) fail(`${what}: пустой json`);
+      if (containerAt(parsed, keys.slice(0, -1)) === undefined) {
+        fail(`${what}: в ${node}.${field} нет пути ${keys.slice(0, -1).join(".") || "(корень)"} в графе ${binding.graph}`);
+      }
     }
   };
 
   (binding.slots || []).forEach((slot, index) => {
     const what = `слот ${index + 1}`;
     if (!slot.targets?.length) fail(`${what}: нет targets`);
-    for (const target of slot.targets) nodeRef(target.node, target.field, what);
-    for (const removal of slot.whenEmpty?.remove ?? []) nodeRef(removal.node, removal.field, `${what}, whenEmpty`);
+    for (const target of slot.targets) nodeRef(target.node, target.field, what, target.json);
+    for (const removal of slot.whenEmpty?.remove ?? []) {
+      nodeRef(removal.node, removal.field, `${what}, whenEmpty`, removal.json);
+    }
     const value = slot.value as Record<string, unknown>;
     if (typeof value.input === "string") {
       const input = inputs[value.input];
       if (!input) fail(`${what}: неизвестный вход ${value.input}`);
-      if ((value.steps || value.templates) && input.kind !== "text") fail(`${what}: steps и templates только для текста`);
-      if (value.index !== undefined && input.kind !== "image") fail(`${what}: index только для картинки`);
+      if ((value.steps || value.templates || value.section) && input.kind !== "text") {
+        fail(`${what}: section, steps и templates только для текста`);
+      }
+      if (value.section !== undefined && input.kind === "text" && !input.sections?.includes(String(value.section))) {
+        fail(`${what}: у входа ${value.input} нет раздела ${value.section}`);
+      }
+      if (value.index !== undefined && input.kind !== "image" && input.kind !== "video") fail(`${what}: index только для файлов`);
       for (const step of (value.steps as TextStep[] | undefined) ?? []) {
         if ("ensure" in step && step.unless !== undefined) {
           // В JSON "\b" — это символ backspace, а не граница слова: нужно "\\b".
@@ -128,12 +168,13 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
         }
       }
       for (const template of (value.templates as TextTemplate[] | undefined) ?? []) {
-        if (template.when && inputs[template.when.input]?.kind !== "image") {
-          fail(`${what}: when.input ${template.when.input} — не картинка`);
+        const kind = template.when ? inputs[template.when.input]?.kind : undefined;
+        if (template.when && kind !== "image" && kind !== "video") {
+          fail(`${what}: when.input ${template.when.input} — не файл`);
         }
       }
-    } else if (value.seed !== "random" && typeof value.template !== "string") {
-      fail(`${what}: значение должно быть input, seed или template`);
+    } else if (value.seed !== "random" && typeof value.template !== "string" && !("const" in value)) {
+      fail(`${what}: значение должно быть input, seed, template или const`);
     }
   });
 }
@@ -195,7 +236,7 @@ export interface ShotContext {
   stageId: StageId;
 }
 
-function listImages(dir: string): string[] {
+function listFiles(dir: string, exts: Set<string> = IMAGE_EXT): string[] {
   let names: string[];
   try {
     names = fs.readdirSync(dir);
@@ -203,7 +244,7 @@ function listImages(dir: string): string[] {
     return [];
   }
   return names
-    .filter((name) => IMAGE_EXT.has(path.extname(name).toLowerCase()))
+    .filter((name) => exts.has(path.extname(name).toLowerCase()))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map((name) => path.join(dir, name));
 }
@@ -221,14 +262,17 @@ function libraryLocation(locationId: string): string[] {
   const folder = path.join(root, folderName);
   const view = path.join(folder, "view.png");
   if (fs.existsSync(view)) return [view];
-  return listImages(folder).filter((file) => !/copy/i.test(path.basename(file)));
+  return listFiles(folder).filter((file) => !/copy/i.test(path.basename(file)));
 }
 
-function sourceImages(ctx: ShotContext, source: ImageSource): string[] {
-  if (source === "refs") return listImages(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"));
-  if (source === "library:location") return libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location);
+function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["kind"]): string[] {
+  const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
+  if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
+  if (source === "library:location") {
+    return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
+  }
   const stage = source.slice("approve:".length) as StageId;
-  return listImages(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "approve"));
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "approve"), exts);
 }
 
 function pickImages(files: string[], input: ImageInput): string[] {
@@ -247,7 +291,7 @@ function pickImages(files: string[], input: ImageInput): string[] {
 export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[] {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
-    const files = sourceImages(ctx, source);
+    const files = sourceFiles(ctx, source, input.kind);
     if (files.length) return pickImages(files, input);
   }
   return [];
@@ -261,21 +305,122 @@ function imageMin(input: ImageInput): number {
 export function missingInputs(ctx: ShotContext, binding: GraphBinding): string[] {
   const missing: string[] = [];
   for (const input of Object.values(binding.inputs)) {
-    if (input.kind !== "image" || imageMin(input) < 1) continue;
+    if ((input.kind !== "image" && input.kind !== "video") || imageMin(input) < 1) continue;
     if (resolveImageInput(ctx, input).length < imageMin(input)) missing.push(input.label);
   }
   return missing;
 }
 
 /** Строки инструкции доски из старых prompt.md («Собери shot-вариант…»). */
-const BOARD_INSTRUCTION = /^\s*(Собери |Правила:\s*playbooks\/|Локация:|Персонажи:)/m;
+export const BOARD_INSTRUCTION = /^\s*(Собери |Правила:\s*playbooks\/|Локация:|Персонажи:)/m;
 
-export function assertModelText(text: string): void {
+/**
+ * Строка с русским текстом (5+ кириллических букв): модели нужен текст на её языке.
+ * Не считаются имена персонажей кадра (их заменяет namesTo) и длительность («5 сек»).
+ */
+export function russianLine(text: string, names: string[] = []): string | null {
+  for (const line of text.split(/\r?\n/)) {
+    let rest = line.replace(/\d+(?:[.,]\d+)?\s*(?:секунд\w*|сек\.?|с(?=\s|$|[.,]))/gi, "");
+    for (const name of names.filter(Boolean)) {
+      rest = rest.replace(new RegExp(`(?<![\\p{L}])${escapeRegExp(name)}(?![\\p{L}])`, "giu"), "");
+    }
+    const cyrillic = (rest.match(/[\u0400-\u04ff]/g) || []).length;
+    if (cyrillic >= 5) return line.trim();
+  }
+  return null;
+}
+
+export function assertModelText(text: string, where = "prompt.md", names: string[] = []): void {
   if (BOARD_INSTRUCTION.test(text)) {
     throw new Error(
-      "prompt.md содержит инструкцию для агента, а не текст для модели: перепиши его или отправь агенту.",
+      `${where} содержит инструкцию для агента, а не текст для модели: перепиши его или отправь агенту.`,
     );
   }
+  const russian = russianLine(text, names);
+  if (russian) {
+    const preview = russian.length > 80 ? `${russian.slice(0, 80)}…` : russian;
+    throw new Error(
+      `${where} содержит русский текст («${preview}»). Модель читает только текст на её языке: перепиши промпт или отправь агенту.`,
+    );
+  }
+}
+
+// ---------- разделы prompt.md ----------
+
+const HEADING = /^##[ \t]+(\S+)[ \t]*$/;
+
+/**
+ * Делит prompt.md на разделы по строкам `## <имя>`. null — заголовков нет.
+ * Текст до первого заголовка и неизвестный заголовок — ошибка.
+ */
+export function splitSections(text: string, allowed: string[], where = "prompt.md"): Map<string, string> | null {
+  const lines = text.split(/\r?\n/);
+  if (!lines.some((line) => HEADING.test(line))) return null;
+  const sections = new Map<string, string>();
+  let current: string | null = null;
+  let buffer: string[] = [];
+  const flush = () => {
+    const body = buffer.join("\n").trim();
+    if (current === null) {
+      if (body) throw new Error(`${where}: текст до первого заголовка «## …». Разделы: ${allowed.join(", ")}.`);
+    } else {
+      sections.set(current, body);
+    }
+    buffer = [];
+  };
+  for (const line of lines) {
+    const match = line.match(HEADING);
+    if (!match) {
+      buffer.push(line);
+      continue;
+    }
+    flush();
+    const name = match[1].toLowerCase();
+    if (!allowed.includes(name)) {
+      throw new Error(`${where}: неизвестный раздел «## ${match[1]}». Разделы: ${allowed.join(", ")}.`);
+    }
+    if (sections.has(name)) throw new Error(`${where}: раздел «## ${name}» дважды.`);
+    current = name;
+  }
+  flush();
+  return sections;
+}
+
+/** Текст раздела. Без заголовков — весь текст, если untitled = all или этот раздел, иначе пусто. */
+export function sectionText(text: string, input: TextInput, section: string | undefined, where?: string): string {
+  if (!input.sections || section === undefined) return text;
+  const parts = splitSections(text, input.sections, where);
+  if (!parts) {
+    const untitled = input.untitled ?? "all";
+    return untitled === "all" || untitled === section ? text : "";
+  }
+  return parts.get(section) ?? "";
+}
+
+// ---------- длительность ролика ----------
+
+/** Длительность mp4/mov в секундах по атому mvhd. null — не нашли. */
+export function videoDurationSeconds(file: string): number | null {
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch {
+    return null;
+  }
+  const at = bytes.indexOf("mvhd");
+  if (at < 0 || at + 32 > bytes.length) return null;
+  const version = bytes[at + 4];
+  let timescale: number;
+  let duration: number;
+  if (version === 1) {
+    timescale = bytes.readUInt32BE(at + 4 + 4 + 16);
+    duration = Number(bytes.readBigUInt64BE(at + 4 + 4 + 16 + 4));
+  } else {
+    timescale = bytes.readUInt32BE(at + 4 + 4 + 8);
+    duration = bytes.readUInt32BE(at + 4 + 4 + 8 + 4);
+  }
+  if (!timescale || !Number.isFinite(duration)) return null;
+  return duration / timescale;
 }
 
 /** Секунды из текста: «5 сек», «5s», «5 с». Вне min..max — нет значения. */
@@ -342,7 +487,81 @@ function pickTemplate(templates: TextTemplate[], counts: Record<string, number>)
   return null;
 }
 
+// ---------- пути внутри JSON-строки ----------
+
+export function jsonKeys(pathText: string): Array<string | number> {
+  return pathText
+    .split(".")
+    .filter((part) => part !== "")
+    .map((part) => (/^\d+$/.test(part) ? Number(part) : part));
+}
+
+function containerAt(root: unknown, keys: Array<string | number>): unknown {
+  let node: unknown = root;
+  for (const key of keys) {
+    if (node === null || typeof node !== "object") return undefined;
+    node = (node as Record<string | number, unknown>)[key];
+  }
+  return node !== null && typeof node === "object" ? node : undefined;
+}
+
+function editJsonField(
+  prompt: ApiPrompt,
+  node: string,
+  field: string,
+  edit: (root: unknown) => void,
+): void {
+  const raw = prompt[node]?.inputs[field];
+  if (typeof raw !== "string") throw new Error(`поле ${node}.${field} не строка`);
+  const root = JSON.parse(raw);
+  edit(root);
+  prompt[node].inputs[field] = JSON.stringify(root, null, 2);
+}
+
+function setJson(prompt: ApiPrompt, target: NodeTarget, value: unknown): void {
+  editJsonField(prompt, target.node, target.field, (root) => {
+    const keys = jsonKeys(target.json!);
+    const parent = containerAt(root, keys.slice(0, -1)) as Record<string | number, unknown> | undefined;
+    if (!parent) throw new Error(`в ${target.node}.${target.field} нет пути ${target.json}`);
+    parent[keys[keys.length - 1]] = value;
+  });
+}
+
+function removeJson(prompt: ApiPrompt, removal: Removal): void {
+  if (!prompt[removal.node] || removal.field === undefined) return;
+  editJsonField(prompt, removal.node, removal.field, (root) => {
+    const keys = jsonKeys(removal.json!);
+    const parent = containerAt(root, keys.slice(0, -1));
+    const last = keys[keys.length - 1];
+    if (Array.isArray(parent) && typeof last === "number") parent.splice(last, 1);
+    else if (parent && typeof parent === "object") delete (parent as Record<string | number, unknown>)[last];
+  });
+}
+
+/** Пути в одном массиве удаляются с конца, чтобы номера оставшихся не сдвигались. */
+function removalOrder(a: Removal, b: Removal): number {
+  const lastIndex = (removal: Removal) => {
+    const keys = removal.json ? jsonKeys(removal.json) : [];
+    const last = keys[keys.length - 1];
+    return typeof last === "number" ? last : -1;
+  };
+  return lastIndex(b) - lastIndex(a);
+}
+
 // ---------- сборка ----------
+
+function numberValue(input: NumberInput, promptMd: string, files: Record<string, string[]>): number | null {
+  if (input.from === "media:duration") {
+    const file = files[input.of!]?.[0];
+    const seconds = file ? videoDurationSeconds(file) : null;
+    if (seconds == null) return null;
+    const rounded = Math.round(seconds);
+    if (input.min != null && rounded < input.min) return null;
+    if (input.max != null && rounded > input.max) return null;
+    return rounded;
+  }
+  return secondsInText(promptMd, input);
+}
 
 export interface BuiltPrompt {
   prompt: ApiPrompt;
@@ -376,28 +595,39 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   const prompt = structuredClone(graph);
   const seed = ctx.random ?? newSeed;
   const meta = readShotMeta(ctx.episodeId, ctx.shotId);
-  const promptMd = readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "prompt.md")).trim();
+  const readPrompt = (stage: StageId) =>
+    readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "prompt.md")).trim();
+  const promptMd = readPrompt(ctx.stageId);
+  const texts: Record<string, string> = {};
 
   const images: Record<string, string[]> = {};
   const missing: string[] = [];
   for (const [name, input] of Object.entries(binding.inputs)) {
-    if (input.kind === "image") {
+    if (input.kind === "image" || input.kind === "video") {
       images[name] = resolveImageInput(ctx, input);
       if (images[name].length < imageMin(input)) missing.push(input.label);
     } else if (input.kind === "text") {
-      if (input.required && !promptMd) {
-        throw new Error("В prompt.md нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.");
+      const own = !input.stage || input.stage === ctx.stageId;
+      const where = own ? "prompt.md" : `prompt.md этапа ${input.stage}`;
+      texts[name] = own ? promptMd : readPrompt(input.stage!);
+      if (input.required && !texts[name]) {
+        throw new Error(`В ${where} нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.`);
       }
-      assertModelText(promptMd);
+      assertModelText(texts[name], where, meta.characters);
+      if (input.sections) splitSections(texts[name], input.sections, where);
     }
   }
   if (missing.length) throw new Error(`Для «${binding.label}» не хватает: ${missing.join(", ")}.`);
   const counts = Object.fromEntries(Object.entries(images).map(([name, files]) => [name, files.length]));
 
   const uploads: BuiltPrompt["uploads"] = [];
-  const removals: Array<{ node: string; field?: string }> = [];
+  const removals: Removal[] = [];
+  const writeTarget = (target: NodeTarget, value: unknown) => {
+    if (target.json) setJson(prompt, target, value);
+    else prompt[target.node].inputs[target.field] = value;
+  };
   const write = (slot: BindingSlot, value: unknown) => {
-    for (const target of slot.targets) prompt[target.node].inputs[target.field] = value;
+    for (const target of slot.targets) writeTarget(target, value);
   };
   /** Значения нет: whenEmpty, иначе ошибка для обязательного входа, иначе значение графа. */
   const empty = (slot: BindingSlot, input: BindingInput, required: boolean) => {
@@ -408,7 +638,11 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   for (const slot of binding.slots) {
     const value = slot.value;
     if ("seed" in value) {
-      for (const target of slot.targets) prompt[target.node].inputs[target.field] = seed();
+      for (const target of slot.targets) writeTarget(target, seed());
+      continue;
+    }
+    if ("const" in value) {
+      write(slot, structuredClone(value.const));
       continue;
     }
     if ("template" in value) {
@@ -424,7 +658,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       continue;
     }
     const input = binding.inputs[value.input];
-    if (input.kind === "image") {
+    if (input.kind === "image" || input.kind === "video") {
       const index = "index" in value && value.index != null ? value.index : 0;
       const file = images[value.input][index];
       if (!file) {
@@ -437,22 +671,30 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
     } else if (input.kind === "text") {
       const steps = "steps" in value ? value.steps : undefined;
       const templates = "templates" in value ? value.templates : undefined;
-      let text = steps?.length ? applySteps(promptMd, steps, meta.characters) : promptMd;
+      const section = "section" in value ? value.section : undefined;
+      const source = sectionText(texts[value.input], input, section);
+      let text = steps?.length ? applySteps(source, steps, meta.characters) : source;
       const template = templates?.length ? pickTemplate(templates, counts) : null;
       if (template) {
         text = renderTemplate(template.text, { text, shotId: ctx.shotId, episodeId: ctx.episodeId });
       }
-      if (!text.trim()) empty(slot, input, input.required);
-      else write(slot, text);
+      const required = section !== undefined ? "required" in value && value.required === true : input.required;
+      if (!text.trim()) {
+        if (section !== undefined && required && !slot.whenEmpty) {
+          throw new Error(`В prompt.md нет раздела «## ${section}» для «${binding.label}».`);
+        }
+        empty(slot, input, required);
+      } else write(slot, text);
     } else {
-      const seconds = secondsInText(promptMd, input);
+      const seconds = numberValue(input as NumberInput, promptMd, images);
       if (seconds == null) empty(slot, input, false);
       else write(slot, seconds);
     }
   }
 
-  for (const removal of removals) {
-    if (removal.field === undefined) delete prompt[removal.node];
+  for (const removal of [...removals].sort(removalOrder)) {
+    if (removal.json) removeJson(prompt, removal);
+    else if (removal.field === undefined) delete prompt[removal.node];
     else if (prompt[removal.node]) delete prompt[removal.node].inputs[removal.field];
   }
   return { prompt, uploads };

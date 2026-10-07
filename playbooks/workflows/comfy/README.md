@@ -1,11 +1,20 @@
 # Comfy graphs
 
-JSON открывается в ComfyUI вручную. Frameboard граф не запускает.
+Графы в формате API. Доска запускает их через манифесты `*.bind.json` (`docs/contracts/graph-binding.md`): манифест говорит, какие файлы и какой текст идут в какие ноды. Новый вариант этапа = граф + манифест, без правки кода.
 
-| Файл | Этап | Статус |
-| --- | --- | --- |
-| `character_pose_outfit_qwen.json` | `characters` | Скелет и сборка позы. Не по умолчанию: только если явно просят конкретную позу с референса. Команда: `characters_comfy.md` |
-| `location_views_multiple_angles.json` | `location` | Простой ракурс, четыре ветки, 9:16. Формат API |
-| `qwen21_character_compositing.json` | `first_frame` | Вписать персонажей в локацию. Формат API |
+| Манифест | Этап | Граф | Кто запускает |
+| --- | --- | --- | --- |
+| `location_views` | `location` | `location_views_multiple_angles.json` | доска; разделы `## simple/objects/camera/camera_objects` в `prompt.md` |
+| `first_frame_compositing` | `first_frame` | `qwen21_character_compositing.json` | доска |
+| `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
+| `final_h3`, `final_h3_768` | `final_render` | `minimax_h3_creator_api.json` (MiniMax H3, ComfyUI-Continuity) | доска; разделы `## body/...` в `prompt.md` |
+| `final_i2v`, `final_flf` | `final_render` | графы Wan превью | доска, запасной вариант |
+| — | `characters` | `character_outfit_qwen21.json` (правка одежды, image 1 — персонаж, image 2 — образец) | агент по `characters_comfy.md`; манифест — черновик в `drafts/` |
 
-Персонаж: `playbooks/workflows/characters_comfy.md`. Локация: `playbooks/workflows/location_comfy.md`. Первый кадр: `playbooks/workflows/first_frame_comfy.md`.
+Черновики, которые ещё не проверены в ComfyUI: `playbooks/workflows/drafts/`.
+
+## После пересохранения графа
+
+1. Экспорт из ComfyUI в формате API под тем же именем.
+2. Если поменялись id нод — поправить манифест в том же коммите.
+3. `npm test`: проверка манифестов (`src/lib/contracts/graph-binding.test.ts`) падает, если нода, поле или путь внутри JSON пропали из графа.

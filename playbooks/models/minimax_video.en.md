@@ -2,7 +2,7 @@
 
 English copy for the model. Russian original: `playbooks/models/minimax_video.md`.
 
-Status: **not connected to the board**. There is no graph and no manifest; no shot of this project has gone through MiniMax on the board. There is no `prompt.md` template yet: it is written after the first checked shot.
+Status: the MiniMax H3 final render is connected to the board — playbook `playbooks/models/minimax_h3.en.md`, variants `final_h3` and `final_h3_768`. Below are the notes from before: where MiniMax is needed instead of Wan and which files are installed.
 
 ## Where it is used
 

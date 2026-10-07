@@ -83,8 +83,17 @@ export function writeStageState(
   return data;
 }
 
+/**
+ * Активной операции нет. jobId и requestId последней операции остаются в файле:
+ * по ним интерфейс показывает последний прогон (StageDetail.job), когда этап уже свободен.
+ */
 export function setIdle(episodeId: string, shotId: string, stageId: StageId): StageStateFile {
-  return writeStageState(episodeId, shotId, stageId, { phase: "idle" });
+  const prev = readStageStateFile(episodeId, shotId, stageId);
+  return writeStageState(episodeId, shotId, stageId, {
+    phase: "idle",
+    jobId: prev?.jobId,
+    requestId: prev?.requestId,
+  });
 }
 
 export function setError(

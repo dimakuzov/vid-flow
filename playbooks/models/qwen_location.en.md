@@ -46,6 +46,26 @@ If the reference is shot from above, one step often leaves the camera at the cei
 
 Empty latent 768×1344, output 9:16. Four variants per run. Do not run empty extra branches.
 
+### In `prompt.md` on the board
+
+Each branch is its own section with a `## <branch>` heading. The board sends each section to its branch of the graph and does not run a branch without a section.
+
+```md
+## simple
+Medium shot of the bed from the front, eye level. Same bedroom, no people.
+
+## objects
+The narrow bed along the wall seen from the front: white sheet, flat white pillow, the blue-beige patchwork wallpaper behind. No people.
+
+## camera
+Rotate the camera 45 degrees to the right. Keep the same room, no people.
+
+## camera_objects
+Rotate the camera 45 degrees to the right. In frame: the narrow bed, white sheet, the patchwork wallpaper. Keep the same room, no people.
+```
+
+Sections: `simple`, `objects`, `camera`, `camera_objects`. Without headings the whole text goes to all four branches (the old behaviour: the four variants differ only by seed). Text before the first heading and other section names are errors. Return only these sections, in English.
+
 ## Hard angle
 
 image 1 is our location. image 2 is any photo with the camera you want. The location is moved into the other composition. The contents of image 2 are banned.

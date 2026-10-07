@@ -9,7 +9,7 @@ This repo is a local-first board for structuring video generation.
 - `DATA_ROOT` overrides the `data/` directory. `SERIES_ROOT` overrides the current episode directory
 - Shot variants stay in `data/episodes/{episodeId}/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
-- Character pose graph, only when a reference pose is explicitly requested: `playbooks/workflows/comfy/character_pose_outfit_qwen.json`
+- Character outfit graph: `playbooks/workflows/comfy/character_outfit_qwen21.json`
 - Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
 - First-frame Comfy graph: `playbooks/workflows/comfy/qwen21_character_compositing.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
@@ -48,7 +48,7 @@ A shot with no specific characters and no specific location is made directly in 
 
 If the inbox item is `characters`, the paperwork above is not the result. Run ComfyUI with the command in `playbooks/workflows/characters_comfy.md` (English: `playbooks/workflows/characters_comfy.en.md`). Claude follows the same section.
 
-ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The default pass is the outfit edit only. Do not extract a skeleton and do not run `character_pose_outfit_qwen.json` unless the user message explicitly asks to take a specific pose from a reference. A description of the shot action is not that request. Set `"status": "done"` in `agent_request.json` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message. Do not write `status.json`.
+ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The pass is an outfit edit with `character_outfit_qwen21.json`: image 1 is the character, image 2 is the garment reference. Set `"status": "done"` in `agent_request.json` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message. Do not write `status.json`.
 
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation

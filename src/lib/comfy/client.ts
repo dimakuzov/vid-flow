@@ -9,7 +9,13 @@ export interface ComfyImageRef {
 export interface ComfyHistory {
   outputs?: Record<
     string,
-    { images?: ComfyImageRef[]; gifs?: ComfyImageRef[]; videos?: ComfyImageRef[] }
+    {
+      images?: ComfyImageRef[];
+      gifs?: ComfyImageRef[];
+      videos?: ComfyImageRef[];
+      /** MiniMaxH3Creator (ComfyUI-Continuity) отчитывается о готовом ролике под своим ключом. */
+      mmc_video?: ComfyImageRef[];
+    }
   >;
   status?: { status_str?: string; completed?: boolean; messages?: [string, Record<string, unknown>][] };
 }
@@ -164,11 +170,21 @@ export async function cancelComfyPrompt(promptId: string): Promise<void> {
   }
 }
 
+/**
+ * Файлы результата из истории. `mmc_takes` (рабочие проходы Continuity) не берём:
+ * это копии готового ролика или промежуточные файлы.
+ */
 export function listHistoryImages(history: ComfyHistory): ComfyImageRef[] {
   const files: ComfyImageRef[] = [];
+  const seen = new Set<string>();
   for (const output of Object.values(history.outputs || {})) {
-    for (const group of [output.images, output.gifs, output.videos]) {
-      for (const file of group || []) files.push(file);
+    for (const group of [output.images, output.gifs, output.videos, output.mmc_video]) {
+      for (const file of group || []) {
+        const key = `${file.type || "output"}/${file.subfolder || ""}/${file.filename}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        files.push(file);
+      }
     }
   }
   return files;

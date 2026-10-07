@@ -4,7 +4,7 @@
   "graph": "location_views_multiple_angles.json",
   "stage": "location",
   "label": "Локация: 4 ракурса по общему виду",
-  "description": "Общий вид локации без людей, четыре варианта ракурса из одной картинки.",
+  "description": "Общий вид локации без людей: четыре ветки ракурса, у каждой свой раздел prompt.md.",
   "playbook": "models/qwen_location.en.md",
   "order": 10,
   "inputs": {
@@ -21,6 +21,13 @@
       "kind": "text",
       "from": "prompt",
       "required": true,
+      "sections": [
+        "simple",
+        "objects",
+        "camera",
+        "camera_objects"
+      ],
+      "untitled": "all",
       "label": "prompt.md"
     }
   },
@@ -41,22 +48,75 @@
         {
           "node": "100",
           "field": "value"
-        },
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "simple"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "104"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
         {
           "node": "110",
           "field": "value"
-        },
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "objects"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "114"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
         {
           "node": "120",
           "field": "value"
-        },
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "camera"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "124"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
         {
           "node": "130",
           "field": "value"
         }
       ],
       "value": {
-        "input": "text"
+        "input": "text",
+        "section": "camera_objects"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "134"
+          }
+        ]
       }
     },
     {

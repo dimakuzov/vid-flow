@@ -100,7 +100,7 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
 function defaultWorkflow(stageId: StageId): string {
   const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nПо умолчанию одежду меняет отдельный edit. Скелет не снимается. Команда: playbooks/workflows/characters_comfy.md, раздел «Команда». Сам JSON графа не редактируется.\n\nГраф со скелетом playbooks/workflows/comfy/character_pose_outfit_qwen.json запускать только если в задании прямо сказано взять конкретную позу с референса.\n`;
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет edit Qwen Image 2.1: image 1 — персонаж, image 2 — образец одежды из refs/. Команда: playbooks/workflows/characters_comfy.md, раздел «Команда». Граф: playbooks/workflows/comfy/character_outfit_qwen21.json. Сам JSON графа не редактируется.\n`;
   }
   if (stageId === "location") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;

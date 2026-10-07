@@ -1,0 +1,25 @@
+{
+  "1": {
+    "class_type": "MiniMaxH3Creator",
+    "inputs": {
+      "creator_data": "{\n  \"version\": 2,\n  \"render\": \"chained\",\n  \"prompt\": \"\",\n  \"aspect\": \"9:16\",\n  \"aspect_source\": \"pill\",\n  \"short_edge\": 1152,\n  \"output_prefix\": \"frameboard/final/h3\",\n  \"loras\": [\n    {\n      \"name\": \"minimax/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors\",\n      \"strength\": 1\n    }\n  ],\n  \"audio_tail_s\": 1,\n  \"models\": {\n    \"fl2va\": \"minimax_h3_fl2va_pruned_bf16.safetensors\",\n    \"ref2va\": \"minimax_h3_ref2va_pruned_bf16.safetensors\",\n    \"clip\": \"qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors\",\n    \"vae\": \"minimax_h3_video_vae_fp16.safetensors\",\n    \"audio_vae\": \"minimax_h3_audio_vae_fp32.safetensors\",\n    \"preview\": \"\",\n    \"sam3\": \"sam3.1_multiplex_fp16.safetensors\",\n    \"cutout\": \"birefnet.safetensors\",\n    \"upscaler\": \"minimax_h3_latent_upscaler_3d_conv_v1_fp32.pth\"\n  },\n  \"turbo\": {\n    \"lora\": \"minimax/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors\",\n    \"quality\": \"good\",\n    \"on\": true,\n    \"saved\": {\n      \"steps\": 20,\n      \"sampler_name\": \"res_multistep\",\n      \"scheduler\": \"simple\",\n      \"shift_video\": 12,\n      \"shift_audio\": 3\n    }\n  },\n  \"sampling\": {\n    \"steps\": 8,\n    \"cfg\": 1,\n    \"sampler_name\": \"euler\",\n    \"scheduler\": \"beta\",\n    \"shift_video\": 12,\n    \"shift_audio\": 3,\n    \"block_cache\": \"off\",\n    \"spectrum\": false,\n    \"spectrum_blend\": 0.5,\n    \"attention\": \"sage\",\n    \"chunk_ffn\": true,\n    \"fp16_accumulation\": false\n  },\n  \"segments\": [\n    {\n      \"prompt\": \"\",\n      \"soundscape\": \"\",\n      \"refined\": {\n        \"body\": \"\",\n        \"scope\": \"shot\",\n        \"sections\": {\n          \"subject_definitions\": \"\",\n          \"summary\": \"\",\n          \"retention_analysis\": \"\"\n        },\n        \"source\": \"\",\n        \"template\": \"REF2VA\",\n        \"enabled\": true\n      },\n      \"assets\": [\n        {\n          \"handle\": \"vid-1\",\n          \"kind\": \"video\",\n          \"role\": \"reference\",\n          \"filename\": \"\",\n          \"track\": \"picture\"\n        },\n        {\n          \"handle\": \"img-1\",\n          \"kind\": \"image\",\n          \"role\": \"reference\",\n          \"filename\": \"\",\n          \"ref_size\": \"max\"\n        },\n        {\n          \"handle\": \"img-2\",\n          \"kind\": \"image\",\n          \"role\": \"reference\",\n          \"filename\": \"\",\n          \"ref_size\": \"match\"\n        },\n        {\n          \"handle\": \"img-3\",\n          \"kind\": \"image\",\n          \"role\": \"reference\",\n          \"filename\": \"\",\n          \"ref_size\": \"match\"\n        }\n      ],\n      \"loras\": [],\n      \"duration_s\": 5\n    }\n  ],\n  \"face\": {\n    \"on\": true,\n    \"canvas\": 512,\n    \"denoise\": 0.45\n  }\n}",
+      "seed": 0,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "shift_video": 12,
+      "shift_audio": 3,
+      "block_cache": "off",
+      "spectrum": false,
+      "spectrum_blend": 0.5,
+      "sage": false,
+      "attention": "default",
+      "chunk_ffn": true,
+      "fp16_accumulation": false
+    },
+    "_meta": {
+      "title": "MiniMax H3 Creator (Frameboard final)"
+    }
+  }
+}
