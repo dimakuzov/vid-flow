@@ -93,7 +93,11 @@ export interface StageDetail {
     refs: string;
     workflow: string;
     runLog: string;
+    /** Прямая речь кадра (`shots/{shotId}/speech.md`). Пусто — молчат. Только при `hasSpeech`. */
+    speech: string;
   };
+  /** На странице этапа есть поле «Реплики» (видео-этапы). */
+  hasSpeech: boolean;
   promptHistory: { id: string; savedAt: string; prompt: string }[];
   refs: MediaFile[];
   output: MediaFile[];

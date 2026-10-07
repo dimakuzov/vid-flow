@@ -33,6 +33,7 @@ import { STAGES, type StageId } from "./constants";
 import { readTextIfExists, writeText } from "./media";
 import { updateStageDocs } from "./mutations";
 import { readShotMeta } from "./shot-meta";
+import { readShotSpeech, SPEECH_FILE, stageHasSpeech } from "./speech";
 import { assertStageFree, writeStageState } from "./stage-state";
 import {
   agentInboxRelative,
@@ -203,6 +204,16 @@ function renderWorkflows(choices: WorkflowChoice[], selected: string | null): st
 Если другой вариант подходит лучше, впиши его id в поле \`suggestedWorkflow\` файла \`${REQUEST_JSON}\`. Доска покажет предложение и сама не переключит.`;
 }
 
+/** Реплики кадра для видео-этапов: раздел с пустой строкой после него, иначе пусто. */
+function renderSpeech(episodeId: string, shotId: string, stageId: StageId): string {
+  if (!stageHasSpeech(stageId)) return "";
+  const speech = readShotSpeech(episodeId, shotId).trim();
+  const body = speech
+    ? `${speech}\n\nЭто дословно то, что персонажи говорят вслух. Как перенести в prompt.md — плейбук модели выбранного воркфлоу.`
+    : "Пусто: в кадре никто не говорит.";
+  return `## Реплики (shots/${shotId}/${SPEECH_FILE})\n\n${body}\n\n`;
+}
+
 /** Длительность из меню этапа (бриф 03): строка с пустой строкой перед ней, иначе пусто. */
 function renderDuration(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
   const seconds = chosenDurationSec(episodeId, shotId, stageId, workflow);
@@ -290,7 +301,7 @@ ${meta.summary || "(действие кадра не описано)"}
 - персонажи: ${bulletList(meta.characters)}
 - локация: ${meta.location || "нет"}
 
-## Воркфлоу этапа
+${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
 ${renderDuration(episodeId, shotId, stageId, selected)}

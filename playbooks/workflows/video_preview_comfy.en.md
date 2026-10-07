@@ -15,7 +15,7 @@ Before queueing, only these change:
 | LoadImage 98 | `image` | FLF only: the newest picture in this stage's `refs/`, as `{shotId}_end.png` |
 | CLIPTextEncode 129:93 | `text` | `prompt.md` as is, nothing added |
 | KSamplerAdvanced 129:86 | `noise_seed` | A new seed |
-| PrimitiveFloat 129:161 | `value` | Seconds, when `prompt.md` has `N sec` (2–8). Otherwise 5 from the graph |
+| PrimitiveFloat 129:161 | `value` | Seconds: the duration menu, otherwise `N sec` in `prompt.md` (2–12). Otherwise 5 from the graph |
 | SaveVideo 108 | `filename_prefix` | `frameboard/video/{shotId}_i2v` or `_flf`; final: `frameboard/final/...` |
 
 Do not touch the negative 129:89, steps, CFG, LoRA, 384×672, or the turbo switches. Prompt: `playbooks/models/wan_video.en.md`.

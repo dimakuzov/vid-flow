@@ -178,4 +178,5 @@ Rules:
 2. Write `subject_definitions`, `summary`, `retention_analysis` (section 4). An empty or missing one is derived by the node, which is where the refiner errors come from.
 3. `@img-N` numbers follow the table above. Two characters: `@img-2` is the first by file name, `@img-3` the second. A character whose face is not visible gets no reference: say so in the message to the user instead of inventing a label.
 4. Start from `video_preview/prompt.md` (the approved Wan prompt), not from an older final.
-5. No Russian text: the board refuses such a `prompt.md`.
+5. No Russian text: the board refuses such a `prompt.md`. The only exception is the lines below.
+6. Lines. If the task has lines (section «Реплики», in text mode `Lines`), put them in `## soundscape` word for word, in quotes, in their own language, each with the speaker by look: `The young woman in the red dress says: "Мама, я дома."` Do not translate, shorten or add lines. The board lets exactly these lines through the language check. No lines — only the environment.

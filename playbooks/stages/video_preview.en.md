@@ -30,7 +30,7 @@ An agent that sees another variant is needed writes `suggestedWorkflow` in `agen
 
 ## What changes in the graph
 
-Only what the manifest says: the first frame, the last frame (FLF), `prompt.md` as is, the seed, the duration (when `prompt.md` ends with `N sec`, 2–8), the prefix `frameboard/video/{shotId}_i2v` or `_flf`. The negative, steps, CFG, LoRA and size come from the graph and do not change. With no number the duration is 5 seconds from the graph.
+Only what the manifest says: the first frame, the last frame (FLF), `prompt.md` as is, the seed, the duration (the menu choice, otherwise `N sec` at the end of `prompt.md`, 2–12), the prefix `frameboard/video/{shotId}_i2v` or `_flf`. The negative, steps, CFG, LoRA and size come from the graph and do not change. With no number the duration is 5 seconds from the graph.
 
 ## Acceptance criteria
 

@@ -8,6 +8,7 @@ import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
 import { getPlaybooksRoot, stageDir } from "../series/paths";
 import { readRunSettings } from "../series/run-settings";
+import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
 import { LLM_TASK, readAgentDispatch } from "./files";
 
@@ -120,6 +121,15 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     "",
     refs.length ? refs.map((name) => `- ${name}`).join("\n") : "(none)",
   ];
+  if (stageHasSpeech(stageId)) {
+    const speech = readShotSpeech(episodeId, shotId).trim();
+    lines.push(
+      "",
+      "## Lines (speech.md: what the characters say aloud, word for word)",
+      "",
+      speech || "(none: nobody speaks in this shot)",
+    );
+  }
   if (refsNote) lines.push("", "## refs.md", "", refsNote);
   lines.push("", "Write the new prompt.md.");
   return { system, user: lines.join("\n") + "\n" };
