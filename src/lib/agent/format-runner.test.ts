@@ -18,6 +18,8 @@ import { POST as postNewEpisode } from "../../app/api/series/new-episode/route";
 import { readFormatRequest } from "../series/format-request";
 import { episodeRoot, listShotIds, prepareDataRoot, readCurrentEpisodeId } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
+import { readShotSpeech } from "../series/speech";
+import { readRunSettings } from "../series/run-settings";
 import { readAgentRequest, submitAgentRequest } from "../series/agent-request";
 import { createEpisode, ensureStageDirs, shotDir } from "../series/paths";
 import { agentRunPromise } from "./runner";
@@ -133,4 +135,21 @@ test("список провайдеров отдаёт модели и моде�
   const claude = (await listAgentProviders()).find((item) => item.id === "claude");
   assert.deepEqual(claude?.models.map((item) => item.id), ["claude-sonnet-5-5"]);
   assert.equal(claude?.defaultModel, "claude-sonnet-5-5");
+});
+
+test("разметка с репликами и длительностью: speech.md кадра и длительность этапа видео", async () => {
+  reply = {
+    status: "done",
+    prompt:
+      "# Тест\n\n## s01 Кафе\n- characters: katya\n- location: cafe\n- duration: 7\n- speech: Катя: Мама, я дома.\n- speech: Мама: Иди ужинать.\nКатя входит.\n\n## s02 Улица\n- characters: \n- location: \n- duration: 30\nПустая улица.\n",
+  };
+  await post({ episodeId: "e10", rawText: "Катя входит: «Мама, я дома». Мама: «Иди ужинать». Пустая улица.", provider: "claude" });
+  await settle("e10");
+  assert.equal(readFormatRequest(episodeRoot("e10"))?.status, "done");
+  assert.equal(readShotSpeech("e10", "s01"), "Катя: Мама, я дома.\nМама: Иди ужинать.\n");
+  assert.equal(readShotMeta("e10", "s01").summary, "Катя входит.", "реплики не попадают в действие");
+  assert.equal(readRunSettings("e10", "s01", "video_preview").durationSec, 7);
+  assert.equal(readShotSpeech("e10", "s02"), "", "без реплик файла нет");
+  assert.equal(readRunSettings("e10", "s02", "video_preview").durationSec, 12, "больше 12 — до предела");
+  assert.match(buildFormatPrompt("x").system, /- speech: /);
 });

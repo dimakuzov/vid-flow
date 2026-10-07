@@ -3,7 +3,9 @@ import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
 import { createEpisode, ensureStageDirs, episodeRoot, stageDir } from "./paths";
+import { readRunSettings, writeRunSettings } from "./run-settings";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
+import { readShotSpeech, writeShotSpeech } from "./speech";
 import { writeStatusFile } from "./status";
 import type { BootstrapPreview, BootstrapShotDraft } from "./types";
 
@@ -63,6 +65,12 @@ export function parseScenario(content: string): BootstrapPreview {
         current.location = value;
       } else if (key === "title" || key === "название") {
         current.title = value;
+      } else if (key.startsWith("speech") || key.startsWith("line") || key.includes("реплик")) {
+        // Одна реплика на строку `- speech:`, дословно, с именем говорящего.
+        current.speech = [...(current.speech ?? []), value];
+      } else if (key.startsWith("duration") || key.includes("длительн")) {
+        const seconds = Number(value.replace(",", ".").match(/\d+(?:\.\d+)?/)?.[0]);
+        if (Number.isFinite(seconds) && seconds > 0) current.durationSec = Math.round(seconds);
       }
       continue;
     }
@@ -109,6 +117,28 @@ function defaultWorkflow(stageId: StageId): string {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: режим сборки или правки, сколько персонажей. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/qwen21_character_compositing.json\n`;
   }
   return note;
+}
+
+/** Пределы длительности клипа на этапе видео (манифесты video_i2v / video_flf). */
+const DURATION_MIN = 2;
+const DURATION_MAX = 12;
+
+/**
+ * Реплики и длительность из разметки сценария: `speech.md` кадра и `durationSec` этапа видео.
+ * Их потом видит агент (llm_task.md, text-режим) и граф. Ручные правки не затираются без overwrite.
+ */
+function seedShotSpeechAndDuration(episodeId: string, shot: BootstrapShotDraft, overwrite: boolean): void {
+  const speech = (shot.speech ?? []).map((line) => line.trim()).filter(Boolean);
+  if (speech.length && (overwrite || !readShotSpeech(episodeId, shot.id).trim())) {
+    writeShotSpeech(episodeId, shot.id, speech.join("\n"));
+  }
+  if (shot.durationSec != null) {
+    const seconds = Math.min(DURATION_MAX, Math.max(DURATION_MIN, shot.durationSec));
+    const settings = readRunSettings(episodeId, shot.id, "video_preview");
+    if (overwrite || settings.durationSec == null) {
+      writeRunSettings(episodeId, shot.id, "video_preview", { ...settings, durationSec: seconds });
+    }
+  }
 }
 
 function seedStageDocs(episodeId: string, shot: BootstrapShotDraft, stageId: StageId): void {
@@ -193,6 +223,7 @@ export function applyBootstrap(options: {
       location: shot.location,
     };
     writeShotMeta(episodeId, meta);
+    seedShotSpeechAndDuration(episodeId, shot, options.overwriteDocs === true);
 
     for (const stageId of STAGES) {
       const promptPath = path.join(stageDir(episodeId, shot.id, stageId), "prompt.md");

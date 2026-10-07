@@ -142,6 +142,10 @@ export interface BootstrapShotDraft {
   summary: string;
   characters: string[];
   location: string;
+  /** Реплики кадра дословно (`- speech:` в scenario.md), одна на строку. Нет — в кадре молчат. */
+  speech?: string[];
+  /** Длительность клипа в секундах (`- duration:` в scenario.md). Нет — по умолчанию графа. */
+  durationSec?: number;
 }
 
 export interface BootstrapPreview {
