@@ -86,7 +86,10 @@ export function agentScopeRules(task: AgentTask): string {
  * Аргументы и папка запуска `claude -p` для этапа. Ничего не запускает.
  * viaShell — claude.cmd: аргументы идут через cmd, длинный текст с кавычками и переводами строк туда нельзя.
  */
-export function claudeInvocation(task: AgentTask, viaShell = false): { args: string[]; cwd: string; stdin?: string } {
+export function claudeInvocation(
+  task: AgentTask,
+  viaShell = false,
+): { args: string[]; cwd: string; stdin?: string; env?: Record<string, string> } {
   const model = task.request?.model || defaultClaudeModel();
   const isolation = ["--strict-mcp-config", "--no-session-persistence"];
   if (task.mode === "text") {
@@ -107,6 +110,8 @@ export function claudeInvocation(task: AgentTask, viaShell = false): { args: str
       ],
       cwd: isolatedCwd(),
       stdin: fits ? `${task.user.trim()}\n` : textPrompt(task),
+      // Без скрытых размышлений: на промпт в ~150 токенов они добавляли 5–7 тыс. выходных токенов.
+      env: { MAX_THINKING_TOKENS: "0" },
     };
   }
   const taskFile = `${task.stageDir}/llm_task.md`.replace(/\\/g, "/");
@@ -324,7 +329,12 @@ const claudeProvider: BoardAgentProvider = {
     const call = claudeInvocation(task, process.platform === "win32" && /\.(cmd|bat)$/i.test(bin));
     const started = Date.now();
     if (task.mode === "text") {
-      const out = await runProcess(bin, call.args, { cwd: call.cwd, stdin: call.stdin, signal });
+      const out = await runProcess(bin, call.args, {
+        cwd: call.cwd,
+        stdin: call.stdin,
+        signal,
+        env: { ...process.env, ...call.env },
+      });
       let data: (ClaudeResultFields & { result?: string; is_error?: boolean }) | null = null;
       try {
         data = JSON.parse(out.stdout);

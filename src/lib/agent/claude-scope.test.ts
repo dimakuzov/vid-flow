@@ -45,6 +45,7 @@ test("текст: без инструментов, MCP и системного �
   assert.equal(flag(call.args, "--system-prompt"), "Playbook text.", "системная часть — только плейбук");
   assert.equal(flag(call.args, "--model"), "claude-haiku-4-5-20251001");
   assert.equal(call.stdin, "## User request\n\nВечер.\n");
+  assert.equal(call.env?.MAX_THINKING_TOKENS, "0", "без скрытых размышлений");
   assert.ok(!path.resolve(call.cwd).startsWith(REPO), "CLAUDE.md и AGENTS.md проекта не подхватываются");
 });
 
