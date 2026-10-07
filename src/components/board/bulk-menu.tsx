@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProviderSelect, useAgentProviders } from "@/components/stage/agent-provider";
 import { errorText, requestJson } from "@/components/stage/api";
 import { STAGE_LABELS, type StageId } from "@/lib/series/constants";
@@ -47,7 +47,10 @@ export function BulkMenu({
   shotCount: number;
   onDone: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  // Меню — fixed поверх страницы: внутри таблицы с прокруткой его обрезало бы снизу.
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const open = anchor !== null;
+  const menuRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [includeApproved, setIncludeApproved] = useState(false);
   const [result, setResult] = useState<BulkResult | null>(null);
@@ -55,6 +58,32 @@ export function BulkMenu({
   // Персонажей агент делает сам (agent), остальные этапы — переписать промпт (text).
   const mode = target === "characters" ? "agent" : "text";
   const { providers, selected, choose } = useAgentProviders(mode);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setAnchor(null);
+    // Прокрутка страницы или таблицы уводит кнопку — меню закрывается. Прокрутка внутри меню — нет.
+    const onScroll = (event: Event) => {
+      if (event.target instanceof Node && menuRef.current?.contains(event.target)) return;
+      close();
+    };
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  function toggle(button: HTMLButtonElement) {
+    if (open) {
+      setAnchor(null);
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    const width = 288;
+    setAnchor({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) });
+  }
 
   async function run() {
     setBusy(true);
@@ -80,10 +109,10 @@ export function BulkMenu({
   }
 
   return (
-    <div className="relative mt-1 normal-case tracking-normal">
+    <div className="mt-1 normal-case tracking-normal">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => toggle(event.currentTarget)}
         disabled={!shotCount}
         aria-expanded={open}
         className="rounded-md border border-teal-800/30 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
@@ -91,7 +120,11 @@ export function BulkMenu({
         {target === "next" ? "▶ Агенты по кадрам" : "▶ Все кадры"}
       </button>
       {open ? (
-        <div className="absolute left-0 z-20 mt-1 w-72 space-y-3 rounded-xl border border-stone-300 bg-white p-3 text-left text-xs font-normal text-stone-700 shadow-lg">
+        <div
+          ref={menuRef}
+          style={{ top: anchor.top, left: anchor.left }}
+          className="fixed z-30 max-h-[calc(100vh-2rem)] w-72 space-y-3 overflow-y-auto rounded-xl border border-stone-300 bg-white p-3 text-left text-xs font-normal text-stone-700 shadow-lg"
+        >
           <div>
             <div className="text-sm font-semibold text-stone-900">{title(target)}</div>
             <p className="mt-1 leading-snug">{description(target)}</p>
@@ -130,7 +163,7 @@ export function BulkMenu({
             </button>
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => setAnchor(null)}
               className="h-8 rounded-lg border border-stone-300 px-3 text-sm text-stone-700"
             >
               Закрыть
