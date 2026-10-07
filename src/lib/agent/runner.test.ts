@@ -251,11 +251,11 @@ test("неподходящий провайдер для режима → 400 с
   assert.equal(unknown.status, 400);
 });
 
-test("ollama без модели → 400 до записи запроса", () => {
+test("ollama без выбранной модели и без FRAMEBOARD_OLLAMA_MODEL → 400 до записи запроса", () => {
   const saved = process.env.FRAMEBOARD_OLLAMA_MODEL;
   delete process.env.FRAMEBOARD_OLLAMA_MODEL;
   try {
-    assert.throws(() => send("s01", "location", "ollama"), /FRAMEBOARD_OLLAMA_MODEL/);
+    assert.throws(() => send("s01", "location", "ollama"), /не выбрана модель/);
     assert.equal(readStageState(EP, "s01", "location").phase, "idle");
   } finally {
     process.env.FRAMEBOARD_OLLAMA_MODEL = saved;
@@ -302,7 +302,11 @@ test("провайдер ollama: POST /api/chat, ответ из message.content
   process.env.FRAMEBOARD_OLLAMA_URL = `http://127.0.0.1:${port}`;
   try {
     const ollama = getAgentProvider("ollama");
-    assert.deepEqual(await ollama.check(), { available: true });
+    assert.deepEqual(await ollama.check(), {
+      available: true,
+      models: [{ id: "fake-model:latest", label: "fake-model" }],
+      defaultModel: "fake-model:latest",
+    });
     const task = { system: "S", user: "U", mode: "text" } as AgentTask;
     const result = await ollama.run(task, new AbortController().signal);
     assert.deepEqual(result, { status: "done", prompt: "Night cafe, rain." });

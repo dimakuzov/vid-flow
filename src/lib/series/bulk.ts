@@ -37,8 +37,13 @@ export interface BulkResult {
 export interface BulkOptions {
   /** manual | ollama | claude. Нет — FRAMEBOARD_AGENT_PROVIDER. */
   provider?: AgentProviderId | string;
-  /** Запускать и там, где этап уже утверждён. По умолчанию нет. */
-  includeApproved?: boolean;
+  /** Модель провайдера. Нет — по умолчанию. */
+  model?: string;
+  /**
+   * Переделать и там, где этап уже пройден: утверждён или есть результат в output/.
+   * По умолчанию нет — пройденное не трогается, даже если его делали вручную или агентом на кадре.
+   */
+  redo?: boolean;
 }
 
 /** Этап не нужен кадру: персонажей или локации у него нет (первый кадр собирается сразу). */
@@ -54,14 +59,16 @@ function blocked(
   shotId: string,
   stageId: StageId,
   meta: ShotMeta,
-  includeApproved: boolean,
+  redo: boolean,
 ): string | null {
   const notNeeded = stageNotNeeded(meta, stageId);
   if (notNeeded) return notNeeded;
   const state = readStageState(episodeId, shotId, stageId);
   if (state.busy) return `этап занят: ${PHASE_LABELS[state.phase].toLowerCase()}`;
-  if (!includeApproved && deriveStageStatus(episodeId, shotId, stageId, meta.characters) === "approved") {
-    return "уже утверждено";
+  if (!redo) {
+    const status = deriveStageStatus(episodeId, shotId, stageId, meta.characters);
+    if (status === "approved") return "уже утверждено";
+    if (status === "review") return "уже есть результат, ждёт утверждения";
   }
   const choices = listWorkflowChoices(episodeId, shotId, stageId);
   // Этап без воркфлоу доски (персонажи) делает агент сам — здесь не блокируем.
@@ -72,7 +79,7 @@ function blocked(
   return null;
 }
 
-function sendToAgent(episodeId: string, shotId: string, stageId: StageId, provider?: string): void {
+function sendToAgent(episodeId: string, shotId: string, stageId: StageId, options: BulkOptions): void {
   const dir = stageDir(episodeId, shotId, stageId);
   // Документы этапа уходят как есть: массовый запуск ничего в них не меняет.
   submitAgentRequest({
@@ -83,7 +90,8 @@ function sendToAgent(episodeId: string, shotId: string, stageId: StageId, provid
     prompt: readTextIfExists(path.join(dir, "prompt.md")),
     refsNote: readTextIfExists(path.join(dir, "refs.md")),
     workflowNote: readTextIfExists(path.join(dir, "workflow.md")),
-    provider,
+    provider: options.provider,
+    model: options.model,
   });
 }
 
@@ -92,10 +100,10 @@ function tryStart(
   episodeId: string,
   shotId: string,
   stageId: StageId,
-  provider: string | undefined,
+  options: BulkOptions,
 ): void {
   try {
-    sendToAgent(episodeId, shotId, stageId, provider);
+    sendToAgent(episodeId, shotId, stageId, options);
     result.started.push({ shotId, stageId });
   } catch (error) {
     result.skipped.push({ shotId, stageId, reason: error instanceof Error ? error.message : "не запустилось" });
@@ -107,9 +115,9 @@ export function runStageForAllShots(episodeId: string, stageId: StageId, options
   const result: BulkResult = { started: [], skipped: [] };
   for (const shotId of listShotIds(episodeId)) {
     const meta = readShotMeta(episodeId, shotId);
-    const reason = blocked(episodeId, shotId, stageId, meta, options.includeApproved === true);
+    const reason = blocked(episodeId, shotId, stageId, meta, options.redo === true);
     if (reason) result.skipped.push({ shotId, stageId, reason });
-    else tryStart(result, episodeId, shotId, stageId, options.provider);
+    else tryStart(result, episodeId, shotId, stageId, options);
   }
   return result;
 }
@@ -126,19 +134,29 @@ export function nextStage(episodeId: string, shotId: string, meta: ShotMeta): St
   return null;
 }
 
+function startNextStage(result: BulkResult, episodeId: string, shotId: string, options: BulkOptions): void {
+  const meta = readShotMeta(episodeId, shotId);
+  const stageId = nextStage(episodeId, shotId, meta);
+  if (!stageId) {
+    result.skipped.push({ shotId, stageId: null, reason: "все этапы утверждены" });
+    return;
+  }
+  // Агент уже работает на кадре или этап уже пройден — не перезапускаем.
+  const reason = blocked(episodeId, shotId, stageId, meta, false);
+  if (reason) result.skipped.push({ shotId, stageId, reason: `${STAGE_LABELS[stageId]}: ${reason}` });
+  else tryStart(result, episodeId, shotId, stageId, options);
+}
+
 /** Кнопка над столбцом «Кадр»: каждому кадру — агент на его следующий этап. */
 export function runNextStageForAllShots(episodeId: string, options: BulkOptions = {}): BulkResult {
   const result: BulkResult = { started: [], skipped: [] };
-  for (const shotId of listShotIds(episodeId)) {
-    const meta = readShotMeta(episodeId, shotId);
-    const stageId = nextStage(episodeId, shotId, meta);
-    if (!stageId) {
-      result.skipped.push({ shotId, stageId: null, reason: "все этапы утверждены" });
-      continue;
-    }
-    const reason = blocked(episodeId, shotId, stageId, meta, false);
-    if (reason) result.skipped.push({ shotId, stageId, reason: `${STAGE_LABELS[stageId]}: ${reason}` });
-    else tryStart(result, episodeId, shotId, stageId, options.provider);
-  }
+  for (const shotId of listShotIds(episodeId)) startNextStage(result, episodeId, shotId, options);
+  return result;
+}
+
+/** Кнопка на кадре: агент (свой провайдер и модель) на следующий этап этого кадра. */
+export function runNextStageForShot(episodeId: string, shotId: string, options: BulkOptions = {}): BulkResult {
+  const result: BulkResult = { started: [], skipped: [] };
+  startNextStage(result, episodeId, shotId, options);
   return result;
 }

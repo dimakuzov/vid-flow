@@ -54,7 +54,15 @@ export interface SeriesSummary {
   shots: ShotSummary[];
   scenarioExists: boolean;
   hasRawScenario: boolean;
-  formatRequestStatus: "pending" | "done" | null;
+  formatRequestStatus: "pending" | "running" | "done" | "error" | null;
+  /** Разметка сценария: кто размечает, ошибка, сколько кадров создано. null — запроса нет. */
+  formatRequest: {
+    status: "pending" | "running" | "done" | "error";
+    provider: string;
+    model: string | null;
+    error: string | null;
+    shots: number | null;
+  } | null;
 }
 
 export interface StageDetail {

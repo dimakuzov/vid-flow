@@ -6,7 +6,7 @@ import type {
   AgentResult,
   AgentTask,
 } from "../contracts/agent-request";
-import { claudeBin, defaultProviderId, ollamaModel, ollamaUrl } from "./config";
+import { CLAUDE_MODELS, claudeBin, defaultClaudeModel, defaultProviderId, ollamaModel, ollamaUrl } from "./config";
 import { resolveExecutable, runProcess } from "./process";
 
 /*
@@ -16,8 +16,8 @@ import { resolveExecutable, runProcess } from "./process";
 
 /** Провайдер доски: контракт плюс синхронная проверка настройки (для ответа 400 до записи запроса). */
 export interface BoardAgentProvider extends AgentProvider {
-  /** Чего не хватает в настройке. null — настроен. Сеть не трогает. */
-  configError?(): string | null;
+  /** Чего не хватает в настройке для этой модели. null — настроен. Сеть не трогает. */
+  configError?(model?: string): string | null;
 }
 
 const CLAUDE_AGENT_TOOLS = "Read,Write,Edit,Glob,Grep,Bash";
@@ -46,39 +46,43 @@ const manualProvider: BoardAgentProvider = {
   },
 };
 
+/** Модели, установленные в Ollama. null — Ollama не отвечает. */
+async function ollamaTags(): Promise<string[] | { error: string }> {
+  try {
+    const response = await fetch(`${ollamaUrl()}/api/tags`, { signal: AbortSignal.timeout(2000) });
+    if (!response.ok) return { error: `Ollama ответил ${response.status}` };
+    const data = (await response.json()) as { models?: Array<{ name?: string }> };
+    return (data.models ?? []).map((item) => item.name || "").filter(Boolean);
+  } catch {
+    return { error: `Ollama не отвечает: ${ollamaUrl()}` };
+  }
+}
+
 const ollamaProvider: BoardAgentProvider = {
   id: "ollama",
-  get label() {
-    const model = ollamaModel();
-    return model ? `Ollama (${model})` : "Ollama";
-  },
+  label: "Локальный агент (Ollama)",
   modes: ["text"],
-  configError() {
-    return ollamaModel() ? null : "Для Ollama не задана модель: FRAMEBOARD_OLLAMA_MODEL";
+  configError(model) {
+    return model || ollamaModel() ? null : "Для Ollama не выбрана модель";
   },
   async check() {
-    const model = ollamaModel();
-    let names: string[];
-    try {
-      const response = await fetch(`${ollamaUrl()}/api/tags`, { signal: AbortSignal.timeout(2000) });
-      if (!response.ok) return { available: false, reason: `Ollama ответил ${response.status}` };
-      const data = (await response.json()) as { models?: Array<{ name?: string }> };
-      names = (data.models ?? []).map((item) => item.name || "").filter(Boolean);
-    } catch {
-      return { available: false, reason: `Ollama не отвечает: ${ollamaUrl()}` };
-    }
-    if (!model) {
-      return {
-        available: false,
-        reason: `Не задана модель FRAMEBOARD_OLLAMA_MODEL. Есть: ${names.join(", ") || "(нет моделей)"}`,
-      };
-    }
-    const found = names.includes(model) || names.includes(`${model}:latest`);
-    return found ? { available: true } : { available: false, reason: `В Ollama нет модели ${model}` };
+    const names = await ollamaTags();
+    if (!Array.isArray(names)) return { available: false, reason: names.error };
+    if (!names.length) return { available: false, reason: "В Ollama нет ни одной модели" };
+    const configured = ollamaModel();
+    const fallback =
+      configured && (names.includes(configured) || names.includes(`${configured}:latest`))
+        ? names.find((name) => name === configured || name === `${configured}:latest`)!
+        : names[0];
+    return {
+      available: true,
+      models: names.map((name) => ({ id: name, label: name.replace(/:latest$/, "") })),
+      defaultModel: fallback,
+    };
   },
   async run(task, signal) {
-    const model = ollamaModel();
-    if (!model) return { status: "error", error: this.configError?.() ?? "Нет модели Ollama" };
+    const model = task.request?.model || ollamaModel();
+    if (!model) return { status: "error", error: "Для Ollama не выбрана модель" };
     const response = await fetch(`${ollamaUrl()}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -142,13 +146,17 @@ function summarizeStream(stdout: string): { log: string; isError: boolean; resul
 
 const claudeProvider: BoardAgentProvider = {
   id: "claude",
-  label: "Claude (подписка)",
+  label: "Claude Code",
   modes: ["text", "agent"],
+  configError(model) {
+    return !model || CLAUDE_MODELS.some((item) => item.id === model) ? null : `Неизвестная модель Claude: ${model}`;
+  },
   async check() {
     const bin = claudeBin();
+    const models = { models: CLAUDE_MODELS, defaultModel: defaultClaudeModel() };
     return resolveExecutable(bin)
-      ? { available: true }
-      : { available: false, reason: `Не найден ${bin}. Путь к CLI задаётся FRAMEBOARD_CLAUDE_BIN` };
+      ? { available: true, ...models }
+      : { available: false, reason: `Не найден ${bin}. Путь к CLI задаётся FRAMEBOARD_CLAUDE_BIN`, ...models };
   },
   async run(task, signal): Promise<AgentResult> {
     const bin = resolveExecutable(claudeBin());
@@ -157,7 +165,7 @@ const claudeProvider: BoardAgentProvider = {
     }
 
     if (task.mode === "text") {
-      const out = await runProcess(bin, ["-p", "--output-format", "json"], {
+      const out = await runProcess(bin, ["-p", "--model", task.request?.model || defaultClaudeModel(), "--output-format", "json"], {
         cwd: task.projectRoot,
         stdin: textPrompt(task),
         signal,
@@ -182,6 +190,8 @@ const claudeProvider: BoardAgentProvider = {
       [
         "-p",
         `Выполни задачу из файла ${taskFile}. Файл самодостаточный, других инструкций не будет.`,
+        "--model",
+        task.request?.model || defaultClaudeModel(),
         "--output-format",
         "stream-json",
         "--verbose",
@@ -232,7 +242,7 @@ export async function listAgentProviders(): Promise<AgentProviderInfo[]> {
   return Promise.all(
     ids.map(async (id) => {
       const provider = getAgentProvider(id);
-      let checked: { available: boolean; reason?: string };
+      let checked: Awaited<ReturnType<BoardAgentProvider["check"]>>;
       try {
         checked = await provider.check();
       } catch (error) {
@@ -245,6 +255,8 @@ export async function listAgentProviders(): Promise<AgentProviderInfo[]> {
         available: checked.available,
         reason: checked.available ? null : checked.reason ?? null,
         isDefault: id === fallback,
+        models: checked.models ?? [],
+        defaultModel: checked.defaultModel ?? null,
       };
     }),
   );

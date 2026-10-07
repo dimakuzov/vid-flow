@@ -80,8 +80,11 @@ function readPendingFormatRequest(
       status?: string;
       episodeId?: string;
       createdAt?: string;
+      provider?: string;
     };
     if (data.status !== "pending" || !data.episodeId) return null;
+    // Разметку моделью доска делает сама: во входящие агенту в чате она не попадает.
+    if (data.provider && data.provider !== "manual") return null;
     return { episodeId: data.episodeId, createdAt: data.createdAt || "" };
   } catch {
     return null;
@@ -364,6 +367,8 @@ export function submitAgentRequest(options: {
   workflow?: string;
   /** Кто исполняет. Нет — FRAMEBOARD_AGENT_PROVIDER, иначе manual. */
   provider?: string;
+  /** Модель провайдера. Нет — модель провайдера по умолчанию. */
+  model?: string;
 }): AgentRequestFile {
   const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
@@ -383,7 +388,8 @@ export function submitAgentRequest(options: {
         .join(", ")}. Выбери Claude или ручной режим.`,
     );
   }
-  const configError = provider.configError?.();
+  const model = options.model?.trim() || undefined;
+  const configError = provider.configError?.(model);
   if (configError) throw new Error(configError);
   const workflow = options.workflow?.trim() || undefined;
   // Неизвестный воркфлоу — ошибка сразу, а не после ответа агента.
@@ -430,6 +436,7 @@ export function submitAgentRequest(options: {
     message,
     refsChangedByUser,
     provider: providerId,
+    model: providerId === "manual" ? undefined : model,
     mode,
     changes: {
       prompt: textChange(baseline, "prompt", options.prompt),

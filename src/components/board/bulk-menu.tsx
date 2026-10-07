@@ -15,26 +15,48 @@ interface BulkResult {
   skipped: Array<BulkItem & { reason: string }>;
 }
 
-/** «next» — над столбцом «Кадр»: каждому кадру агент на его следующий этап. Иначе — этап столбца на всех кадрах. */
-export type BulkTarget = StageId | "next";
+/**
+ * next — над столбцом «Кадр»: каждому кадру агент на его следующий этап.
+ * shot — на одном кадре: агент на его следующий этап.
+ * stage — над столбцом этапа: этот этап на всех кадрах.
+ */
+export type BulkTarget = { kind: "next" } | { kind: "shot"; shotId: string } | { kind: "stage"; stageId: StageId };
 
 function title(target: BulkTarget): string {
-  return target === "next" ? "Агенты по всем кадрам" : `${STAGE_LABELS[target]}: все кадры`;
+  if (target.kind === "next") return "Агенты по всем кадрам";
+  if (target.kind === "shot") return `Агент на кадре ${target.shotId}`;
+  return `${STAGE_LABELS[target.stageId]}: все кадры`;
 }
 
 function description(target: BulkTarget): string {
-  if (target === "next") {
-    return "Каждому кадру — агент на его следующий неутверждённый этап. Агент готовит промпт, доска запускает этап. Утверждаете вы.";
+  if (target.kind === "next") {
+    return "Каждому кадру — агент на его следующий этап. Кадры, где агент уже работает или этап уже пройден, не трогаются.";
   }
-  if (target === "characters") {
-    return "На каждом кадре агент сам делает персонажей в ComfyUI. Нужен Claude или агент в чате.";
+  if (target.kind === "shot") {
+    return "Агент на следующий этап этого кадра. Выберите агента и модель под сложность кадра.";
   }
-  return "На каждом кадре агент готовит промпт этого этапа, затем доска ставит прогон в ComfyUI. Задания идут по очереди.";
+  if (target.stageId === "characters") {
+    return "На каждом кадре агент сам делает персонажей в ComfyUI. Нужен Claude Code или агент в чате.";
+  }
+  return "На каждом кадре агент готовит промпт этого этапа, затем доска ставит прогон в ComfyUI. Пройденные этапы не переделываются.";
+}
+
+function endpoint(episodeId: string, target: BulkTarget): string {
+  const episode = `/api/episodes/${encodeURIComponent(episodeId)}`;
+  if (target.kind === "next") return `${episode}/next-stage`;
+  if (target.kind === "shot") return `${episode}/shots/${encodeURIComponent(target.shotId)}/next-stage`;
+  return `${episode}/stages/${encodeURIComponent(target.stageId)}/run-all`;
+}
+
+function buttonText(target: BulkTarget): string {
+  if (target.kind === "next") return "▶ Агенты по кадрам";
+  if (target.kind === "shot") return "▶ Агент";
+  return "▶ Все кадры";
 }
 
 /**
- * Кнопка над столбцом таблицы и её меню: выбор агента, запуск, итог по кадрам.
- * Кадры, где этап запустить нельзя, пропускаются с причиной.
+ * Кнопка и меню запуска агентов: выбор агента и модели, запуск, итог по кадрам.
+ * Кадры, где запускать нельзя или не нужно, пропускаются с причиной.
  */
 export function BulkMenu({
   episodeId,
@@ -52,12 +74,12 @@ export function BulkMenu({
   const open = anchor !== null;
   const menuRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
-  const [includeApproved, setIncludeApproved] = useState(false);
+  const [redo, setRedo] = useState(false);
   const [result, setResult] = useState<BulkResult | null>(null);
   const [error, setError] = useState("");
   // Персонажей агент делает сам (agent), остальные этапы — переписать промпт (text).
-  const mode = target === "characters" ? "agent" : "text";
-  const { providers, selected, choose } = useAgentProviders(mode);
+  const mode = target.kind === "stage" && target.stageId === "characters" ? "agent" : "text";
+  const agent = useAgentProviders(mode);
 
   useEffect(() => {
     if (!open) return;
@@ -90,13 +112,13 @@ export function BulkMenu({
     setError("");
     setResult(null);
     try {
-      const url =
-        target === "next"
-          ? `/api/episodes/${encodeURIComponent(episodeId)}/next-stage`
-          : `/api/episodes/${encodeURIComponent(episodeId)}/stages/${encodeURIComponent(target)}/run-all`;
-      const data = await requestJson<BulkResult>(url, {
+      const data = await requestJson<BulkResult>(endpoint(episodeId, target), {
         method: "POST",
-        body: { provider: selected ?? undefined, includeApproved: target === "next" ? undefined : includeApproved },
+        body: {
+          provider: agent.selected ?? undefined,
+          model: agent.model ?? undefined,
+          redo: target.kind === "stage" ? redo : undefined,
+        },
         fallbackError: "Не удалось запустить",
       });
       setResult(data);
@@ -108,6 +130,8 @@ export function BulkMenu({
     }
   }
 
+  const runLabel = target.kind === "shot" ? "Запустить агента" : `Запустить на ${shotCount} кадрах`;
+
   return (
     <div className="mt-1 normal-case tracking-normal">
       <button
@@ -117,9 +141,9 @@ export function BulkMenu({
         aria-expanded={open}
         className="rounded-md border border-teal-800/30 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
       >
-        {target === "next" ? "▶ Агенты по кадрам" : "▶ Все кадры"}
+        {buttonText(target)}
       </button>
-      {open ? (
+      {anchor ? (
         <div
           ref={menuRef}
           style={{ top: anchor.top, left: anchor.left }}
@@ -129,27 +153,30 @@ export function BulkMenu({
             <div className="text-sm font-semibold text-stone-900">{title(target)}</div>
             <p className="mt-1 leading-snug">{description(target)}</p>
           </div>
-          {providers ? (
+          {agent.providers ? (
             <ProviderSelect
-              id={`bulk-provider-${target}`}
-              providers={providers}
-              selected={selected}
+              id={`bulk-provider-${target.kind}-${target.kind === "stage" ? target.stageId : target.kind === "shot" ? target.shotId : "all"}`}
+              providers={agent.providers}
+              selected={agent.selected}
               mode={mode}
               disabled={busy}
-              onChoose={choose}
+              onChoose={agent.choose}
+              model={agent.model}
+              onChooseModel={agent.chooseModel}
             />
           ) : (
             <p className="text-stone-500">Агент — по умолчанию доски.</p>
           )}
-          {target !== "next" ? (
-            <label className="flex items-center gap-2">
+          {target.kind === "stage" ? (
+            <label className="flex items-start gap-2">
               <input
                 type="checkbox"
-                checked={includeApproved}
+                className="mt-0.5"
+                checked={redo}
                 disabled={busy}
-                onChange={(event) => setIncludeApproved(event.target.checked)}
+                onChange={(event) => setRedo(event.target.checked)}
               />
-              И там, где этап уже утверждён
+              Переделать и там, где этап уже пройден (утверждён или есть результат)
             </label>
           ) : null}
           <div className="flex gap-2">
@@ -159,7 +186,7 @@ export function BulkMenu({
               disabled={busy}
               className="h-8 flex-1 rounded-lg bg-teal-800 px-3 text-sm font-medium text-white hover:bg-teal-900 disabled:opacity-60"
             >
-              {busy ? "Запуск…" : `Запустить на ${shotCount} кадрах`}
+              {busy ? "Запуск…" : runLabel}
             </button>
             <button
               type="button"
@@ -176,7 +203,11 @@ export function BulkMenu({
                 Запущено: {result.started.length}
                 {result.started.length
                   ? ` (${result.started
-                      .map((item) => (target === "next" && item.stageId ? `${item.shotId} · ${STAGE_LABELS[item.stageId]}` : item.shotId))
+                      .map((item) =>
+                        target.kind !== "stage" && item.stageId
+                          ? `${item.shotId} · ${STAGE_LABELS[item.stageId]}`
+                          : item.shotId,
+                      )
                       .join(", ")})`
                   : ""}
               </p>

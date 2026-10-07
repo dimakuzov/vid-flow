@@ -23,6 +23,33 @@ function readStored(): string | null {
   }
 }
 
+function modelKey(provider: string): string {
+  return `frameboard.agentModel.${provider}`;
+}
+
+function readStoredModel(provider: string): string | null {
+  try {
+    return window.localStorage.getItem(modelKey(provider));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredModel(provider: string, model: string) {
+  try {
+    window.localStorage.setItem(modelKey(provider), model);
+  } catch {
+    // Выбор просто не запомнится.
+  }
+}
+
+/** Модель провайдера: запомненная, если она ещё есть в списке, иначе по умолчанию провайдера. */
+export function pickModel(provider: AgentProviderInfo | undefined, stored: string | null): string | null {
+  if (!provider?.models?.length) return null;
+  if (stored && provider.models.some((item) => item.id === stored)) return stored;
+  return provider.defaultModel ?? provider.models[0].id;
+}
+
 function writeStored(id: string) {
   try {
     window.localStorage.setItem(STORAGE_KEY, id);
@@ -48,6 +75,7 @@ function usable(provider: AgentProviderInfo | undefined, mode: AgentMode): boole
 export function useAgentProviders(mode: AgentMode) {
   const [providers, setProviders] = useState<AgentProviderInfo[] | null>(null);
   const [preferred, setPreferred] = useState<string | null>(null);
+  const [storedModels, setStoredModels] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     let stopped = false;
@@ -58,6 +86,9 @@ export function useAgentProviders(mode: AgentMode) {
         if (stopped || !Array.isArray(data)) return;
         setProviders(data as AgentProviderInfo[]);
         setPreferred(readStored());
+        setStoredModels(
+          Object.fromEntries((data as AgentProviderInfo[]).map((item) => [item.id, readStoredModel(item.id)])),
+        );
       })
       .catch(() => {
         // Маршрута нет — селектор не показываем.
@@ -77,12 +108,21 @@ export function useAgentProviders(mode: AgentMode) {
       ].find((item) => usable(item, mode)) ?? null)
     : null;
 
+  const model = pickModel(selected ?? undefined, selected ? storedModels[selected.id] ?? null : null);
+
   return {
     providers,
     selected: selected?.id ?? null,
+    /** Модель выбранного провайдера. null — у провайдера нет выбора модели. */
+    model,
     choose(id: string) {
       setPreferred(id);
       writeStored(id);
+    },
+    chooseModel(id: string) {
+      if (!selected) return;
+      setStoredModels((current) => ({ ...current, [selected.id]: id }));
+      writeStoredModel(selected.id, id);
     },
   };
 }
@@ -94,6 +134,8 @@ export function ProviderSelect({
   mode,
   disabled,
   onChoose,
+  model,
+  onChooseModel,
 }: {
   id: string;
   providers: AgentProviderInfo[];
@@ -101,7 +143,11 @@ export function ProviderSelect({
   mode: AgentMode;
   disabled?: boolean;
   onChoose: (id: string) => void;
+  /** Выбранная модель и её смена. Нет onChooseModel — выбора модели не показываем. */
+  model?: string | null;
+  onChooseModel?: (id: string) => void;
 }) {
+  const models = providers.find((item) => item.id === selected)?.models ?? [];
   return (
     <div className="grid min-w-0 gap-1 text-xs text-stone-600">
       <label htmlFor={id}>Кто выполняет</label>
@@ -128,6 +174,24 @@ export function ProviderSelect({
           );
         })}
       </select>
+      {onChooseModel && models.length ? (
+        <>
+          <label htmlFor={`${id}-model`}>Модель</label>
+          <select
+            id={`${id}-model`}
+            value={model ?? ""}
+            disabled={disabled}
+            onChange={(event) => onChooseModel(event.target.value)}
+            className="h-9 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900 disabled:opacity-60"
+          >
+            {models.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
     </div>
   );
 }

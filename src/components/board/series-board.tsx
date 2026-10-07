@@ -7,9 +7,18 @@ import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
 import { BulkMenu } from "./bulk-menu";
+import { NewEpisodeDialog } from "./new-episode-dialog";
 import { StageCell } from "./stage-cell";
 
-function ShotHeader({ shot }: { shot: ShotSummary }) {
+function ShotHeader({
+  shot,
+  episodeId,
+  onChanged,
+}: {
+  shot: ShotSummary;
+  episodeId: string;
+  onChanged: () => void;
+}) {
   return (
     <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">{shot.id}</div>
@@ -19,6 +28,7 @@ function ShotHeader({ shot }: { shot: ShotSummary }) {
         <br />
         {shot.location || "локация не задана"}
       </div>
+      <BulkMenu episodeId={episodeId} target={{ kind: "shot", shotId: shot.id }} shotCount={1} onDone={onChanged} />
     </div>
   );
 }
@@ -40,7 +50,7 @@ export function SeriesBoard({
   const [pending, setPending] = useState(false);
   const [series, setSeries] = useState(initialSeries);
   const [seenSeries, setSeenSeries] = useState(initialSeries);
-  const [newSeriesId, setNewSeriesId] = useState("");
+  const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
   const [headerMessage, setHeaderMessage] = useState("");
   const reloadInFlight = useRef(false);
   // Эпизод страницы задаётся URL (/e/{episodeId}); на смену эпизода страница монтируется заново.
@@ -61,7 +71,6 @@ export function SeriesBoard({
         body: { episodeId: nextId },
         fallbackError: "Не удалось открыть серию",
       });
-      setNewSeriesId("");
       router.push(episodePagePath(data.episodeId));
     } catch (error) {
       setHeaderMessage(errorText(error));
@@ -140,22 +149,18 @@ export function SeriesBoard({
                 ))}
               </select>
             </label>
-            <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-stone-600 sm:w-36 sm:flex-none">
-              Новая
-              <input
-                value={newSeriesId}
-                onChange={(event) => setNewSeriesId(event.target.value)}
-                placeholder="e02"
-                className="h-9 rounded-lg border border-stone-300 bg-white/90 px-2 font-mono text-sm text-stone-900"
-              />
-            </label>
             <button
               type="button"
-              onClick={() => openSeries(newSeriesId)}
+              onClick={() => setNewEpisodeOpen(true)}
               className="h-9 rounded-lg border border-stone-300 bg-white/90 px-3 text-sm text-stone-800"
             >
               Добавить
             </button>
+            <NewEpisodeDialog
+              open={newEpisodeOpen}
+              onOpenChange={setNewEpisodeOpen}
+              onCreated={(id) => router.push(episodePagePath(id))}
+            />
           </div>
         </div>
         {headerMessage ? (
@@ -179,6 +184,20 @@ export function SeriesBoard({
           ) : null}
         </div>
 
+        {series.formatRequest && series.formatRequest.provider !== "manual" && series.formatRequest.status !== "done" ? (
+          <p
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              series.formatRequest.status === "error"
+                ? "border-red-300 bg-red-50 text-red-950"
+                : "border-sky-300 bg-sky-50 text-sky-950"
+            }`}
+          >
+            {series.formatRequest.status === "error"
+              ? `Разметка сценария не удалась: ${series.formatRequest.error ?? "ошибка"}`
+              : `Модель размечает сценарий (${series.formatRequest.model ?? series.formatRequest.provider}). Таблица появится сама.`}
+          </p>
+        ) : null}
+
         {loadError ? (
           <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-red-300 bg-red-50 px-4 py-4 text-sm text-red-950">
             {loadError}
@@ -189,7 +208,7 @@ export function SeriesBoard({
           <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-8 text-sm text-stone-600">
             {episodeId
               ? "Кадров пока нет. Отметь их галкой в импорте сценария ниже."
-              : "Эпизодов пока нет. Впиши имя в поле «Новая» и нажми «Добавить»."}
+              : "Эпизодов пока нет. Нажми «Добавить» в шапке: выбери сценарий и модель, таблица соберётся сама."}
           </p>
         ) : null}
 
@@ -197,18 +216,18 @@ export function SeriesBoard({
           <>
             {/* Телефон: кадр — карточка, этапы списком. Кнопки «для всех кадров» — строкой сверху. */}
             <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
-              <BulkMenu episodeId={episodeId} target="next" shotCount={series.shots.length} onDone={onChanged} />
+              <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} onDone={onChanged} />
               {STAGES.map((stageId) => (
                 <div key={stageId} className="flex items-center gap-1 text-[11px] text-stone-500">
                   <span>{STAGE_LABELS[stageId]}</span>
-                  <BulkMenu episodeId={episodeId} target={stageId} shotCount={series.shots.length} onDone={onChanged} />
+                  <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} onDone={onChanged} />
                 </div>
               ))}
             </div>
             <div className="space-y-6 md:hidden">
               {series.shots.map((shot) => (
                 <div key={shot.id} className="space-y-2">
-                  <ShotHeader shot={shot} />
+                  <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                   <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                     {STAGES.map((stageId) => (
                       <div key={stageId} className="min-w-0">
@@ -234,7 +253,7 @@ export function SeriesBoard({
                   <tr>
                     <th className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                       Кадр
-                      <BulkMenu episodeId={episodeId} target="next" shotCount={series.shots.length} onDone={onChanged} />
+                      <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} onDone={onChanged} />
                     </th>
                     {STAGES.map((stageId) => (
                       <th
@@ -242,7 +261,7 @@ export function SeriesBoard({
                         className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500"
                       >
                         {STAGE_LABELS[stageId]}
-                        <BulkMenu episodeId={episodeId} target={stageId} shotCount={series.shots.length} onDone={onChanged} />
+                        <BulkMenu episodeId={episodeId} target={{ kind: "stage", stageId }} shotCount={series.shots.length} onDone={onChanged} />
                       </th>
                     ))}
                   </tr>
@@ -251,7 +270,7 @@ export function SeriesBoard({
                   {series.shots.map((shot) => (
                     <tr key={shot.id}>
                       <td className="align-top">
-                        <ShotHeader shot={shot} />
+                        <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                       </td>
                       {STAGES.map((stageId) => (
                         <td key={stageId} className="align-top">

@@ -88,6 +88,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             workflow: docs.workflow,
             ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
             ...(agent.selected ? { provider: agent.selected } : {}),
+            ...(agent.model ? { model: agent.model } : {}),
           },
           fallbackError: "Не отправлено",
         },
@@ -379,6 +380,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               providers={agent.providers}
               provider={agent.selected}
               onChooseProvider={agent.choose}
+              model={agent.model}
+              onChooseModel={agent.chooseModel}
               onSend={sendToAgent}
             />
           </div>

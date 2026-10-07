@@ -23,6 +23,7 @@ export function emptySeries(): SeriesSummary {
     scenarioExists: false,
     hasRawScenario: false,
     formatRequestStatus: null,
+    formatRequest: null,
   };
 }
 

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 /**
  * Кнопка над столбцом этапа: агент на этом этапе у всех кадров.
- * Тело `{ provider?, includeApproved? }`. Ответ `{ started, skipped }` — по кадрам, с причинами.
+ * Тело `{ provider?, model?, redo? }`. redo — переделать и там, где этап уже пройден. Ответ `{ started, skipped }` — по кадрам, с причинами.
  */
 export async function POST(
   request: Request,
@@ -17,7 +17,7 @@ export async function POST(
     const params = await context.params;
     const episodeId = normalizeEpisodeId(params.episodeId);
     if (!STAGES.includes(params.stage as StageId)) throw new Error("Неизвестный этап");
-    let body: { provider?: unknown; includeApproved?: unknown } = {};
+    let body: { provider?: unknown; model?: unknown; redo?: unknown } = {};
     try {
       body = await request.json();
     } catch {
@@ -25,7 +25,8 @@ export async function POST(
     }
     const result = runStageForAllShots(episodeId, params.stage as StageId, {
       provider: typeof body.provider === "string" ? body.provider : undefined,
-      includeApproved: body.includeApproved === true,
+      model: typeof body.model === "string" ? body.model : undefined,
+      redo: body.redo === true,
     });
     return NextResponse.json(result);
   } catch (error) {

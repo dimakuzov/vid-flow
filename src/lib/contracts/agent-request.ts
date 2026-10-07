@@ -33,6 +33,8 @@ export interface AgentRequestFile {
   refsChangedByUser: boolean;
   /** Кто исполняет. Нет поля — manual (запросы до контракта). */
   provider?: AgentProviderId;
+  /** Модель провайдера (`claude-sonnet-5-5`, модель Ollama). Нет — модель провайдера по умолчанию. */
+  model?: string;
   mode?: AgentMode;
   /** Провайдер запущен (running). */
   startedAt?: string;
@@ -86,14 +88,23 @@ export interface AgentResult {
   suggestedWorkflow?: string;
 }
 
+/** Модель провайдера в меню: id уходит провайдеру как есть (`claude --model`, модель Ollama). */
+export interface ModelChoice {
+  id: string;
+  label: string;
+}
+
 export interface AgentProvider {
   id: AgentProviderId;
   /** Подпись в меню: «Ollama (qwen3)», «Claude (подписка)», «Вручную (чат читает файлы)». */
   label: string;
   /** Какие режимы умеет. manual — только manual. */
   modes: AgentMode[];
-  /** Есть ли провайдер на этой машине (ответил Ollama, найден `claude`). Причина — в reason. */
-  check(): Promise<{ available: boolean; reason?: string }>;
+  /**
+   * Есть ли провайдер на этой машине (ответил Ollama, найден `claude`). Причина — в reason.
+   * models — модели на выбор, defaultModel — какая стоит по умолчанию.
+   */
+  check(): Promise<{ available: boolean; reason?: string; models?: ModelChoice[]; defaultModel?: string | null }>;
   /** manual не вызывается: запрос ждёт, пока агент сам поставит done. */
   run(task: AgentTask, signal: AbortSignal): Promise<AgentResult>;
 }
@@ -107,4 +118,7 @@ export interface AgentProviderInfo {
   reason: string | null;
   /** Провайдер по умолчанию (FRAMEBOARD_AGENT_PROVIDER). */
   isDefault: boolean;
+  /** Модели на выбор. Пусто — у провайдера нет выбора модели (ручной режим). */
+  models: ModelChoice[];
+  defaultModel: string | null;
 }

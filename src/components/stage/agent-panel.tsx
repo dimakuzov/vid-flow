@@ -29,6 +29,8 @@ export function AgentPanel({
   providers,
   provider,
   onChooseProvider,
+  model,
+  onChooseModel,
   onSend,
 }: {
   detail: StageDetail;
@@ -37,6 +39,8 @@ export function AgentPanel({
   providers: AgentProviderInfo[] | null;
   provider: string | null;
   onChooseProvider: (id: string) => void;
+  model: string | null;
+  onChooseModel: (id: string) => void;
   onSend: () => void;
 }) {
   const request = detail.agentRequest;
@@ -52,6 +56,8 @@ export function AgentPanel({
               mode={mode}
               disabled={disabled || detail.state.busy}
               onChoose={onChooseProvider}
+              model={model}
+              onChooseModel={onChooseModel}
             />
           </div>
         ) : null}

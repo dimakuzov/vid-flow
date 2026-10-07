@@ -107,6 +107,7 @@ function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
     scenarioExists: false,
     hasRawScenario: false,
     formatRequestStatus: null,
+    formatRequest: null,
   };
 }
 
@@ -164,6 +165,15 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
     scenarioExists: scenario.trim().length > 0,
     hasRawScenario: raw.trim().length > 0,
     formatRequestStatus: formatRequest?.status ?? null,
+    formatRequest: formatRequest
+      ? {
+          status: formatRequest.status,
+          provider: formatRequest.provider ?? "manual",
+          model: formatRequest.model ?? null,
+          error: formatRequest.error ?? null,
+          shots: formatRequest.shots ?? null,
+        }
+      : null,
   };
 }
 

@@ -18,7 +18,7 @@ interface BootstrapPanelProps {
   initialScenario: string;
   initialRawScenario: string;
   initialPreview: BootstrapPreview;
-  formatRequestStatus: "pending" | "done" | null;
+  formatRequestStatus: "pending" | "running" | "done" | "error" | null;
   onImported: () => void;
 }
 

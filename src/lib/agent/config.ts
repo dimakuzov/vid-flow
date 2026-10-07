@@ -35,6 +35,17 @@ export function providerParallel(id: AgentProviderId): number {
   return id === "claude" ? 2 : 1;
 }
 
+/** Модели Claude Code на выбор. Первая — по умолчанию, если не задана FRAMEBOARD_CLAUDE_MODEL. */
+export const CLAUDE_MODELS = [
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+];
+
+export function defaultClaudeModel(): string {
+  const configured = process.env.FRAMEBOARD_CLAUDE_MODEL?.trim();
+  return configured || CLAUDE_MODELS[0].id;
+}
+
 export function claudeBin(): string {
   return process.env.FRAMEBOARD_CLAUDE_BIN?.trim() || "claude";
 }

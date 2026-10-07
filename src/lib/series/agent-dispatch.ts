@@ -1,9 +1,11 @@
+import { isFormatRunLive, startFormatRun } from "../agent/format-runner";
 import { abortAgentRun, isAgentRunLive, startAgentRun } from "../agent/runner";
 import { registerLoop } from "../background";
 import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
 import { STAGES, type StageId } from "./constants";
-import { listEpisodeIds, listShotIds } from "./paths";
+import { readFormatRequest, writeFormatRequest } from "./format-request";
+import { episodeRoot, listEpisodeIds, listShotIds } from "./paths";
 import {
   cancelAgentRequest,
   readAgentDispatch,
@@ -125,9 +127,28 @@ export function reconcileStage(episodeId: string, shotId: string, stageId: Stage
   }
 }
 
+/**
+ * Разметка сценария моделью доски: pending без исполнителя — запустить;
+ * running без исполнителя (доску перезапустили) — ошибка.
+ */
+function reconcileFormatRequest(episodeId: string): void {
+  const request = readFormatRequest(episodeRoot(episodeId));
+  if (!request || (request.provider ?? "manual") === "manual") return;
+  if (isFormatRunLive(episodeId)) return;
+  if (request.status === "pending") void startFormatRun(episodeId);
+  else if (request.status === "running") {
+    writeFormatRequest({ ...request, status: "error", error: RESTARTED_ERROR, finishedAt: new Date().toISOString() });
+  }
+}
+
 /** Один проход фонового цикла по всем эпизодам, а не только по открытому в шапке. */
 export function reconcileAllStages(): void {
   for (const episodeId of listEpisodeIds()) {
+    try {
+      reconcileFormatRequest(episodeId);
+    } catch {
+      // format_request.json ещё пишется.
+    }
     let shotIds: string[];
     try {
       shotIds = listShotIds(episodeId);

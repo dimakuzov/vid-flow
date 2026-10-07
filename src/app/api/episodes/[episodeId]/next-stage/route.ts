@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request, context: { params: Promise<{ episodeId: string }> }) {
   try {
     const episodeId = normalizeEpisodeId((await context.params).episodeId);
-    let body: { provider?: unknown } = {};
+    let body: { provider?: unknown; model?: unknown } = {};
     try {
       body = await request.json();
     } catch {
@@ -19,6 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ episod
     }
     const result = runNextStageForAllShots(episodeId, {
       provider: typeof body.provider === "string" ? body.provider : undefined,
+      model: typeof body.model === "string" ? body.model : undefined,
     });
     return NextResponse.json(result);
   } catch (error) {

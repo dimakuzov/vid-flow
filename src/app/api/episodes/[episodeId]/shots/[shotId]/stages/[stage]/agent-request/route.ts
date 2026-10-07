@@ -27,6 +27,8 @@ export async function POST(request: Request, context: StageRouteContext) {
       videoWorkflow?: unknown;
       /** manual | ollama | claude. Нет — FRAMEBOARD_AGENT_PROVIDER. */
       provider?: unknown;
+      /** Модель провайдера (claude-sonnet-5-5, модель Ollama). Нет — по умолчанию. */
+      model?: unknown;
     };
     const submitted = submitAgentRequest({
       episodeId,
@@ -43,6 +45,7 @@ export async function POST(request: Request, context: StageRouteContext) {
             ? body.videoWorkflow
             : undefined,
       provider: typeof body.provider === "string" ? body.provider : undefined,
+      model: typeof body.model === "string" ? body.model : undefined,
     });
 
     return NextResponse.json({
