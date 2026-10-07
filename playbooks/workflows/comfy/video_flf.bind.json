@@ -33,10 +33,11 @@
     },
     "seconds": {
       "kind": "number",
-      "from": "prompt:seconds",
+      "from": "settings:seconds",
+      "fallback": "prompt:seconds",
       "min": 2,
       "max": 8,
-      "label": "Длительность в prompt.md"
+      "label": "Длительность клипа"
     }
   },
   "slots": [

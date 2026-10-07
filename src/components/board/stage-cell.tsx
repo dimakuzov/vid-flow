@@ -62,6 +62,24 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     }
   }
 
+  async function chooseDuration(seconds: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      setDetail(
+        await requestJson<StageDetail>(stageApi, {
+          method: "PATCH",
+          body: { runDuration: seconds },
+          fallbackError: "Не удалось выбрать длительность",
+        }),
+      );
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runAction() {
     setBusy(true);
     setMessage("");
@@ -276,6 +294,8 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
                   selected={detail.workflow}
                   disabled={busy || stage.busy}
                   onSelect={chooseWorkflow}
+                  duration={{ range: detail.durationRange, selected: detail.durationSec }}
+                  onDuration={chooseDuration}
                 />
                 <SuggestedWorkflow
                   workflows={detail.workflows}

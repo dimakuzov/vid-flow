@@ -27,6 +27,7 @@ import {
   type AgentDispatch,
 } from "../agent/files";
 import { getAgentProvider } from "../agent/providers";
+import { chosenDurationSec, durationTaskLine } from "../agent/task";
 import { startAgentRun } from "../agent/runner";
 import { STAGES, type StageId } from "./constants";
 import { readTextIfExists, writeText } from "./media";
@@ -202,6 +203,14 @@ function renderWorkflows(choices: WorkflowChoice[], selected: string | null): st
 Если другой вариант подходит лучше, впиши его id в поле \`suggestedWorkflow\` файла \`${REQUEST_JSON}\`. Доска покажет предложение и сама не переключит.`;
 }
 
+/** Длительность из меню этапа (бриф 03): строка с пустой строкой перед ней, иначе пусто. */
+function renderDuration(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
+  const seconds = chosenDurationSec(episodeId, shotId, stageId, workflow);
+  return seconds == null
+    ? ""
+    : `\n${durationTaskLine(seconds)} Длительность доска ставит сама: \`N sec\` в prompt.md не пиши.\n`;
+}
+
 /** Выбор воркфлоу без ошибок: неизвестное имя — вариант по умолчанию. */
 function safeWorkflowId(episodeId: string, shotId: string, stageId: StageId, requested?: string): string | null {
   try {
@@ -284,7 +293,7 @@ ${meta.summary || "(действие кадра не описано)"}
 ## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
-
+${renderDuration(episodeId, shotId, stageId, selected)}
 ## Что сделать
 
 ${work}

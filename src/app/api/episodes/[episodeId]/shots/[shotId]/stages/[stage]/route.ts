@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
-import { writeRunSettings } from "@/lib/series/run-settings";
+import { readRunSettings, updateRunSettings } from "@/lib/series/run-settings";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
-import { getStageDetail } from "@/lib/series/scanner";
+import { effectiveWorkflowId, getStageDetail } from "@/lib/series/scanner";
+import type { StageId } from "@/lib/series/constants";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,27 @@ export async function GET(_request: Request, context: StageRouteContext) {
   }
 }
 
+/** Длительность из PATCH: пусто — по умолчанию (null), иначе целое в пределах меню воркфлоу. */
+function parseDuration(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  workflow: string | null | undefined,
+  raw: unknown,
+): number | null {
+  if (raw === null || (typeof raw === "string" && !raw.trim())) return null;
+  const value = typeof raw === "string" ? Number(raw.trim()) : raw;
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error("runDuration — целое число секунд или пустая строка");
+  }
+  const { range } = stageDuration({ episodeId, shotId, stageId }, effectiveWorkflowId(episodeId, shotId, stageId, workflow));
+  if (!range) throw new Error("У этого воркфлоу нет выбора длительности");
+  if (value < range.min || value > range.max) {
+    throw new Error(`Длительность ${value} с вне ${range.min}–${range.max} с`);
+  }
+  return value;
+}
+
 export async function PATCH(request: Request, context: StageRouteContext) {
   try {
     const { episodeId, shotId, stageId } = parseStageParams(await context.params);
@@ -27,13 +50,20 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       workflow?: string;
       /** Выбор графа (id манифеста). Пустая строка — вернуть вариант по умолчанию. */
       runWorkflow?: string;
+      /** Длительность клипа, с (целое в min..max меню). Пустая строка или null — по умолчанию. */
+      runDuration?: number | string | null;
     };
+    const patch: { workflow?: string | null; durationSec?: number | null } = {};
     if (typeof body.runWorkflow === "string") {
-      const workflow = body.runWorkflow.trim()
+      patch.workflow = body.runWorkflow.trim()
         ? resolveWorkflowId(episodeId, shotId, stageId, body.runWorkflow)
         : null;
-      writeRunSettings(episodeId, shotId, stageId, { workflow: workflow ?? undefined });
     }
+    if (body.runDuration !== undefined) {
+      const workflow = patch.workflow !== undefined ? patch.workflow : readRunSettings(episodeId, shotId, stageId).workflow;
+      patch.durationSec = parseDuration(episodeId, shotId, stageId, workflow, body.runDuration);
+    }
+    if (Object.keys(patch).length) updateRunSettings(episodeId, shotId, stageId, patch);
     updateStageDocs({
       episodeId,
       shotId,
