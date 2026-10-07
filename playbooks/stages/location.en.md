@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/stages/location.md`.
 
 Shot-specific location with no people. The general view comes from the series library. The angle and edits for this shot are built here.
 
-Prompts: `playbooks/models/qwen_location.en.md`. How to run the angle graph: `playbooks/workflows/location_comfy.en.md`.
+Prompts: `playbooks/models/qwen_location.en.md`. How to run the angle graph: `playbooks/workflows/location_comfy.en.md`. A new location from scratch: `playbooks/models/krea2_location.en.md`.
 
 ## Depends on the library
 
@@ -39,6 +39,23 @@ There is no `env/` folder. Older notes called this file `S<number>/env/env.png`.
 | `{locationId}_view.png` | image 1, our location. A copy of `view.png` from the library |
 | `angle.png` | image 2 only for a hard angle change: someone else's picture with the camera you want. Do not copy its objects or light |
 | object photo | image 3, 4… only on an edit pass, when an object must match that photo |
+
+## Which graph
+
+The stage "Воркфлоу" menu has two options:
+
+| Option | When |
+| --- | --- |
+| `location_views` — «Локация: 4 ракурса по общему виду» (Qwen, order 10) | The location exists in `data/locations/` or its general view is in `refs/`. You need the same room from another point. It keeps the room |
+| `location_krea2` — «Локация с нуля: Krea 2 по тексту» (order 20) | The location is not in the library. Or a fresh take on the space is needed, for example a future `view.png` for a new library folder. A picture in `refs/` is only a meaning reference: Krea 2 draws the room anew |
+
+By default the board takes the first available one: with a general view, `location_views`; without one, `location_krea2` (it does not need a picture). To use Krea 2 when a general view exists, the user picks it in the menu. If you think Krea 2 fits better, say so with `suggestedWorkflow: "location_krea2"`.
+
+Edits of a finished Krea picture (light, an object, cleanup) are pass B below; another angle of the same Krea room is pass A with that picture in `refs/`.
+
+## Location from the library
+
+The model that formatted the scenario may not have recognized the location. The "Из библиотеки" button next to "Референсы" (on this stage only) lists the `data/locations/` folders with a thumbnail and puts the general view into `refs/` as `{locationId}_view.png`. An existing file is not overwritten. The graph takes the first file in `refs/`, so the chosen location becomes the input right away. The "Записать в кадр" checkbox also changes `- location:` in `shot.md`. After such a pick the agent does not rebuild `refs/` (`agent_touch.json`).
 
 ## Which pass
 
