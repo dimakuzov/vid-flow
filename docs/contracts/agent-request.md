@@ -84,8 +84,22 @@
 | `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
 | `POST .../stages/{stage}/cancel` | отмена (общая с прогоном) |
 | `GET /api/agent/providers` | `AgentProviderInfo[]`: `id`, `label`, `modes`, `available`, `reason`, `isDefault` |
+| `GET /api/agent/runs` | `{ running, queued }` по всем эпизодам — см. «Агенты доски в CLI» |
+| `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }` или `{ all: true }`. Ответ `{ stopped, running, queued }` |
 
 `StageDetail.agentRequest` отдаёт `status`, `provider`, `error`, `suggestedWorkflow` (поля уже в `types.ts`).
+
+## Агенты доски в CLI
+
+`GET /api/agent/runs` (`listAgentRuns` в `src/lib/series/agent-dispatch.ts`) — что сейчас делают провайдеры доски. Элемент списка (`AgentRunEntry`): `kind` (`stage` или `format` — разметка сценария), `episodeId`, `shotId`, `stageId` (у `format` — `null`), `provider`, `model` (без выбора — модель провайдера по умолчанию), `since`.
+
+- `running` — живые прогоны этого процесса доски: исполнитель (`listLiveAgentRuns` в `runner.ts`, без отменённых) и разметка (`isFormatRunLive`). `since` — `startedAt`.
+- `queued` — `pending` у `ollama` / `claude`, которые фоновый цикл запустит, когда у провайдера освободится место (`providerParallel`): этап в фазе `agent` с этим же запросом, плюс разметка `pending`. `since` — `createdAt`.
+- `manual` в список не входит: его исполняет агент в чате, а не доска.
+
+`POST /api/agent/runs/stop` (`stopAgentRuns`) вызывает `cancelStage` — ровно то же, что «Отменить» на этапе — для одного этапа или для всех `stage`-записей из обоих списков. Этап без прогона агента доски не трогается (`stopped: []`). Разметку сценария отсюда не остановить: у неё нет отмены.
+
+Скрипты без зависимостей: `scripts/frameboard-status.mjs` — строка состояния Claude Code (таймаут 500 мс, код выхода всегда 0), `scripts/frameboard-agents.mjs` — `npm run agents -- list | stop <ep>/<shot>/<stage> | stop --all`. Порт — `FRAMEBOARD_PORT` (3456). Настройка — README, «Агенты доски в Claude Code».
 
 ## Ручной режим и `agent-mail/`
 

@@ -15,7 +15,12 @@ import { buildAgentTask } from "./task";
 
 interface LiveRun {
   requestId: string;
+  episodeId: string;
+  shotId: string;
+  stageId: StageId;
   provider: AgentProviderId;
+  model: string | null;
+  startedAt: string;
   controller: AbortController;
   promise: Promise<void>;
   cancelled: boolean;
@@ -51,6 +56,33 @@ export function liveRunCount(provider: AgentProviderId): number {
   let count = 0;
   for (const run of liveRuns().values()) if (run.provider === provider) count += 1;
   return count;
+}
+
+/** Живой прогон для списка `GET /api/agent/runs`. */
+export interface LiveAgentRun {
+  requestId: string;
+  episodeId: string;
+  shotId: string;
+  stageId: StageId;
+  provider: AgentProviderId;
+  model: string | null;
+  startedAt: string;
+}
+
+/** Все прогоны, которые сейчас идут в процессе доски (без отменённых), по времени запуска. */
+export function listLiveAgentRuns(): LiveAgentRun[] {
+  return [...liveRuns().values()]
+    .filter((run) => !run.cancelled)
+    .map(({ requestId, episodeId, shotId, stageId, provider, model, startedAt }) => ({
+      requestId,
+      episodeId,
+      shotId,
+      stageId,
+      provider,
+      model,
+      startedAt,
+    }))
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 }
 
 export function isAgentRunLive(episodeId: string, requestId: string): boolean {
@@ -194,7 +226,12 @@ export function startAgentRun(episodeId: string, shotId: string, stageId: StageI
   const key = runKey(episodeId, request.id);
   const run: LiveRun = {
     requestId: request.id,
+    episodeId,
+    shotId,
+    stageId,
     provider: providerId,
+    model: request.model ?? null,
+    startedAt: running.startedAt!,
     controller: new AbortController(),
     cancelled: false,
     promise: Promise.resolve(),
