@@ -1,133 +1,77 @@
-# Frameboard: карта модулей и общие правила
+# Frameboard, раунд 2: обзор и правила
 
-Читать каждому агенту перед своим брифом. Папку `data/` не просматривать: это реальный проект пользователя. Работать только с временной `DATA_ROOT` (см. ниже).
+Читать каждому агенту перед своим брифом. Прошлый раунд — в `docs/briefs/archive/round-1/` (только для справки, не задачи).
 
-## Как устроен поток
+## Как устроена доска сейчас
 
 ```
-UI (Next.js) ──HTTP──> API /api/episodes/{ep}/shots/{shot}/stages/{stage}/...  ──> lib/series (файлы = источник правды)
-                                                       │
-     «Отправить агенту» ──> agent_request.json, llm_task.md ──> провайдер агента (модуль 5): Ollama / claude -p / вручную
-                                                       │                     │ status: done
-     фоновый цикл agent-dispatch (3 с, все эпизоды) <──┘─────────────────────┘
-                     │ queueStageRun(ep, shot, stage, { workflow })
-                     ↓
-     lib/comfy: граф + манифест *.bind.json ──> data/comfy_queue/<id>.json ──> очередь (2 с) ──> ComfyUI :8188 ──> output/
+UI (Next.js, /e/{ep}/...) ──HTTP──> /api/episodes/{ep}/shots/{shot}/stages/{stage}/...  ──> src/lib/series (файлы = правда)
+   │                                                     │
+   ├ кнопки таблицы (bulk-menu.tsx) ──> /api/episodes/{ep}/{next-stage, stages/{stage}/run-all}, .../shots/{shot}/next-stage
+   ├ «Отправить агенту» ──> agent_request.json ──> src/lib/agent (провайдеры manual / ollama / claude, модель, очередь)
+   ├ «Добавить» в шапке ──> /api/series/new-episode ──> src/lib/agent/format-runner.ts (разметка сценария моделью)
+   └ «Запустить» ──> src/lib/comfy (граф + манифест *.bind.json) ──> data/comfy_queue ──> ComfyUI :8188 ──> output/
 ```
 
-Фоновые циклы живут в процессе Next: `src/instrumentation.ts` → `src/lib/background.ts` (`registerLoop`, переживает горячую перезагрузку). Отдельного воркера нет.
+Контракты — `docs/contracts/`: папка этапа и API (`stage-folder.md`), манифест графа (`graph-binding.md`), задание очереди (`comfy-job.md`), запрос агенту (`agent-request.md`). Фоновые циклы — внутри процесса Next (`src/lib/background.ts`).
 
-## Состояние работ
+## Брифы этого раунда
 
-| # | Модуль | Статус |
+| Бриф | Что | Когда |
 |---|---|---|
-| 1 | Единое состояние этапа | готово, ветка `stage-state`, отчёт `reports/01-stage-state.md` |
-| 2 | Хранилище, явный `episodeId` | готово, ветка `storage`, отчёт `reports/02-storage.md` |
-| — | Контракты для параллельной работы | готово, ветка `contracts` (содержит 1 и 2) |
-| 3 | Запуск в ComfyUI | бриф `03-comfy-runner.md` |
-| 4 | Воркфлоу и плейбуки | бриф `04-workflows.md` |
-| 5 | Связь с агентом | бриф `05-agent-bridge.md` |
-| 6 | Интерфейс | бриф `06-ui.md` |
+| `01-stage-files.md` | Удаление файлов output/ и refs/, скрытая заметка workflow.md, показ всех входов этапа | **первым** |
+| `02-location-library.md` | Локация: выбор из библиотеки `data/locations/`, граф Krea 2 и плейбук | после 01, параллельно с 03 и 04 |
+| `03-video-duration.md` | Видео (превью): выбор длительности клипа | после 01, параллельно с 02 и 04 |
+| `04-cli-status.md` | Число агентов доски в строке состояния Claude Code CLI и их остановка | после 01, параллельно с 02 и 03 |
 
-Брифы 3–6 делаются **параллельно**, каждый в своём git worktree от ветки `contracts`. Файлы между ними не пересекаются.
+Бриф 01 меняет страницу этапа, которую трогают и остальные. Поэтому сначала он, потом остальные три параллельно — их файлы не пересекаются.
 
 ## Кто какие файлы правит
 
-Правишь только файлы своей строки. Новые файлы создаёшь только в своих папках. Отчёт — `docs/briefs/reports/0N-<модуль>.md`.
-
 | Бриф | Файлы |
 |---|---|
-| 3 | `src/lib/comfy/**`, `src/app/api/comfy/**`, `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/run/route.ts`, `scripts/comfy-queue.ts`, `package.json` (только раздел `scripts`, если нужно) |
-| 4 | `playbooks/**` (плейбуки, графы, манифесты `*.bind.json`) |
-| 5 | `src/lib/series/{agent-request,agent-dispatch,format-request}.ts`, `src/lib/series/stage-state.test.ts`, новая папка `src/lib/agent/**`, `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/{agent-request,cancel}/route.ts`, `src/app/api/series/format-request/route.ts`, новая папка `src/app/api/agent/**`, `AGENTS.md`, `CLAUDE.md`, `docs/AGENT_BOOTSTRAP.md`, `agent-mail/**` |
-| 6 | `src/components/**`, `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css`, `src/app/shots/**`, новая папка `src/app/e/**`, `src/lib/series/labels.ts`, `README.md` |
+| 01 | `src/components/stage/{stage-workspace,ref-files,output-panel,media-card}.tsx`, новые `src/components/stage/stage-inputs.tsx`, `src/lib/series/{mutations,scanner,types}.ts`, новый `src/lib/series/stage-inputs.ts`, новый маршрут `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/files/route.ts`, `docs/contracts/stage-folder.md`, `AGENTS.md` (строка про удаление файлов) |
+| 02 | новые `src/components/stage/location-library.tsx`, `src/lib/series/library.ts`, маршруты `src/app/api/library/locations/**` и `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/refs-from-library/route.ts`; одна строка вставки в `stage-workspace.tsx`; `playbooks/**` (Krea 2: граф, манифест, плейбуки локации) |
+| 03 | `src/components/stage/workflow-menu.tsx`, `src/lib/series/run-settings.ts`, `src/lib/series/scanner.ts`, `src/lib/series/types.ts`, `src/app/api/episodes/[episodeId]/shots/[shotId]/stages/[stage]/route.ts`, `src/lib/comfy/binding.ts`, `src/lib/contracts/graph-binding.ts`, `src/lib/agent/task.ts`, `playbooks/workflows/comfy/{video,final}_*.bind.json`, `playbooks/models/wan_video*.md`, `docs/contracts/graph-binding.md` |
+| 04 | `src/lib/agent/runner.ts`, `src/lib/series/agent-dispatch.ts`, новые маршруты `src/app/api/agent/runs/**`, новые `scripts/frameboard-status.mjs`, `scripts/frameboard-agents.mjs`, `package.json` (раздел `scripts`), `docs/contracts/agent-request.md`, `README.md` (раздел про CLI) |
 
-**Заморожено на время параллельной работы** (никто из 3–6 не правит; нужна правка — опиши в отчёте, раздел «Нужно от других модулей»):
-
-- `src/lib/contracts/**` — типы контрактов и проверка манифестов (`graph-binding.test.ts`);
-- `src/lib/series/{paths,status,media,mutations,scanner,prompt-history,shot-meta,shot-watch,bootstrap,types,constants,stage-state,run-settings,route-params}.ts`, `src/lib/series/storage.test.ts`;
-- `src/lib/background.ts`, `src/instrumentation.ts`;
-- остальные маршруты: `src/app/api/episodes/[episodeId]/route.ts`, `.../shots/[shotId]/{route,watch/route}.ts`, `.../stages/[stage]/{route,approve,upload,prompt-history}/route.ts`, `src/app/api/series/{route,episode,bootstrap}/**`, `src/app/api/media/**`;
-- `docs/contracts/**`, `docs/briefs/0*.md`, `package-lock.json`, `scripts/bootstrap-sample.ts`.
-
-API routes — тонкие обёртки над функцией модуля; route правит тот модуль, кому он отдан в таблице.
-
-## Контракты
-
-| Контракт | Документ | Типы |
-|---|---|---|
-| Папка этапа, фазы, эпизод в сигнатурах, API | `docs/contracts/stage-folder.md` | `src/lib/series/types.ts`, `stage-state.ts` |
-| Манифест графа, несколько воркфлоу на этап | `docs/contracts/graph-binding.md` | `src/lib/contracts/graph-binding.ts` |
-| Задание очереди ComfyUI | `docs/contracts/comfy-job.md` | `src/lib/contracts/comfy-job.ts` |
-| Запрос агенту и провайдер | `docs/contracts/agent-request.md` | `src/lib/contracts/agent-request.ts` |
-
-Зафиксированные сигнатуры между модулями (тело можно менять, сигнатуру — нет):
-
-- модуль 3: `queueStageRun(episodeId, shotId, stageId, { workflow?, fromAgent? })`, `cancelComfyJob(id)`, `listWorkflowChoices(episodeId, shotId, stageId): WorkflowChoice[]`, `resolveWorkflowId(episodeId, shotId, stageId, requested)`, `startComfyQueue()`, `enqueueComfyJob(job)`, `readComfyJob(id)`;
-- модуль 5: `submitAgentRequest({ episodeId, ... })`, `cancelStage(episodeId, shotId, stageId)`, `reconcileStage(...)`, `reconcileAllStages()`, `startAgentDispatch()`, `readAgentRequestSummary(...)`, `rebuildAgentInbox(episodeId)`.
-
-Поля, которые нужны интерфейсу, уже есть в `StageDetail`: `workflow`, `workflows`, `job`, `agentRequest.{provider,error,suggestedWorkflow}`. Пока модули 3 и 5 не смержены, они заполняются временными значениями.
+Пересечение 02 ↔ 03: нет. Бриф 02 правит в `stage-workspace.tsx` одну строку (вставка кнопки у «Референсы»); 03 этот файл не трогает. Нужна правка чужого файла — опиши её в отчёте, не делай сам.
 
 ## Общие правила
 
-- `data/` не открывать, не коммитить, ничего в нём не удалять. Тестовые данные — только во временной `DATA_ROOT`.
-- Реальные задания в ComfyUI не отправлять: `COMFY_URL=http://127.0.0.1:9` (мёртвый порт). Задание должно висеть в «Ожидает очереди». Запуск на GPU — только с разрешения пользователя.
+- `data/` — реальный проект пользователя. Не открывать целиком, ничего не удалять и не перезаписывать. Проверки — во временной папке: `DATA_ROOT=<tmp>`.
+- Реальные задания в ComfyUI не отправлять без согласия пользователя: `COMFY_URL=http://127.0.0.1:9`. Ollama и Claude на настоящих моделях не гонять без согласия: в тестах — подменённый провайдер (`overrideAgentProvider`).
 - Этот Next.js новее твоих знаний: перед правкой Next-кода читать `node_modules/next/dist/docs/` (см. `AGENTS.md`).
-- Перед сдачей: `npm test` и `npx tsc --noEmit` без ошибок. После переноса маршрутов `tsc` может ругаться на устаревшие `.next/dev/types` — запусти `npm run dev` или `npx next typegen`.
-- Новую логику покрывать `node --test` + `tsx` во временной папке (`DATA_ROOT=<tmp>`, `FRAMEBOARD_LOOPS=off`). Тесты лежат рядом с кодом (`*.test.ts`) в своих папках.
-- Метаданные результата не дублировать: ComfyUI пишет воркфлоу (промпт, seed) в PNG. Для видео — проверить, что нода сохранения тоже пишет.
-- Плейбуки: `.en.md` читает агент, русские — для пользователя. Меняешь смысл в одной версии — обнови вторую в том же коммите.
-- Статус этапа пишет только доска. Агент сигналит только `"status": "done"` в `agent_request.json`.
-- В модель идёт только `prompt.md`. Рекомендация очищается доской при отправке.
-- Новый воркфлоу = JSON графа + манифест, без правки кода.
-- В конце — отчёт `docs/briefs/reports/0N-<модуль>.md`: что сделано, что проверено, риски, «Нужно от других модулей».
-- `git status` на этой машине может показывать все файлы изменёнными из-за прав доступа. Коммитить с `git -c core.fileMode=false`.
-- Коммиты — только в своей ветке. В `main` не мержить.
+- Плейбуки: `.en.md` читает агент, русские — для пользователя. Меняешь смысл в одной — обнови вторую в том же коммите.
+- В модель идёт только `prompt.md`. Статус этапа пишет только доска.
+- Перед сдачей: `npm test`, `npx tsc --noEmit`, `npx eslint src scripts` — без ошибок. Новую логику покрывать тестами `node --test` во временной папке, `FRAMEBOARD_LOOPS=off`.
+- В конце — отчёт `docs/briefs/reports/0N-<имя>.md`: что сделано, что проверено, риски, «Нужно от других».
+- Коммитить с `git -c core.fileMode=false`. Коммиты — только в своей ветке, в `main` не мержить.
+- Если у пользователя запущен `npm run dev` в основной папке, второй `next dev` там не стартует. Проверять в своём worktree на своём порту.
 
-## Запуск параллельных агентов
+## Запуск агентов
 
-Все команды — из корня основного репозитория (`vid-flow`). Пользователь на Windows; команды для Git Bash.
-
-### 1. Worktree на каждый бриф
+Основа — ветка `bulk-actions` (в ней всё прошлое: PR #4 и кнопки таблицы). Если пользователь уже смержил её в `main`, основа — `main`.
 
 ```bash
-git worktree add ../vid-flow-comfy -b b3-comfy-runner contracts
-git worktree add ../vid-flow-playbooks -b b4-playbooks contracts
-git worktree add ../vid-flow-agent -b b5-agent-bridge contracts
-git worktree add ../vid-flow-ui -b b6-ui contracts
+git worktree add ../vid-flow-r2-files -b r2-stage-files bulk-actions
 ```
 
-В каждом worktree один раз: `npm install` (папка `node_modules` у worktree своя).
-
-### 2. Данные и порты
-
-У каждого агента своя временная папка данных и свой порт, чтобы два `next dev` не мешали друг другу и никто не трогал реальный `data/`:
-
-| Бриф | Папка | `DATA_ROOT` | Порт |
-|---|---|---|---|
-| 3 | `../vid-flow-comfy` | `$TEMP/frameboard-comfy` | 3463 |
-| 4 | `../vid-flow-playbooks` | не нужен (код не запускает) | — |
-| 5 | `../vid-flow-agent` | `$TEMP/frameboard-agent` | 3465 |
-| 6 | `../vid-flow-ui` | `$TEMP/frameboard-ui` | 3466 |
+После мержа брифа 01:
 
 ```bash
-export DATA_ROOT="$TEMP/frameboard-ui" COMFY_URL=http://127.0.0.1:9
-npx next dev -p 3466 -H 127.0.0.1
+git worktree add ../vid-flow-r2-location -b r2-location-library bulk-actions
+git worktree add ../vid-flow-r2-duration -b r2-video-duration bulk-actions
+git worktree add ../vid-flow-r2-cli -b r2-cli-status bulk-actions
 ```
 
-Тестовый эпизод (сервер запущен):
+(вместо `bulk-actions` — ветка, куда смержен 01). В каждом worktree один раз `npm install`.
 
-```bash
-curl -s -X POST http://127.0.0.1:3466/api/series/episode -H 'content-type: application/json' -d '{"episodeId":"t01"}'
-curl -s -X POST http://127.0.0.1:3466/api/series/bootstrap -H 'content-type: application/json' \
-  -d '{"episodeId":"t01","scenario":"# Тест\n\n## s01 Кафе\n- characters: katya\n- location: cafe\nКатя входит в кафе.\n"}'
-```
+| Бриф | Порт | `DATA_ROOT` |
+|---|---|---|
+| 01 | 3471 | `$TEMP/frameboard-r2-files` |
+| 02 | 3472 | `$TEMP/frameboard-r2-location` |
+| 03 | 3473 | `$TEMP/frameboard-r2-duration` |
+| 04 | 3474 | `$TEMP/frameboard-r2-cli` |
 
-Картинки для `refs/` и `approve/` клади во временную папку сам (любой PNG). Папку после работы удали.
-
-### 3. Порядок мержа
-
-1. Пользователь проверяет и мержит `contracts` в `main` (в ней уже `stage-state` и `storage`).
-2. Затем ветки брифов по одной, в порядке **4 → 3 → 5 → 6**: каждая следующая опирается на поведение предыдущей (3 читает манифесты из 4, 5 решает «доска запускает этап?» по манифестам из 3, 6 показывает поля из 3 и 5). Файлы не пересекаются, поэтому конфликтов быть не должно.
-3. Перед каждым мержем в ветке брифа: `git merge main`, `npm test`, `npx tsc --noEmit`, короткая проверка в браузере на временной `DATA_ROOT`.
-4. Мерж делает пользователь или отдельная беседа по его просьбе. После мержа: `git worktree remove ../vid-flow-<модуль>`.
+Порядок мержа: 01 → 02, 03, 04 в любом порядке. Перед мержем — `git merge <основа>` в ветке брифа, тесты, проверка в браузере.
