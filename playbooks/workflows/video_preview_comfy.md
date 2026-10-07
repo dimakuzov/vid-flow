@@ -15,7 +15,7 @@
 | LoadImage 98 | `image` | Только FLF: самая новая картинка в `refs/` этого этапа, как `{shotId}_end.png` |
 | CLIPTextEncode 129:93 | `text` | `prompt.md` как есть, без добавок |
 | KSamplerAdvanced 129:86 | `noise_seed` | Новый seed |
-| PrimitiveFloat 129:161 | `value` | Секунды, если в `prompt.md` есть `N sec` (2–8). Иначе 5 из графа |
+| PrimitiveFloat 129:161 | `value` | Секунды: меню длительности, иначе `N sec` в `prompt.md` (2–12). Иначе 5 из графа |
 | SaveVideo 108 | `filename_prefix` | `frameboard/video/{shotId}_i2v` или `_flf`; финал — `frameboard/final/...` |
 
 Негатив 129:89, шаги, CFG, LoRA, 384×672 и переключатели turbo не трогать. Промпт: `playbooks/models/wan_video.md`.

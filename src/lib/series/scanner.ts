@@ -29,6 +29,7 @@ import { readAgentRequestSummary } from "./agent-request";
 import { stageDuration } from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import { readRunSettings } from "./run-settings";
+import { readShotSpeech, stageHasSpeech } from "./speech";
 import { stageInputs } from "./stage-inputs";
 import { readJobSummary, readStageState } from "./stage-state";
 import type { SeriesChoice, SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
@@ -263,7 +264,9 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
       refs: readTextIfExists(path.join(dir, "refs.md")),
       workflow: readTextIfExists(path.join(dir, "workflow.md")),
       runLog: readTextIfExists(path.join(dir, "run_log.md")),
+      speech: stageHasSpeech(stageId) ? readShotSpeech(episodeId, shotId) : "",
     },
+    hasSpeech: stageHasSpeech(stageId),
     promptHistory: syncPromptHistory(episodeId, shotId, stageId),
     refs: listMediaFiles(path.join(dir, "refs")),
     output: listMediaFiles(path.join(dir, "output")),

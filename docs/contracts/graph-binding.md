@@ -65,7 +65,7 @@ playbooks/workflows/comfy/
 "view":     { "kind": "image", "from": ["refs", "library:location"], "pick": "first", "label": "Общий вид" },
 "end":      { "kind": "image", "from": "refs", "pick": "newest", "uploadAs": "{shotId}_end{ext}", "label": "Последний кадр в refs/" },
 "text":     { "kind": "text", "from": "prompt", "required": true, "label": "prompt.md" },
-"seconds":  { "kind": "number", "from": "settings:seconds", "fallback": "prompt:seconds", "min": 2, "max": 8, "label": "Длительность клипа" }
+"seconds":  { "kind": "number", "from": "settings:seconds", "fallback": "prompt:seconds", "min": 2, "max": 12, "label": "Длительность клипа" }
 ```
 
 Картинки (`kind: image`):
@@ -192,7 +192,7 @@ playbooks/workflows/comfy/
 
 ### Язык текста
 
-Текст для модели проверяется перед запуском: строка инструкции доски («Собери …», «Правила: playbooks/…») или строка с русским текстом (5+ кириллических букв, не считая имён персонажей кадра и длительности «5 сек») — ошибка «перепиши prompt.md или отправь агенту». Старые `prompt.md` переводятся скриптом `npm run migrate-prompts` (без `--write` только показывает план).
+Текст для модели проверяется перед запуском: строка инструкции доски («Собери …», «Правила: playbooks/…») или строка с русским текстом (5+ кириллических букв, не считая имён персонажей кадра, дословных реплик из `shots/{shotId}/speech.md` и длительности «5 сек») — ошибка «перепиши prompt.md или отправь агенту». Старые `prompt.md` переводятся скриптом `npm run migrate-prompts` (без `--write` только показывает план).
 
 ## Метаданные
 

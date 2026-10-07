@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { AgentMode } from "@/lib/contracts/agent-request";
 import { submitAgentRequest } from "@/lib/series/agent-request";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
+import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { getStageDetail } from "@/lib/series/scanner";
 
 export const runtime = "nodejs";
@@ -29,7 +30,10 @@ export async function POST(request: Request, context: StageRouteContext) {
       provider?: unknown;
       /** Модель провайдера (claude-sonnet-5-5, модель Ollama). Нет — по умолчанию. */
       model?: unknown;
+      /** Прямая речь кадра (speech.md): сохраняется до задачи, чтобы агент её увидел. */
+      speech?: unknown;
     };
+    if (typeof body.speech === "string" && stageHasSpeech(stageId)) writeShotSpeech(episodeId, shotId, body.speech);
     const submitted = submitAgentRequest({
       episodeId,
       shotId,

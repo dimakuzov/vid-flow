@@ -35,7 +35,7 @@
       "kind": "number",
       "from": "prompt:seconds",
       "min": 2,
-      "max": 8,
+      "max": 12,
       "label": "Длительность в prompt.md"
     }
   },

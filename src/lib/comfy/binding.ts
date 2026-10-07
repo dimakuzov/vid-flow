@@ -20,6 +20,7 @@ import { readTextIfExists } from "../series/media";
 import { getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
 import { readRunSettings } from "../series/run-settings";
 import { readShotMeta } from "../series/shot-meta";
+import { readShotSpeech, speechPhrases } from "../series/speech";
 
 /*
  * Манифесты графов (docs/contracts/graph-binding.md): загрузка, проверка против графа,
@@ -328,7 +329,7 @@ export const BOARD_INSTRUCTION = /^\s*(Собери |Правила:\s*playbooks
 
 /**
  * Строка с русским текстом (5+ кириллических букв): модели нужен текст на её языке.
- * Не считаются имена персонажей кадра (их заменяет namesTo) и длительность («5 сек»).
+ * Не считаются имена персонажей кадра, дословные реплики из speech.md (передаются в names) и длительность («5 сек»).
  */
 export function russianLine(text: string, names: string[] = []): string | null {
   for (const line of text.split(/\r?\n/)) {
@@ -676,6 +677,8 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   const promptMd = readPrompt(ctx.stageId);
   const durationSec = readRunSettings(ctx.episodeId, ctx.shotId, ctx.stageId).durationSec;
   const texts: Record<string, string> = {};
+  // Реплики из speech.md звучат на своём языке: проверка языка их пропускает.
+  const allowed = [...meta.characters, ...speechPhrases(readShotSpeech(ctx.episodeId, ctx.shotId))];
 
   const images: Record<string, string[]> = {};
   const missing: string[] = [];
@@ -690,7 +693,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       if (input.required && !texts[name]) {
         throw new Error(`В ${where} нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.`);
       }
-      assertModelText(texts[name], where, meta.characters);
+      assertModelText(texts[name], where, allowed);
       if (input.sections) splitSections(texts[name], input.sections, where);
     }
   }

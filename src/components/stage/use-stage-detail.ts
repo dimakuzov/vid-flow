@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer } from "react";
 import type { StageDetail } from "@/lib/series/types";
 import { requestJson, stageApiPath } from "./api";
 
-export const DOC_FIELDS = ["prompt", "llmNotes", "refs", "workflow"] as const;
+export const DOC_FIELDS = ["prompt", "llmNotes", "refs", "workflow", "speech"] as const;
 export type DocField = (typeof DOC_FIELDS)[number];
 export type Docs = Record<DocField, string>;
 

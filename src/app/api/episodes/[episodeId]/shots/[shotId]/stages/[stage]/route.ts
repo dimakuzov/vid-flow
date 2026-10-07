@@ -3,6 +3,7 @@ import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
 import { readRunSettings, updateRunSettings } from "@/lib/series/run-settings";
+import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { effectiveWorkflowId, getStageDetail } from "@/lib/series/scanner";
 import type { StageId } from "@/lib/series/constants";
@@ -52,6 +53,8 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       runWorkflow?: string;
       /** Длительность клипа, с (целое в min..max меню). Пустая строка или null — по умолчанию. */
       runDuration?: number | string | null;
+      /** Прямая речь кадра (speech.md). Только на видео-этапах, на других игнорируется. */
+      speech?: string;
     };
     const patch: { workflow?: string | null; durationSec?: number | null } = {};
     if (typeof body.runWorkflow === "string") {
@@ -64,6 +67,7 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       patch.durationSec = parseDuration(episodeId, shotId, stageId, workflow, body.runDuration);
     }
     if (Object.keys(patch).length) updateRunSettings(episodeId, shotId, stageId, patch);
+    if (typeof body.speech === "string" && stageHasSpeech(stageId)) writeShotSpeech(episodeId, shotId, body.speech);
     updateStageDocs({
       episodeId,
       shotId,

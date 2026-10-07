@@ -21,6 +21,8 @@ import { SuggestedWorkflow, WorkflowMenu } from "./workflow-menu";
 
 const PROMPT_PLACEHOLDER = "Текст для модели, на английском. Пусто — отправьте рекомендацию агенту.";
 
+const SPEECH_PLACEHOLDER = "Что персонаж говорит вслух, дословно. Одна реплика на строку: «Катя: Мама, я дома.» Молчат — оставьте пустым.";
+
 type Viewer = { files: MediaFile[]; index: number; runContext: boolean };
 
 export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }) {
@@ -88,6 +90,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             prompt: docs.prompt,
             refs: docs.refs,
             workflow: docs.workflow,
+            ...(detail.hasSpeech ? { speech: docs.speech } : {}),
             ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
             ...(agent.selected ? { provider: agent.selected } : {}),
             ...(agent.model ? { model: agent.model } : {}),
@@ -362,6 +365,18 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               disabled={busy}
               onRestore={restorePrompt}
             />
+            {detail.hasSpeech ? (
+              <>
+                <DocFieldLabel htmlFor="doc-speech" note="дословно · для агента · пусто — молчат">
+                  Реплики
+                </DocFieldLabel>
+                {docField("speech", {
+                  readOnly: stageBusy,
+                  placeholder: SPEECH_PLACEHOLDER,
+                  className: "min-h-16",
+                })}
+              </>
+            ) : null}
             <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · очищается после отправки">
               Рекомендация
             </DocFieldLabel>
