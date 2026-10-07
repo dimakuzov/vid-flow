@@ -1,0 +1,242 @@
+{
+  "29": {
+    "inputs": {
+      "filename_prefix": "Krea2_turbo",
+      "images": [
+        "55",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "49": {
+    "inputs": {
+      "aspect_ratio": "1:1 (Square)",
+      "megapixels": 2,
+      "multiple": 8
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector"
+    }
+  },
+  "52": {
+    "inputs": {
+      "text": [
+        "61",
+        0
+      ],
+      "clip": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "53": {
+    "inputs": {
+      "width": [
+        "49",
+        0
+      ],
+      "height": [
+        "49",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "54": {
+    "inputs": {
+      "seed": 290351905933836,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "62",
+        0
+      ],
+      "positive": [
+        "66",
+        0
+      ],
+      "negative": [
+        "59",
+        0
+      ],
+      "latent_image": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "55": {
+    "inputs": {
+      "samples": [
+        "54",
+        0
+      ],
+      "vae": [
+        "58",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "56": {
+    "inputs": {
+      "unet_name": "krea2_turbo_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "57": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "58": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "59": {
+    "inputs": {
+      "conditioning": [
+        "66",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "Conditioning Zero Out"
+    }
+  },
+  "60": {
+    "inputs": {
+      "lora_name": "krea2_darkbrush.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "56",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "61": {
+    "inputs": {
+      "value": "(Interior design:1.1), IntemporalDesign, structural framing, surface treatment, furnishings arrangement, lighting strategy, color palette, ornamental language, spatial rhythm, material juxtaposition, era-informed styling, modern furniture, antique furniture, v67_victorian\n\nA spacious dining room inside a hillside house, high ceilings with subtle crown molding, light blue-gray walls, elegant refined interior, no view of the pool. A long rectangular dining table made entirely of solid walnut wood, one uniform material top to bottom, no inlay, no contrasting materials, dark wood base with turned legs. The wood grain flows lengthwise along the table, except for one continuous knotted streak running down the center from end to end, where the grain twists into a dark, tightly whorled knot pattern. Ten upholstered cream-colored curved-back dining chairs with dark wood legs surround the table. A chandelier fitted with candles hangs above the table. One end of the room lit by flat, cool daylight from a window, the other end glowing with warm flickering candlelight, the two light qualities meeting across the tabletop. A wooden console table against the wall beneath framed artwork, a large vase with greenery, flanked by brass wall sconces. Wide-plank wood floor, large patterned area rug, tall curtained doorway to the side. Photorealistic, 35mm lens, wide composition, cinematic lighting contrast"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Text String (User Prompt)"
+    }
+  },
+  "62": {
+    "inputs": {
+      "switch": [
+        "63",
+        0
+      ],
+      "on_false": [
+        "56",
+        0
+      ],
+      "on_true": [
+        "65",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Model)"
+    }
+  },
+  "63": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Boolean (Enable LoRA?)"
+    }
+  },
+  "65": {
+    "inputs": {
+      "lora_name": "krea2\\V67_Interior_design.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "66": {
+    "inputs": {
+      "prompt": [
+        "61",
+        0
+      ],
+      "clip": [
+        "57",
+        0
+      ],
+      "image1": [
+        "67",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "Text Encode Qwen Image Edit Plus"
+    }
+  },
+  "67": {
+    "inputs": {
+      "image": "Seawavetable-New-York-Modern-Coastal-Black-Walnut-Resin-Table-CRT-227_1.webp"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  }
+}

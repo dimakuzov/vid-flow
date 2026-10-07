@@ -1,0 +1,51 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "location_krea2",
+  "graph": "location_krea2_api.json",
+  "stage": "location",
+  "label": "Локация с нуля: Krea 2 по тексту",
+  "description": "Новая локация по описанию, 9:16. Картинка из refs/ (или общий вид из библиотеки) — необязательный смысловой референс, не правка.",
+  "playbook": "models/krea2_location.en.md",
+  "order": 20,
+  "aliases": [],
+  "inputs": {
+    "view": {
+      "kind": "image",
+      "from": ["refs", "library:location"],
+      "pick": "first",
+      "min": 0,
+      "label": "Референс из refs/ или общий вид из data/locations/ (необязательно)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "label": "prompt.md"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "67", "field": "image" }],
+      "value": { "input": "view" },
+      "whenEmpty": {
+        "remove": [{ "node": "67" }, { "node": "66", "field": "image1" }]
+      }
+    },
+    {
+      "targets": [{ "node": "61", "field": "value" }],
+      "value": { "input": "text" }
+    },
+    {
+      "targets": [{ "node": "49", "field": "aspect_ratio" }],
+      "value": { "const": "9:16 (Portrait Widescreen)" }
+    },
+    {
+      "targets": [{ "node": "54", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "29", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/location/{shotId}_krea2" }
+    }
+  ]
+}

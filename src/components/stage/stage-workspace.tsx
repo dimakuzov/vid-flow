@@ -10,6 +10,7 @@ import { useAgentProviders } from "./agent-provider";
 import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
 import { DocFieldLabel, DocTextarea } from "./doc-field";
 import { ImageLightbox } from "./image-lightbox";
+import { LocationLibrary } from "./location-library";
 import { OutputPanel } from "./output-panel";
 import { PromptHistory } from "./prompt-history";
 import { RefFiles, usedRefNames } from "./ref-files";
@@ -372,6 +373,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onDeleteRef={busy ? undefined : deleteRef}
             />
             <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
+            {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
             <RefFiles
               files={detail.refs}
               selectedName={selectedRef}

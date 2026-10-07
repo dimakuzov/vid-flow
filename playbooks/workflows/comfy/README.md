@@ -5,6 +5,7 @@
 | Манифест | Этап | Граф | Кто запускает |
 | --- | --- | --- | --- |
 | `location_views` | `location` | `location_views_multiple_angles.json` | доска; разделы `## simple/objects/camera/camera_objects` в `prompt.md` |
+| `location_krea2` | `location` | `location_krea2_api.json` (Krea 2 Turbo, локация с нуля; как пересохранить — `drafts/README.md`) | доска; один абзац в `prompt.md`, картинка из `refs/` необязательна |
 | `first_frame_compositing` | `first_frame` | `qwen21_character_compositing.json` | доска |
 | `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
 | `final_h3`, `final_h3_768` | `final_render` | `minimax_h3_creator_api.json` (MiniMax H3, ComfyUI-Continuity) | доска; разделы `## body/...` в `prompt.md` |
