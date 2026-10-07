@@ -6,6 +6,16 @@ import type {
   AgentResult,
   AgentTask,
 } from "../contracts/agent-request";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import {
+  getCharactersRoot,
+  getComfyQueueRoot,
+  getLocationsRoot,
+  getPlaybooksRoot,
+  shotDir,
+} from "../series/paths";
 import { CLAUDE_MODELS, claudeBin, defaultClaudeModel, defaultProviderId, ollamaModel, ollamaUrl } from "./config";
 import { resolveExecutable, runProcess } from "./process";
 
@@ -32,6 +42,110 @@ export function cleanPromptText(raw: string): string {
 
 function textPrompt(task: AgentTask): string {
   return `${task.system.trim()}\n\n---\n\n${task.user.trim()}\n`;
+}
+
+/** Системная часть длиннее — уходит в stdin вместе с задачей (предел командной строки Windows). */
+const SYSTEM_ARG_LIMIT = 20_000;
+
+/**
+ * Пустая папка вне репозитория: claude стартует в ней и не подхватывает CLAUDE.md, AGENTS.md,
+ * настройки и память проекта. Файлы кадра агенту открывает только --add-dir.
+ */
+function isolatedCwd(): string {
+  const dir = path.join(os.tmpdir(), "frameboard-claude");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/** Папки, которые видит агент этапа: этот кадр, плейбуки, очередь ComfyUI, контракт задания, библиотека этапа. */
+export function agentScopeDirs(task: AgentTask): string[] {
+  const { episodeId, shotId, stageId } = task.request;
+  const dirs = [
+    shotDir(episodeId, shotId),
+    getPlaybooksRoot(),
+    getComfyQueueRoot(),
+    path.join(task.projectRoot, "docs", "contracts"),
+  ];
+  if (stageId === "characters") dirs.push(getCharactersRoot());
+  if (stageId === "location") dirs.push(getLocationsRoot());
+  return dirs;
+}
+
+/** Рамки агента этапа: один этап одного кадра, больше ничего. */
+export function agentScopeRules(task: AgentTask): string {
+  const { episodeId, shotId, stageId } = task.request;
+  return `You are a Frameboard stage agent. Your whole job is ONE stage of ONE shot: episode ${episodeId}, shot ${shotId}, stage ${stageId}.
+- Work only with: this stage folder (${task.stageDir}), shot.md and speech.md of this shot, the playbooks the task names, the ComfyUI queue folder for jobs, and the library folder of this stage (read only).
+- Do not open other shots, other stages of this shot, other episodes, the board code, settings, git, AGENTS.md or CLAUDE.md. Do not search the disk.
+- Do not start, prepare or plan any other stage. Do not watch for new requests and do not wait for the user's approval.
+- When this stage's task is finished, or you have to stop, do what the task says with agent_request.json and end. Keep the answer short.`;
+}
+
+/**
+ * Аргументы и папка запуска `claude -p` для этапа. Ничего не запускает.
+ * viaShell — claude.cmd: аргументы идут через cmd, длинный текст с кавычками и переводами строк туда нельзя.
+ */
+export function claudeInvocation(task: AgentTask, viaShell = false): { args: string[]; cwd: string; stdin?: string } {
+  const model = task.request?.model || defaultClaudeModel();
+  const isolation = ["--strict-mcp-config", "--no-session-persistence"];
+  if (task.mode === "text") {
+    // Чистый вызов модели: без инструментов, MCP и системного промпта Claude Code — один запрос, один ответ.
+    const fits = !viaShell && task.system.length <= SYSTEM_ARG_LIMIT;
+    return {
+      args: [
+        "-p",
+        "--model",
+        model,
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        ...isolation,
+        "--system-prompt",
+        fits ? task.system.trim() : "Follow the instructions at the top of the message.",
+      ],
+      cwd: isolatedCwd(),
+      stdin: fits ? `${task.user.trim()}\n` : textPrompt(task),
+    };
+  }
+  const taskFile = `${task.stageDir}/llm_task.md`.replace(/\\/g, "/");
+  const root = task.projectRoot.replace(/\\/g, "/");
+  return {
+    args: [
+      "-p",
+      `Выполни задачу из файла ${taskFile}. Файл самодостаточный, других инструкций не будет. Относительные пути в задаче (playbooks/…, data/…, docs/…) считай от корня проекта ${root}.`,
+      "--model",
+      model,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      // Без настроек пользователя и проекта; файловые инструменты — только в папках --add-dir.
+      "--restricted",
+      "--tools",
+      CLAUDE_AGENT_TOOLS,
+      "--allowedTools",
+      CLAUDE_AGENT_TOOLS,
+      ...isolation,
+      "--append-system-prompt",
+      viaShell ? agentScopeRules(task).replace(/\s*\n\s*/g, " ") : agentScopeRules(task),
+      "--add-dir",
+      ...agentScopeDirs(task),
+    ],
+    cwd: isolatedCwd(),
+  };
+}
+
+/** Текст ошибки из JSON-ответа claude (поле result), иначе начало вывода. */
+function claudeFailure(code: number | null, stdout: string, stderr: string): string {
+  let detail = (stderr || stdout).trim();
+  try {
+    const data = JSON.parse(stdout) as { result?: string; subtype?: string };
+    if (data.result) detail = data.result;
+    else if (data.subtype) detail = data.subtype;
+  } catch {
+    // не JSON
+  }
+  return `claude вышел с кодом ${code}: ${detail.slice(0, 500)}`;
 }
 
 const manualProvider: BoardAgentProvider = {
@@ -164,15 +278,10 @@ const claudeProvider: BoardAgentProvider = {
       return { status: "error", error: `Не найден ${claudeBin()}. Путь к CLI задаётся FRAMEBOARD_CLAUDE_BIN` };
     }
 
+    const call = claudeInvocation(task, process.platform === "win32" && /\.(cmd|bat)$/i.test(bin));
     if (task.mode === "text") {
-      const out = await runProcess(bin, ["-p", "--model", task.request?.model || defaultClaudeModel(), "--output-format", "json"], {
-        cwd: task.projectRoot,
-        stdin: textPrompt(task),
-        signal,
-      });
-      if (out.code !== 0) {
-        return { status: "error", error: `claude вышел с кодом ${out.code}: ${(out.stderr || out.stdout).trim().slice(0, 500)}` };
-      }
+      const out = await runProcess(bin, call.args, { cwd: call.cwd, stdin: call.stdin, signal });
+      if (out.code !== 0) return { status: "error", error: claudeFailure(out.code, out.stdout, out.stderr) };
       let data: { result?: string; is_error?: boolean };
       try {
         data = JSON.parse(out.stdout);
@@ -184,22 +293,7 @@ const claudeProvider: BoardAgentProvider = {
       return prompt ? { status: "done", prompt } : { status: "error", error: "claude вернул пустой ответ" };
     }
 
-    const taskFile = `${task.stageDir}/llm_task.md`.replace(/\\/g, "/");
-    const out = await runProcess(
-      bin,
-      [
-        "-p",
-        `Выполни задачу из файла ${taskFile}. Файл самодостаточный, других инструкций не будет.`,
-        "--model",
-        task.request?.model || defaultClaudeModel(),
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--allowedTools",
-        CLAUDE_AGENT_TOOLS,
-      ],
-      { cwd: task.projectRoot, signal },
-    );
+    const out = await runProcess(bin, call.args, { cwd: call.cwd, signal });
     const summary = summarizeStream(out.stdout);
     const log = [summary.log, summary.result, out.stderr.trim()].filter(Boolean).join("\n\n");
     if (out.code === 0 && !summary.isError) return { status: "done", log };

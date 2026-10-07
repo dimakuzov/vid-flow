@@ -21,7 +21,7 @@ import { POST as postAgentRequest } from "../../app/api/episodes/[episodeId]/sho
 import { POST as postShotNext } from "../../app/api/episodes/[episodeId]/shots/[shotId]/next-stage/route";
 import { cancelStage, stopAgentRuns } from "./agent-dispatch";
 import { readAgentRequest } from "./agent-request";
-import { runNextStageForAllShots, runStageForAllShots } from "./bulk";
+import { assignShotAgents, runStageForAllShots } from "./bulk";
 import { createEpisode, ensureStageDirs, shotDir } from "./paths";
 import { scanSeries } from "./scanner";
 import { readShotAgent, readShotAgentActivity, writeShotAgent } from "./shot-agent";
@@ -127,18 +127,21 @@ test("остановка агента кадра: только этот кадр
   assert.equal(readAgentRequest(EP, "s02", "location")?.status, "pending", "чужой кадр не тронут");
 });
 
-test("«Агенты по кадрам» не меняет назначенных; без агента и без выбора — агент доски без назначения", async () => {
+test("«Агенты по кадрам» не меняет назначенных и ничего не запускает; без агента и без выбора — агент доски", async () => {
   await freeAll();
   fs.rmSync(path.join(shotDir(EP, "s03"), "agent.json"));
-  const result = runNextStageForAllShots(EP, { provider: "claude", model: "claude-sonnet-5-5" });
+  const before = readAgentRequest(EP, "s03", "location")?.id;
+  const result = assignShotAgents(EP, { provider: "claude", model: "claude-sonnet-5-5" });
   assert.deepEqual(result.assigned, ["s03"]);
+  assert.deepEqual(result.started, []);
+  assert.equal(readAgentRequest(EP, "s03", "location")?.id, before, "нового запроса нет");
   assert.equal(readShotAgent(EP, "s01")?.model, HAIKU);
   assert.equal(readShotAgent(EP, "s02")?.provider, "manual");
   assert.equal(readShotAgent(EP, "s03")?.model, "claude-sonnet-5-5");
 
   await freeAll();
   fs.rmSync(path.join(shotDir(EP, "s03"), "agent.json"));
-  const fallback = runNextStageForAllShots(EP);
+  const fallback = runStageForAllShots(EP, "location");
   assert.deepEqual(fallback.assigned, []);
   assert.equal(readShotAgent(EP, "s03"), null);
   assert.equal(readAgentRequest(EP, "s03", "location")?.provider, "manual", "FRAMEBOARD_AGENT_PROVIDER не задан — manual");

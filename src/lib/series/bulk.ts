@@ -173,12 +173,14 @@ function startNextStage(result: BulkResult, episodeId: string, shotId: string, o
   else tryStart(result, episodeId, shotId, stageId, options);
 }
 
-/** Кнопка над столбцом «Кадр»: каждому кадру — агент на его следующий этап. */
-export function runNextStageForAllShots(episodeId: string, options: BulkOptions = {}): BulkResult {
+/**
+ * Кнопка над столбцом «Кадр»: агент из меню — кадрам без агента. Ничего не запускает: этап
+ * начинается только по «Отправить агенту», «▶ Все кадры» или «Запустить следующий этап» в меню кадра.
+ */
+export function assignShotAgents(episodeId: string, options: BulkOptions = {}): BulkResult {
   const result: BulkResult = { started: [], skipped: [], assigned: [] };
-  const shotIds = listShotIds(episodeId);
-  assignAgents(result, episodeId, shotIds, options);
-  for (const shotId of shotIds) startNextStage(result, episodeId, shotId, options);
+  if (!options.provider) throw new Error("Выберите агента");
+  assignAgents(result, episodeId, listShotIds(episodeId), options);
   return result;
 }
 

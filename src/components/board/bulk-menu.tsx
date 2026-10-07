@@ -19,19 +19,19 @@ export interface BulkResult {
 }
 
 /**
- * next — над столбцом «Кадр»: каждому кадру его агент на следующий этап.
+ * assign — над столбцом «Кадр»: назначить агента кадрам без агента, ничего не запуская.
  * stage — над столбцом этапа: этот этап на всех кадрах, каждый кадр своим агентом.
  */
-export type BulkTarget = { kind: "next" } | { kind: "stage"; stageId: StageId };
+export type BulkTarget = { kind: "assign" } | { kind: "stage"; stageId: StageId };
 
 function title(target: BulkTarget): string {
-  if (target.kind === "next") return "Агенты по всем кадрам";
+  if (target.kind === "assign") return "Агенты по кадрам";
   return `${STAGE_LABELS[target.stageId]}: все кадры`;
 }
 
 function description(target: BulkTarget): string {
-  if (target.kind === "next") {
-    return "Каждому кадру — его агент на следующий этап. Кадры, где агент уже работает или этап уже пройден, не трогаются.";
+  if (target.kind === "assign") {
+    return "Назначает агента кадрам без агента. Ничего не запускает: этап начнётся, только когда вы нажмёте «Отправить агенту», «▶ Все кадры» над этапом или «Запустить следующий этап» в меню кадра.";
   }
   if (target.stageId === "characters") {
     return "На каждом кадре агент кадра сам делает персонажей в ComfyUI. Нужен Claude Code или агент в чате.";
@@ -41,7 +41,7 @@ function description(target: BulkTarget): string {
 
 function endpoint(episodeId: string, target: BulkTarget): string {
   const episode = `/api/episodes/${encodeURIComponent(episodeId)}`;
-  if (target.kind === "next") return `${episode}/next-stage`;
+  if (target.kind === "assign") return `${episode}/assign-agents`;
   return `${episode}/stages/${encodeURIComponent(target.stageId)}/run-all`;
 }
 
@@ -136,7 +136,7 @@ export function BulkMenu({
         aria-expanded={open}
         className="rounded-md border border-teal-800/30 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
       >
-        {target.kind === "next" ? "▶ Агенты по кадрам" : "▶ Все кадры"}
+        {target.kind === "assign" ? "▶ Агенты по кадрам" : "▶ Все кадры"}
       </button>
       {anchor ? (
         <div
@@ -158,7 +158,7 @@ export function BulkMenu({
                   : `Для ${withoutAgent} кадров без агента (станет их агентом):`}
               </p>
               <ProviderSelect
-                id={`bulk-provider-${target.kind === "stage" ? target.stageId : "next"}`}
+                id={`bulk-provider-${target.kind === "stage" ? target.stageId : "assign"}`}
                 providers={agent.providers}
                 selected={agent.selected}
                 mode={mode}
@@ -187,10 +187,16 @@ export function BulkMenu({
             <button
               type="button"
               onClick={run}
-              disabled={busy}
+              disabled={busy || (target.kind === "assign" && (!askAgent || !agent.selected))}
               className="h-8 flex-1 rounded-lg bg-teal-800 px-3 text-sm font-medium text-white hover:bg-teal-900 disabled:opacity-60"
             >
-              {busy ? "Запуск…" : `Запустить на ${shotCount} кадрах`}
+              {target.kind === "assign"
+                ? busy
+                  ? "Назначение…"
+                  : `Назначить ${withoutAgent} кадрам`
+                : busy
+                  ? "Запуск…"
+                  : `Запустить на ${shotCount} кадрах`}
             </button>
             <button
               type="button"
@@ -201,7 +207,15 @@ export function BulkMenu({
             </button>
           </div>
           {error ? <p className="text-red-800">{error}</p> : null}
-          {result ? <BulkResultView result={result} withStage={target.kind !== "stage"} /> : null}
+          {result && target.kind === "assign" ? (
+            <p>
+              {result.assigned.length
+                ? `Агент назначен: ${result.assigned.join(", ")}. Ничего не запущено.`
+                : "Назначать некому: у всех кадров свой агент."}
+            </p>
+          ) : result ? (
+            <BulkResultView result={result} withStage={false} />
+          ) : null}
         </div>
       ) : null}
     </div>

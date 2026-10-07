@@ -219,7 +219,7 @@ export function SeriesBoard({
           <>
             {/* Телефон: кадр — карточка, этапы списком. Кнопки «для всех кадров» — строкой сверху. */}
             <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
-              <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
+              <BulkMenu episodeId={episodeId} target={{ kind: "assign" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
               {STAGES.map((stageId) => (
                 <div key={stageId} className="flex items-center gap-1 text-[11px] text-stone-500">
                   <span>{STAGE_LABELS[stageId]}</span>
@@ -256,7 +256,7 @@ export function SeriesBoard({
                   <tr>
                     <th className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                       Кадр
-                      <BulkMenu episodeId={episodeId} target={{ kind: "next" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
+                      <BulkMenu episodeId={episodeId} target={{ kind: "assign" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
                     </th>
                     {STAGES.map((stageId) => (
                       <th

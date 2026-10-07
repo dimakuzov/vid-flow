@@ -19,7 +19,7 @@ import { liveRunCount } from "../agent/runner";
 import { overrideAgentProvider } from "../agent/providers";
 import { reconcileAllStages } from "./agent-dispatch";
 import { readAgentRequest } from "./agent-request";
-import { nextStage, runNextStageForAllShots, runNextStageForShot, runStageForAllShots } from "./bulk";
+import { assignShotAgents, nextStage, runNextStageForShot, runStageForAllShots } from "./bulk";
 import { createEpisode, ensureStageDirs, shotDir, stageDir } from "./paths";
 import { readShotMeta } from "./shot-meta";
 import { readStageState } from "./stage-state";
@@ -118,11 +118,11 @@ test("пройденное не переделывается: результат
   assert.ok(redo.started.some((item) => item.shotId === "s03"), "redo трогает и утверждённое");
 });
 
-test("кнопка на кадре: только этот кадр; кнопка сверху его потом не перезапускает", () => {
+test("кнопка на кадре: только этот кадр, второй раз — этап занят", () => {
   const one = runNextStageForShot(EP, "s04", { provider: "manual" });
   assert.deepEqual(one.started, [{ shotId: "s04", stageId: "characters" }]);
-  const all = runNextStageForAllShots(EP, { provider: "manual" });
-  assert.match(all.skipped.find((item) => item.shotId === "s04")?.reason ?? "", /этап занят/);
+  const again = runNextStageForShot(EP, "s04", { provider: "manual" });
+  assert.match(again.skipped[0]?.reason ?? "", /этап занят/);
   // Освобождаем s04 для следующего теста.
   fs.rmSync(path.join(stageDir(EP, "s04", "characters"), "stage_state.json"), { force: true });
   fs.rmSync(path.join(stageDir(EP, "s01", "characters"), "stage_state.json"), { force: true });
@@ -130,15 +130,21 @@ test("кнопка на кадре: только этот кадр; кнопка
   for (const shotId of ["s01", "s02", "s03", "s04"]) fs.rmSync(path.join(shotDir(EP, shotId), "agent.json"), { force: true });
 });
 
-test("агенты по кадрам: следующий этап каждого кадра, очередь из одного места", async () => {
-  const result = runNextStageForAllShots(EP, { provider: "claude" });
+test("«Агенты по кадрам» только назначают: ни одного запроса агенту", () => {
+  const result = assignShotAgents(EP, { provider: "claude" });
+  assert.deepEqual(result.assigned, ["s01", "s02", "s03", "s04"]);
+  assert.deepEqual(result.started, []);
+  assert.equal(readAgentRequest(EP, "s01", "characters"), null, "s01 ничего не получил");
+  assert.equal(readStageState(EP, "s01", "characters").phase, "idle");
+  assert.throws(() => assignShotAgents(EP), /Выберите агента/);
+});
+
+test("следующий этап по кадрам их агентом, очередь из одного места", async () => {
+  const result = { started: [...runNextStageForShot(EP, "s01").started, ...runNextStageForShot(EP, "s04").started] };
   assert.deepEqual(
     result.started.map((item) => `${item.shotId}:${item.stageId}`).sort(),
     ["s01:characters", "s04:characters"],
   );
-  const reasons = Object.fromEntries(result.skipped.map((item) => [item.shotId, item.reason]));
-  assert.match(reasons.s02, /Первый кадр: не хватает/);
-  assert.match(reasons.s03, /этап занят/, "s03 уже отдан агенту прошлыми тестами");
 
   // FRAMEBOARD_AGENT_PARALLEL=1: работает один агент, второй ждёт в pending.
   assert.equal(liveRunCount("claude"), 1);

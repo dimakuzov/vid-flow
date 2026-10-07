@@ -57,7 +57,7 @@
 |---|---|---|
 | `manual` | manual | — |
 | `ollama` | text | `POST {FRAMEBOARD_OLLAMA_URL}/api/chat`, `stream: false`, модель `FRAMEBOARD_OLLAMA_MODEL` |
-| `claude` | text, agent | text: `claude -p --output-format json` (текст на stdin, ответ в `.result`). agent: `claude -p <задача> --output-format stream-json --verbose --allowedTools ...` в корне репо. Подписка пользователя, без API-ключа |
+| `claude` | text, agent | `claudeInvocation` в `providers.ts`. Оба режима стартуют в пустой папке вне репозитория (`%TEMP%/frameboard-claude`: без `CLAUDE.md`, `AGENTS.md`, памяти проекта), с `--strict-mcp-config` (без MCP-серверов) и `--no-session-persistence`. text: `--tools ""` (без инструментов), `--system-prompt` = правила и плейбук этапа, задача на stdin, ответ в `.result` — один запрос, один ответ. agent: `--restricted` (без настроек, файловые инструменты только в `--add-dir`), `--tools`/`--allowedTools Read,Write,Edit,Glob,Grep,Bash`, `--add-dir`: папка кадра, `playbooks/`, `data/comfy_queue/`, `docs/contracts/`, библиотека этапа (`data/characters/` или `data/locations/`); `--append-system-prompt` — рамки «один этап одного кадра». Ошибка — поле `result` ответа. Подписка пользователя, без API-ключа |
 
 Провайдер не умеет нужный режим (например, `ollama` на `characters`) — запрос сразу `error` с понятным текстом; интерфейс такой выбор не предлагает.
 
@@ -86,7 +86,8 @@
 | `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }` — агент кадра и что он делает |
 | `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }` — «Сохранить» в меню агента кадра. Неизвестный провайдер или модель — 400 |
 | `POST /api/episodes/{ep}/shots/{shot}/next-stage` | `{ provider?, model? }` — с provider выбор сначала записывается агентом кадра, затем следующий этап идёт агентом кадра. Ответ `{ started, skipped, assigned }` |
-| `POST /api/episodes/{ep}/next-stage`, `POST /api/episodes/{ep}/stages/{stage}/run-all` | `{ provider?, model? }` (+ `redo?` у run-all) — агент для кадров **без своего агента**, назначается им; кадры с агентом идут своим. Ответ `{ started, skipped, assigned }` |
+| `POST /api/episodes/{ep}/assign-agents` | `{ provider, model? }` — «▶ Агенты по кадрам»: агент кадрам без агента. **Ничего не запускает.** Ответ `{ started: [], skipped: [], assigned }` |
+| `POST /api/episodes/{ep}/stages/{stage}/run-all` | `{ provider?, model?, redo? }` — агент для кадров **без своего агента**, назначается им; кадры с агентом идут своим. Ответ `{ started, skipped, assigned }` |
 | `GET /api/agent/providers` | `AgentProviderInfo[]`: `id`, `label`, `modes`, `available`, `reason`, `isDefault` |
 | `GET /api/agent/runs` | `{ running, queued }` по всем эпизодам — см. «Агенты доски в CLI» |
 | `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }`, `{ episodeId, shotId }` (все этапы кадра), `{ episodeId, format: true }` или `{ all: true }`. Ответ `{ stopped, running, queued }` |
@@ -97,8 +98,8 @@
 
 `shots/{shotId}/agent.json` → `{ provider, model, updatedAt }` (`model: null` — модель провайдера по умолчанию). Пишет **только доска** (`writeShotAgent` в `src/lib/series/shot-agent.ts`; провайдер и модель проверяются как в запросе). Агент файл не трогает.
 
-- Все запуски кадра — «▶ Агент» на кадре, «▶ Агенты по кадрам», «▶ Все кадры» — идут агентом кадра. У кадра без агента — агент, выбранный в меню; он назначается кадру. Выбора нет — `FRAMEBOARD_AGENT_PROVIDER` (иначе manual), без назначения.
-- «Агенты по кадрам» и «Все кадры» назначают выбор **всем кадрам без агента** (и тем, что будут пропущены), кадры с агентом не меняют. Меню спрашивает агента, только если такие кадры есть.
+- Сам агент ничего не начинает. Этап запускают только три команды пользователя: «Отправить агенту» на странице этапа, «▶ Все кадры» над этапом, «Запустить следующий этап» в меню «▶ Агент» на кадре. Все они идут агентом кадра. У кадра без агента — агент, выбранный в меню; он назначается кадру. Выбора нет — `FRAMEBOARD_AGENT_PROVIDER` (иначе manual), без назначения.
+- «▶ Агенты по кадрам» только назначает выбор кадрам без агента и ничего не запускает. «▶ Все кадры» назначает выбор **всем кадрам без агента** (и тем, что будут пропущены), кадры с агентом не меняет. Меню спрашивает агента, только если такие кадры есть.
 - Страница этапа: «Отправить агенту» по умолчанию берёт агента кадра; другой выбор уходит на один запуск, с галкой «запомнить» — становится агентом кадра. У кадра без агента галка включена.
 - `agent_request.json` хранит, кем фактически выполнен запуск (`provider`, `model`).
 - `ShotSummary.agent` — `{ provider, model } | null`; `ShotSummary.agentActivity` — `{ stageId, status: running | queued, since, provider } | null`: работающий запрос этапов кадра, иначе ждущий (`pending`, этап в фазе `agent` с этим запросом, включая manual — «ждёт агента в чате»).
