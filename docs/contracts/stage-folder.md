@@ -6,8 +6,8 @@
 
 | Файл | Что это | Пишет | Агент |
 |---|---|---|---|
-| `refs/` | входные картинки этапа | пользователь, агент (если пересобирает референсы) | да, по правилам запроса |
-| `output/` | результаты | очередь Comfy, агент (characters), загрузка | только добавлять |
+| `refs/` | входные картинки этапа | пользователь (загрузка, удаление кнопкой), агент (если пересобирает референсы) | да, по правилам запроса; не удалять |
+| `output/` | результаты | очередь Comfy, агент (characters), загрузка; удаляет только пользователь кнопкой | только добавлять |
 | `approve/` | выбранный результат | кнопка approve, агент (characters) | только по плейбуку |
 | `prompt.md` | **ровно текст, который уходит в модель**, на языке модели. Новые кадры получают пустой файл | пользователь, агент (или доска в text-режиме агента) | да |
 | `run_settings.json` | выбор воркфлоу этапа `{ "workflow": "<id манифеста>" }` (`docs/contracts/graph-binding.md`) | доска (PATCH этапа, поле `runWorkflow`) | нет |
@@ -20,6 +20,27 @@
 | `agent_baseline.json`, `agent_touch.json` | снимок refs для сравнения | агент / доска | да |
 | `prompt_history.json` | прошлые версии `prompt.md` | доска | нет |
 | `run_log.md` | журнал прогонов агента | агент | дописывать |
+
+## Удаление файлов
+
+Корзина на карточке файла в `output/` и `refs/` удаляет файл с диска насовсем (`fs.unlinkSync`, не в корзину Windows), после вопроса «Удалить файл … навсегда?». Это и есть подтверждение пользователя; агент сам из этих папок не удаляет.
+
+- Только имя файла (`path.basename`, без `..` и `/`), только внутри папки этапа, только существующий файл.
+- `refs/`: после удаления доска пишет `agent_touch.json` с `refsTouchedByUser: true` (как при загрузке) — агент тогда не пересобирает refs.
+- Занятый этап (`agent`, `queued`, `running`): из `output/` удалять можно, из `refs/` нельзя (граф или агент могут их читать) — ошибка «Этап занят…».
+- `output/` опустел, а `status.json` был `review` — доска пишет `prep`.
+- `approve/` — не здесь: «Убрать» (`DELETE .../approve`).
+
+## Входы этапа (`StageDetail.inputs`)
+
+`stageInputs(ep, shot, stage)` в `src/lib/series/stage-inputs.ts` — что граф возьмёт по умолчанию. Только чтение. На странице этапа — блок «Что уйдёт в граф» над «Референсы».
+
+`StageInput = { label, source, fromRefs, files: MediaFile[] }`.
+
+- Этап с манифестами: входы `image`/`video` выбранного воркфлоу (`run_settings.json`, иначе по умолчанию). Для каждого — первый непустой источник, как при запуске (`resolveImageInput`). `source`: «approve этапа Локация», «refs/ этого этапа», «библиотека data/locations/cafe/». Все источники пусты — `files: []`, `source: "пусто: …"`.
+- `characters` (манифестов нет): по персонажу кадра — `full_body.png`, `portrait.png`, `side.png` из `data/characters/{name}/` (имя папки без учёта регистра), плюс «Образцы одежды» из `refs/`.
+- `fromRefs: true` — файлы из `refs/` этого этапа: только их можно удалить из этого блока.
+- Файлы библиотек отдаются через `/api/media/{characters,locations}/...`.
 
 ## Статус клетки
 
@@ -84,7 +105,7 @@
 | `shot-meta.ts` | `readShotMeta(ep, shot)`, `writeShotMeta(ep, meta)` |
 | `shot-watch.ts` | `readShotWatch(ep, shot)`, `setShotWatchStopped(ep, shot, stopped)` |
 | `prompt-history.ts` | `syncPromptHistory(ep, shot, stage)`, `restorePromptVersion(ep, shot, stage, id)` |
-| `mutations.ts` | `saveUpload({episodeId,...})`, `approveFiles({episodeId,...})`, `updateStageDocs({episodeId,...})`, `removeApprovedFile(ep, shot, stage, name)`, `listApprove(ep, shot, stage)`, `deleteShot(ep, shot)` |
+| `mutations.ts` | `saveUpload({episodeId,...})`, `approveFiles({episodeId,...})`, `updateStageDocs({episodeId,...})`, `removeApprovedFile(ep, shot, stage, name)`, `deleteStageFile(ep, shot, stage, folder, name)`, `listApprove(ep, shot, stage)`, `deleteShot(ep, shot)` |
 | `scanner.ts` | `scanSeries(ep?)` (без аргумента — открытый эпизод), `getStageDetail(ep, shot, stage)` |
 | `bootstrap.ts` | `applyBootstrap({episodeId,...})` (обязателен), `readScenarioText(ep)`, `readRawScenarioText(ep)` |
 | `agent-request.ts` | `submitAgentRequest({episodeId,...})`, `readAgentRequest`, `readAgentRequestSummary`, `readAgentDispatch`, `writeAgentDispatch`, `stageBoardQueues`, `cancelAgentRequest` — `(ep, shot, stage)`; `rebuildAgentInbox(ep)`. В `agent_request.json` есть поле `episodeId` |
@@ -108,6 +129,7 @@
 | `GET, PATCH /api/episodes/{ep}/shots/{shot}/stages/{stage}` | этап: чтение, сохранение документов | `getStageDetail`, `updateStageDocs` |
 | `POST .../stages/{stage}/upload` | загрузка в `refs/` или `output/` | `saveUpload` |
 | `POST, DELETE .../stages/{stage}/approve` | утвердить / убрать из `approve/` | `approveFiles`, `removeApprovedFile` |
+| `DELETE .../stages/{stage}/files` `{folder: "output" \| "refs", filename}` | удалить файл насовсем, ответ — `StageDetail` | `deleteStageFile` |
 | `POST .../stages/{stage}/prompt-history` | вернуть версию промпта | `restorePromptVersion` |
 | `POST .../stages/{stage}/agent-request` | отправить агенту | `submitAgentRequest` |
 | `POST .../stages/{stage}/run` | поставить прогон в очередь | `queueStageRun` |

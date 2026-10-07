@@ -41,12 +41,15 @@ export function RefFiles({
   usedNames,
   onSelect,
   onOpen,
+  onDelete,
 }: {
   files: MediaFile[];
   selectedName: string | null;
   usedNames: string[];
   onSelect: (name: string) => void;
   onOpen: (file: MediaFile) => void;
+  /** Нет — этап занят, удалять refs/ нельзя. */
+  onDelete?: (name: string) => void;
 }) {
   const selected = files.find((file) => file.name === selectedName) ?? null;
   const used = new Set(usedNames);
@@ -72,6 +75,7 @@ export function RefFiles({
             selected={file.name === selectedName}
             onSelect={() => onSelect(file.name)}
             onOpen={() => onOpen(file)}
+            onDelete={onDelete ? () => onDelete(file.name) : undefined}
             caption={`${refRole(file.name)}${used.has(file.name) ? " · использован" : ""}`}
           />
         ))}

@@ -1,7 +1,22 @@
 "use client";
 
+import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
 import type { MediaFile } from "@/lib/series/types";
+
+function DeleteButton({ name, onDelete }: { name: string; onDelete: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onDelete}
+      className="shrink-0 rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-700"
+      aria-label={`Удалить ${name} навсегда`}
+      title="Удалить файл навсегда"
+    >
+      <Trash2Icon className="size-3.5" />
+    </button>
+  );
+}
 
 export function MediaCard({
   file,
@@ -11,6 +26,8 @@ export function MediaCard({
   onRemove,
   caption,
   onApprove,
+  onDelete,
+  compact,
 }: {
   file: MediaFile;
   selected?: boolean;
@@ -19,6 +36,10 @@ export function MediaCard({
   onRemove?: () => void;
   caption?: string;
   onApprove?: () => void;
+  /** Корзина: удалить файл с диска. Подтверждение спрашивает вызывающий. */
+  onDelete?: () => void;
+  /** Миниатюра: картинка ниже, для списка входов. */
+  compact?: boolean;
 }) {
   return (
     <div
@@ -39,7 +60,7 @@ export function MediaCard({
             width={640}
             height={960}
             unoptimized
-            className="max-h-96 w-full rounded-lg bg-stone-100 object-contain"
+            className={`${compact ? "max-h-40" : "max-h-96"} w-full rounded-lg bg-stone-100 object-contain`}
           />
         </button>
       ) : file.kind === "video" ? (
@@ -55,15 +76,18 @@ export function MediaCard({
         </div>
       )}
       {onSelect ? (
-        <button
-          type="button"
-          onClick={onSelect}
-          className="mt-2 w-full truncate text-left text-xs text-stone-600"
-        >
-          {selected ? "Выбрано · " : ""}
-          {caption ? `${caption} · ` : ""}
-          {file.name}
-        </button>
+        <div className="mt-2 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onSelect}
+            className="min-w-0 flex-1 truncate text-left text-xs text-stone-600"
+          >
+            {selected ? "Выбрано · " : ""}
+            {caption ? `${caption} · ` : ""}
+            {file.name}
+          </button>
+          {onDelete ? <DeleteButton name={file.name} onDelete={onDelete} /> : null}
+        </div>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-600">
           <span className="truncate">
@@ -75,6 +99,7 @@ export function MediaCard({
               Убрать
             </button>
           ) : null}
+          {onDelete ? <DeleteButton name={file.name} onDelete={onDelete} /> : null}
         </div>
       )}
       {onApprove ? (

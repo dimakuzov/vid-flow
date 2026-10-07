@@ -11,6 +11,7 @@ export function OutputPanel({
   onOpen,
   onApprove,
   onRemoveApproved,
+  onDelete,
 }: {
   detail: StageDetail;
   disabled: boolean;
@@ -19,6 +20,8 @@ export function OutputPanel({
   onOpen: (files: MediaFile[], file: MediaFile) => void;
   onApprove: (names: string[]) => void;
   onRemoveApproved: (name: string) => void;
+  /** Удалить файл из output/ насовсем. Разрешено и у занятого этапа. */
+  onDelete: (name: string) => void;
 }) {
   return (
     <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
@@ -56,6 +59,7 @@ export function OutputPanel({
                 onSelect={() => onToggle(file.name)}
                 onOpen={() => onOpen(detail.output, file)}
                 onApprove={disabled ? undefined : () => onApprove([file.name])}
+                onDelete={disabled ? undefined : () => onDelete(file.name)}
               />
             ))
           ) : (

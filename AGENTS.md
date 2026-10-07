@@ -51,7 +51,7 @@ If the inbox item is `characters`, the paperwork above is not the result. Run Co
 ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The pass is an outfit edit with `character_outfit_qwen21.json`: image 1 is the character, image 2 is the garment reference. Set `"status": "done"` in `agent_request.json` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message. Do not write `status.json`.
 
 ## Do not
-- Delete `output/` or `approve/` without explicit user confirmation
+- Delete `output/` or `approve/` without explicit user confirmation. The trash button on a board file card (`output/`, `refs/`) is that confirmation and the board deletes the file itself; an agent still never deletes from these folders on its own
 - Put playbooks inside a series folder; they are global
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 

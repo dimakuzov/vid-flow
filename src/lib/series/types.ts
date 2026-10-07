@@ -15,6 +15,18 @@ export interface MediaFile {
   url: string;
 }
 
+/** Картинки или видео, которые этап возьмёт на вход. Только для показа. */
+export interface StageInput {
+  /** Что это за вход: «Утверждённая локация». */
+  label: string;
+  /** Откуда файлы: «approve этапа Локация», «refs/ этого этапа», «библиотека data/locations/cafe/». */
+  source: string;
+  /** true — файлы из refs/ этого этапа (их можно удалить на странице). */
+  fromRefs: boolean;
+  /** Пусто — источник пока пустой, граф этот вход не получит. */
+  files: MediaFile[];
+}
+
 export interface StageSummary {
   id: StageId;
   status: StageStatus;
@@ -86,6 +98,8 @@ export interface StageDetail {
   refs: MediaFile[];
   output: MediaFile[];
   approve: MediaFile[];
+  /** Что уйдёт в граф по умолчанию, включая approve других этапов и библиотеки. */
+  inputs: StageInput[];
   playbooks: string[];
   relativeDir: string;
   state: StageState;

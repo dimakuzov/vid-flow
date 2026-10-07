@@ -75,6 +75,14 @@ function uniqueTarget(dir: string, filename: string): string {
   return candidate;
 }
 
+/** Пользователь сам менял refs/: агент их не пересобирает (agent_touch.json). */
+function markRefsTouched(episodeId: string, shotId: string, stageId: StageId): void {
+  fs.writeFileSync(
+    path.join(stageDir(episodeId, shotId, stageId), "agent_touch.json"),
+    JSON.stringify({ refsTouchedByUser: true, touchedAt: new Date().toISOString() }, null, 2) + "\n",
+  );
+}
+
 export async function saveUpload(options: {
   episodeId: string;
   shotId: string;
@@ -92,16 +100,7 @@ export async function saveUpload(options: {
   const savedAs = uniqueTarget(dir, path.basename(options.filename));
   fs.writeFileSync(path.join(dir, savedAs), options.bytes);
 
-  if (options.target === "refs") {
-    fs.writeFileSync(
-      path.join(stageDir(episodeId, shotId, options.stageId), "agent_touch.json"),
-      JSON.stringify(
-        { refsTouchedByUser: true, touchedAt: new Date().toISOString() },
-        null,
-        2,
-      ) + "\n",
-    );
-  }
+  if (options.target === "refs") markRefsTouched(episodeId, shotId, options.stageId);
 
   if (options.approveAfter) {
     const approvedAs = approveFiles({
@@ -227,6 +226,47 @@ export function removeApprovedFile(
       : remaining.length > 0;
   if (!stillApproved && readStatusFile(episodeId, safeShot, stageId).status === "approved") {
     writeStatusFile(episodeId, safeShot, stageId, { status: output.length ? "review" : "prep" });
+  }
+  return safeName;
+}
+
+/**
+ * Удалить файл из output/ или refs/ этапа насовсем (без корзины). Кнопка на доске —
+ * это и есть подтверждение пользователя. approve/ — через removeApprovedFile.
+ */
+export function deleteStageFile(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  folder: "output" | "refs",
+  filename: string,
+): string {
+  const safeShot = assertSafeSegment(shotId, "shot");
+  if (folder !== "output" && folder !== "refs") throw new Error("Удалять можно только из output/ и refs/");
+  const safeName = path.basename(filename);
+  if (!safeName || safeName !== filename || safeName === "." || safeName === "..") {
+    throw new Error("Некорректное имя файла");
+  }
+  if (folder === "refs" && readStageState(episodeId, safeShot, stageId).busy) {
+    throw new Error(
+      "Этап занят: граф или агент сейчас читает refs/. Удалить референс можно после прогона или «Отменить».",
+    );
+  }
+  const dir = path.join(stageDir(episodeId, safeShot, stageId), folder);
+  const target = path.join(dir, safeName);
+  if (!target.startsWith(dir + path.sep)) throw new Error("Некорректное имя файла");
+  if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    throw new Error(`Файл не найден в ${folder}/: ${safeName}`);
+  }
+  fs.unlinkSync(target);
+
+  if (folder === "refs") {
+    markRefsTouched(episodeId, safeShot, stageId);
+  } else if (
+    !listMediaFiles(dir).length &&
+    readStatusFile(episodeId, safeShot, stageId).status === "review"
+  ) {
+    writeStatusFile(episodeId, safeShot, stageId, { status: "prep" });
   }
   return safeName;
 }

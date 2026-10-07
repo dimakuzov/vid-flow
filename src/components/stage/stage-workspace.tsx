@@ -13,6 +13,7 @@ import { ImageLightbox } from "./image-lightbox";
 import { OutputPanel } from "./output-panel";
 import { PromptHistory } from "./prompt-history";
 import { RefFiles, usedRefNames } from "./ref-files";
+import { StageInputs } from "./stage-inputs";
 import { StageStatusBar } from "./stage-status-bar";
 import { useStageDetail, type DocField } from "./use-stage-detail";
 import { SuggestedWorkflow, WorkflowMenu } from "./workflow-menu";
@@ -174,6 +175,23 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       else await stage.reload();
       return `${filename} убран из approve`;
     });
+
+  /** Удалить файл с диска насовсем, после подтверждения. Ответ маршрута — StageDetail. */
+  const deleteFile = (folder: "output" | "refs", filename: string) => {
+    if (!window.confirm(`Удалить файл ${filename} навсегда?`)) return;
+    void act(async () => {
+      const data = await requestJson<StageDetail>(`${stageApi}/files`, {
+        method: "DELETE",
+        body: { folder, filename },
+        fallbackError: "Не удалось удалить файл",
+      });
+      stage.merge(data);
+      if (folder === "output") setSelectedOutput((prev) => prev.filter((item) => item !== filename));
+      else setSelectedRef((current) => (current === filename ? null : current));
+      return `${filename} удалён из ${folder}/`;
+    });
+  };
+  const deleteRef = stageBusy ? undefined : (name: string) => deleteFile("refs", name);
 
   const approveSelected = (names = selectedOutput) => {
     if (!names.length) {
@@ -347,6 +365,12 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 </pre>
               </details>
             ) : null}
+            <StageInputs
+              inputs={detail.inputs}
+              boardRuns={canRun}
+              onOpen={(files, file) => openImage(files, file, false)}
+              onDeleteRef={busy ? undefined : deleteRef}
+            />
             <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
             <RefFiles
               files={detail.refs}
@@ -354,6 +378,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               usedNames={usedRefNames(detail.refs, detail.output, selectedOutput, shotId)}
               onSelect={(name) => setSelectedRef((current) => (current === name ? null : name))}
               onOpen={(file) => openImage(detail.refs, file, false)}
+              onDelete={busy ? undefined : deleteRef}
             />
             <details className="text-xs text-stone-500">
               <summary className="cursor-pointer">Заметка refs.md</summary>
@@ -361,10 +386,12 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 {docField("refs", { className: "min-h-24 font-mono text-xs" })}
               </div>
             </details>
-            <DocFieldLabel htmlFor="doc-workflow" optional note="заметка на этот кадр">
-              Workflow.md
-            </DocFieldLabel>
-            {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
+            <details className="text-xs text-stone-500">
+              <summary className="cursor-pointer">Заметка workflow.md (на этот кадр)</summary>
+              <div className="mt-2">
+                {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
+              </div>
+            </details>
             {stage.dirty ? (
               <Button variant="outline" disabled={busy} onClick={() => act(async () => {
                 await saveDocs();
@@ -413,6 +440,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           onOpen={(files, file) => openImage(files, file, true)}
           onApprove={approveSelected}
           onRemoveApproved={removeApproved}
+          onDelete={(name) => deleteFile("output", name)}
         />
       </div>
       {viewer ? (

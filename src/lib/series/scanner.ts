@@ -28,6 +28,7 @@ import {
 import { readAgentRequestSummary } from "./agent-request";
 import { listWorkflowChoices } from "../comfy/workflows";
 import { readRunSettings } from "./run-settings";
+import { stageInputs } from "./stage-inputs";
 import { readJobSummary, readStageState } from "./stage-state";
 import type { SeriesChoice, SeriesSummary, ShotSummary, StageDetail, StageSummary } from "./types";
 
@@ -249,6 +250,7 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     refs: listMediaFiles(path.join(dir, "refs")),
     output: listMediaFiles(path.join(dir, "output")),
     approve: listMediaFiles(path.join(dir, "approve")),
+    inputs: stageInputs(episodeId, shotId, stageId),
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
     state,
