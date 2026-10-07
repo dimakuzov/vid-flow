@@ -15,8 +15,33 @@ import type { MediaFile, StageInput } from "./types";
  * на другом этапе или лежит в общей библиотеке. Только чтение.
  */
 
-/** База персонажа в data/characters/{name}/, по порядку показа. */
-const CHARACTER_BASE = ["full_body.png", "portrait.png", "side.png"];
+/**
+ * База персонажа в data/characters/{name}/, по порядку показа: каноническое имя и старые имена
+ * из исходных заметок (`body.png`, `portret.png`, `portret_side.png`).
+ */
+const CHARACTER_BASE = [
+  ["full_body.png", "body.png"],
+  ["portrait.png", "portret.png"],
+  ["side.png", "portret_side.png"],
+];
+const IMAGE = /\.(png|jpe?g|webp)$/i;
+
+/** Картинки базы: канонические или старые имена; нет ни одного — любые картинки папки, кроме копий. */
+function characterBaseFiles(folder: string): string[] {
+  const named = CHARACTER_BASE.map((names) => names.map((name) => path.join(folder, name)).find((file) => fs.existsSync(file)))
+    .filter((file): file is string => Boolean(file));
+  if (named.length) return named;
+  try {
+    return fs
+      .readdirSync(folder)
+      .filter((name) => IMAGE.test(name) && !/copy/i.test(name))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+      .map((name) => path.join(folder, name))
+      .filter((file) => fs.statSync(file).isFile());
+  } catch {
+    return [];
+  }
+}
 
 function mediaFileAt(absolute: string): MediaFile | null {
   const relativePath = mediaUrlPath(absolute);
@@ -105,8 +130,7 @@ function characterInputs(ctx: ShotContext): StageInput[] {
   const inputs: StageInput[] = readShotMeta(episodeId, shotId).characters.map((name) => {
     const folder = libraryFolder(getCharactersRoot(), name);
     const files = folder
-      ? CHARACTER_BASE.map((file) => path.join(folder, file))
-          .filter((file) => fs.existsSync(file))
+      ? characterBaseFiles(folder)
           .map(mediaFileAt)
           .filter((file): file is MediaFile => file !== null)
       : [];

@@ -134,6 +134,16 @@ test("входы персонажей: база из библиотеки и о�
   assert.equal(base?.source, "библиотека data/characters/Katya/");
   assert.match(base!.files[0].url, /^\/api\/media\/characters\/Katya\/full_body\.png/);
 
+  // Старые имена из исходных заметок, как у Лены: body.png, portret.png, portret_side.png; копии не берутся.
+  const lena = path.join(getCharactersRoot(), "Lena");
+  fs.mkdirSync(lena, { recursive: true });
+  for (const name of ["body.png", "portret.png", "portret_side.png", "portret - Copy.png"]) {
+    fs.writeFileSync(path.join(lena, name), PNG);
+  }
+  fs.writeFileSync(path.join(shotDir("e01", "s01"), "shot.md"), "# Кафе\n\n- characters: katya, lena, mark\n- location: cafe\n");
+  const withLena = stageInputs("e01", "s01", "characters").find((input) => input.label === "Персонаж lena");
+  assert.deepEqual(withLena?.files.map((file) => file.name), ["body.png", "portret.png", "portret_side.png"]);
+
   const mark = inputs.find((input) => input.label === "Персонаж mark");
   assert.equal(mark?.files.length, 0);
   assert.match(mark!.source, /^пусто: нет папки data\/characters\/mark\//);
