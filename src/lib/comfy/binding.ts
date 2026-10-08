@@ -17,7 +17,7 @@ import type {
 } from "../contracts/graph-binding";
 import { STAGES, type StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
-import { getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
+import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
 import { readRunSettings } from "../series/run-settings";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech, speechPhrases } from "../series/speech";
@@ -90,8 +90,20 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       if (!sources.length) fail(`вход ${name}: пустой from`);
       for (const source of sources) {
         const stage = source.startsWith("approve:") ? source.slice("approve:".length) : null;
-        const known = source === "refs" || source === "library:location" || (stage && STAGES.includes(stage as StageId));
+        const known =
+          source === "refs" ||
+          source === "library:location" ||
+          source === "library:faces" ||
+          (stage && STAGES.includes(stage as StageId));
         if (!known) fail(`вход ${name}: неизвестный источник ${source}`);
+      }
+      if (input.whenPrompt !== undefined) {
+        try {
+          new RegExp(input.whenPrompt, "i");
+        } catch {
+          fail(`вход ${name}: whenPrompt не регэксп`);
+        }
+        if (imageMin(input) > 0) fail(`вход ${name}: вход с whenPrompt должен быть необязательным (min: 0)`);
       }
       if (!["first", "newest", "all"].includes(input.pick)) fail(`вход ${name}: pick ${input.pick}`);
     } else if (input.kind === "text") {
@@ -278,12 +290,73 @@ function libraryLocation(locationId: string): string[] {
   return listFiles(folder).filter((file) => !/copy/i.test(path.basename(file)));
 }
 
+function findImage(folder: string, stems: string[]): string | null {
+  let names: string[];
+  try {
+    names = fs.readdirSync(folder);
+  } catch {
+    return null;
+  }
+  for (const stem of stems) {
+    const found = names.find(
+      (name) => IMAGE_EXT.has(path.extname(name).toLowerCase()) && path.parse(name).name.toLowerCase() === stem,
+    );
+    if (found) return path.join(folder, found);
+  }
+  return null;
+}
+
+/**
+ * Лицо персонажа в библиотеке: `face`, `portrait`, `portret` (так названы старые файлы), в том
+ * числе с именем персонажа (`Julia_portret.png`, `portret_ivan.png`). Иначе — первая картинка
+ * с face/portr в имени, кроме профиля и копий.
+ */
+export function libraryFace(name: string): string | null {
+  const root = getCharactersRoot();
+  let folderName: string | undefined;
+  try {
+    folderName = fs.readdirSync(root).find((item) => item.toLowerCase() === name.toLowerCase());
+  } catch {
+    return null;
+  }
+  if (!folderName) return null;
+  const folder = path.join(root, folderName);
+  const id = name.toLowerCase();
+  const stems = ["face", "portrait", "portret"].flatMap((word) => [word, `${id}_${word}`, `${word}_${id}`]);
+  return (
+    findImage(folder, stems) ??
+    listFiles(folder).find((file) => {
+      const base = path.basename(file);
+      return /face|portr/i.test(base) && !/side|copy/i.test(base);
+    }) ??
+    null
+  );
+}
+
+/** Персонажи кадра в порядке файлов approve/ этапа characters: `julia_s05.png` → julia. */
+function approvedCharacters(ctx: ShotContext): string[] {
+  const suffix = `_${ctx.shotId}`.toLowerCase();
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, "characters"), "approve")).map((file) => {
+    const stem = path.parse(file).name;
+    return stem.toLowerCase().endsWith(suffix) ? stem.slice(0, -suffix.length) : stem;
+  });
+}
+
+/** Лица по одному на персонажа из approve: `refs/{name}_face.*` этого этапа, иначе библиотека. */
+function faceFiles(ctx: ShotContext): string[] {
+  const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
+  return approvedCharacters(ctx)
+    .map((name) => findImage(refs, [`${name.toLowerCase()}_face`]) ?? libraryFace(name))
+    .filter((file): file is string => Boolean(file));
+}
+
 function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["kind"]): string[] {
   const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
   if (source === "library:location") {
     return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
   }
+  if (source === "library:faces") return kind === "image" ? faceFiles(ctx) : [];
   const stage = source.slice("approve:".length) as StageId;
   return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "approve"), exts);
 }
@@ -300,8 +373,16 @@ function pickImages(files: string[], input: ImageInput): string[] {
   return input.max != null ? files.slice(0, input.max) : files;
 }
 
-/** Картинки входа: первый непустой источник, затем pick. */
+/** Вход с whenPrompt включён: prompt.md этапа совпал с регэкспом. */
+export function promptEnablesInput(ctx: ShotContext, input: ImageInput): boolean {
+  if (!input.whenPrompt) return true;
+  const prompt = readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "prompt.md"));
+  return new RegExp(input.whenPrompt, "i").test(prompt);
+}
+
+/** Картинки входа: первый непустой источник, затем pick. Вход с whenPrompt без совпадения — пусто. */
 export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[] {
+  if (!promptEnablesInput(ctx, input)) return [];
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
     const files = sourceFiles(ctx, source, input.kind);
@@ -343,7 +424,17 @@ export function russianLine(text: string, names: string[] = []): string | null {
   return null;
 }
 
+/** Путь или имя файла: модель видит картинки по номерам (image 2), а не по путям. */
+const FILE_REFERENCE =
+  /(?:^|[\s"'(`])(?:data|shots|refs|approve|output|characters|locations)\/|[\w-]+\.(?:png|jpe?g|webp|mp4|webm)\b/i;
+
 export function assertModelText(text: string, where = "prompt.md", names: string[] = []): void {
+  const file = text.match(FILE_REFERENCE);
+  if (file) {
+    throw new Error(
+      `${where} ссылается на файл («${file[0].trim()}»). Модель не читает пути: называй картинки по номерам — image 1, image 2.`,
+    );
+  }
   if (BOARD_INSTRUCTION.test(text)) {
     throw new Error(
       `${where} содержит инструкцию для агента, а не текст для модели: перепиши его или отправь агенту.`,

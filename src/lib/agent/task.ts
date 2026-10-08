@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import type { AgentMode, AgentRequestFile, AgentTask } from "../contracts/agent-request";
-import type { WorkflowChoice } from "../contracts/graph-binding";
-import { stageDuration } from "../comfy/binding";
+import type { ImageInput, WorkflowChoice } from "../contracts/graph-binding";
+import { resolveImageInput, stageBindings, stageDuration } from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
@@ -36,6 +36,67 @@ export function selectedWorkflow(episodeId: string, shotId: string, stageId: Sta
     id = resolveWorkflowId(episodeId, shotId, stageId, null);
   }
   return choices.find((choice) => choice.id === id) ?? choices.find((choice) => choice.isDefault) ?? null;
+}
+
+/** Кто на картинке входа: имя персонажа из `julia_s05.png`, лицо — по папке библиотеки или `{name}_face`. */
+function imageSubject(input: ImageInput, file: string, shotId: string): string {
+  const sources = Array.isArray(input.from) ? input.from : [input.from];
+  const stem = path.parse(file).name;
+  if (sources.includes("library:faces")) {
+    const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
+    return `${name.toLowerCase()}'s face`;
+  }
+  if (sources.includes("approve:characters")) {
+    const suffix = `_${shotId}`;
+    return stem.toLowerCase().endsWith(suffix.toLowerCase()) ? stem.slice(0, -suffix.length) : stem;
+  }
+  if (sources.some((source) => source.endsWith(":location") || source === "approve:location")) return "the location";
+  return input.label;
+}
+
+/**
+ * Номера картинок, которые получит граф первого кадра: `image N` в prompt.md. Нода Qwen берёт
+ * подключённые картинки по порядку и сжимает пропуски, поэтому номера идут подряд.
+ * Входы с whenPrompt (лица) — отдельным списком: граф получит их, только если промпт их зовёт.
+ */
+export function renderGraphImages(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  workflowId: string | null | undefined,
+): string {
+  if (stageId !== "first_frame" || !workflowId) return "";
+  const binding = stageBindings(stageId).find((item) => item.id === workflowId)?.binding;
+  if (!binding) return "";
+  const ctx = { episodeId, shotId, stageId };
+  const always: string[] = [];
+  const optional: { line: string; when: string }[] = [];
+  let number = 0;
+  for (const input of Object.values(binding.inputs)) {
+    if (input.kind !== "image" && input.kind !== "video") continue;
+    for (const file of resolveImageInput(ctx, { ...input, whenPrompt: undefined })) {
+      number += 1;
+      const line = `- image ${number}: ${imageSubject(input, file, shotId)} (${path.basename(file)})`;
+      if (input.whenPrompt) optional.push({ line, when: input.whenPrompt });
+      else always.push(line);
+    }
+  }
+  if (!always.length) return "";
+  const parts = [
+    "## Images the graph receives (use these numbers in prompt.md)",
+    "",
+    ...always,
+  ];
+  if (optional.length) {
+    parts.push(
+      "",
+      "Face references, only for a close-up (playbook section «Face for a close-up»). The board attaches them only if prompt.md contains the phrase `face from image N`; without that phrase they are not sent and the numbers above stay as they are:",
+      "",
+      ...optional.map((item) => item.line),
+    );
+  }
+  parts.push("", "Never write file names or paths in prompt.md: the model sees only the image numbers.");
+  return parts.join("\n");
 }
 
 /** Длительность, выбранная в меню этапа для воркфлоу. null — «по умолчанию» или у воркфлоу нет меню. */
@@ -130,6 +191,8 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
       speech || "(none: nobody speaks in this shot)",
     );
   }
+  const images = renderGraphImages(episodeId, shotId, stageId, workflow?.id);
+  if (images) lines.push("", images);
   if (refsNote) lines.push("", "## refs.md", "", refsNote);
   lines.push("", "Write the new prompt.md.");
   return { system, user: lines.join("\n") + "\n" };

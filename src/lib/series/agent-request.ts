@@ -27,7 +27,7 @@ import {
   type AgentDispatch,
 } from "../agent/files";
 import { getAgentProvider } from "../agent/providers";
-import { chosenDurationSec, durationTaskLine } from "../agent/task";
+import { chosenDurationSec, durationTaskLine, renderGraphImages } from "../agent/task";
 import { startAgentRun } from "../agent/runner";
 import { STAGES, type StageId } from "./constants";
 import { readTextIfExists, writeText } from "./media";
@@ -222,6 +222,12 @@ function renderDuration(episodeId: string, shotId: string, stageId: StageId, wor
     : `\n${durationTaskLine(seconds)} Длительность доска ставит сама: \`N sec\` в prompt.md не пиши.\n`;
 }
 
+/** Номера картинок графа первого кадра (`image N`): блок с пустой строкой перед ним, иначе пусто. */
+function renderImages(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
+  const text = renderGraphImages(episodeId, shotId, stageId, workflow);
+  return text ? `\n${text.replace(/^## /, "### ")}\n` : "";
+}
+
 /** Выбор воркфлоу без ошибок: неизвестное имя — вариант по умолчанию. */
 function safeWorkflowId(episodeId: string, shotId: string, stageId: StageId, requested?: string): string | null {
   try {
@@ -304,7 +310,7 @@ ${meta.summary || "(действие кадра не описано)"}
 ${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
-${renderDuration(episodeId, shotId, stageId, selected)}
+${renderDuration(episodeId, shotId, stageId, selected)}${renderImages(episodeId, shotId, stageId, boardQueues ? selected : null)}
 ## Что сделать
 
 ${work}

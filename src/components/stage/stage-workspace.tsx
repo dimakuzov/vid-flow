@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { StatusPill } from "@/components/board/status-pill";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const { detail, fields, docs, stageApi } = stage;
   const { episodeId, shotId, stageId } = detail;
   const shotApi = shotApiPath(episodeId, shotId);
+  const router = useRouter();
 
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,6 +105,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         },
       );
       stage.reset(data.stage);
+      // Запрос ушёл — обратно к таблице, как «← Таблица».
+      router.push(episodePagePath(episodeId));
       return data.message;
     });
 

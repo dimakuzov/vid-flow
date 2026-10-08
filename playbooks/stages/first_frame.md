@@ -15,7 +15,8 @@
 Не из сырых баз. У баз другой ракурс и другая одежда.
 
 - Локация: один файл из `shots/{shotId}/location/approve/`. Это image 1.
-- Персонаж: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Первый — image 2, второй — image 3.
+- Персонаж: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Доска берёт их по алфавиту имени файла: при `julia_s05.png` и `lena_s05.png` Юля — image 2, Лена — image 3. В задаче агенту номера перечислены в «Images the graph receives».
+- Лицо, только для крупного плана: портрет персонажа после персонажей (image 3 для одного человека, image 4 и image 5 для двоих). Доска отправляет его, только если в `prompt.md` есть `face from image N`. Откуда: `refs/{name}_face.png` этого этапа, иначе портрет в `data/characters/{name}/` (`portrait.png`, `portret.png`, `{Name}_portret.png`, `face.png`). Правила: `playbooks/models/qwen_first_frame.md`, «Лицо для крупного плана».
 
 В `refs/` этого этапа кладутся копии этих файлов: `location.png`, `{name}.png`. Ручной approve может обойти проверку upstream, но в граф всё равно идут эти кадры, не `view.png` и не `full_body.png`.
 

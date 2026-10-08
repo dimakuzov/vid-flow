@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { ImageInput, ImageSource } from "../contracts/graph-binding";
-import { resolveImageInput, stageBindings, type ShotContext } from "../comfy/binding";
+import { promptEnablesInput, resolveImageInput, stageBindings, type ShotContext } from "../comfy/binding";
 import { resolveWorkflowId } from "../comfy/workflows";
 import { STAGE_LABELS, type StageId } from "./constants";
 import { listMediaFiles, mediaKind, mediaUrlPath } from "./media";
@@ -82,6 +82,7 @@ function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): st
       : path.join(getLocationsRoot(), readShotMeta(ctx.episodeId, ctx.shotId).location || "?");
     return `библиотека ${dataLabel(folder)}`;
   }
+  if (source === "library:faces") return `лица: refs/{имя}_face или ${dataLabel(getCharactersRoot())}`;
   const stage = source.slice("approve:".length) as StageId;
   return `approve этапа ${STAGE_LABELS[stage] ?? stage}`;
 }
@@ -89,6 +90,16 @@ function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): st
 /** Вход манифеста: первый непустой источник, как при запуске (resolveImageInput). */
 function bindingInput(ctx: ShotContext, input: ImageInput): StageInput {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
+  if (!promptEnablesInput(ctx, input)) {
+    // Вход по фразе в промпте: показываем, что уйдёт, если промпт его позовёт.
+    const files = resolveImageInput(ctx, { ...input, whenPrompt: undefined });
+    return {
+      label: input.label,
+      source: "сейчас не уйдёт: prompt.md этот вход не зовёт",
+      fromRefs: false,
+      files: files.map(mediaFileAt).filter((file): file is MediaFile => file !== null),
+    };
+  }
   for (const source of sources) {
     const files = resolveImageInput(ctx, { ...input, from: source });
     if (files.length) {

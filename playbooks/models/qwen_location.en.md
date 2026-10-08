@@ -6,6 +6,16 @@ Prompts for a shot-specific location. Where files go: `playbooks/stages/location
 
 Write only about what is on `view.png` and in `description.txt`. Do not add details from the shot text that are not on the reference. The location reference wins over the shot text.
 
+## Shot size
+
+The approved location becomes the background of the first frame as it is: the first frame does not move the camera. Frame it for the shot size from the first words of the shot text; the user message wins.
+
+- **Long shot**: the whole space, eye level, the spot for the people free.
+- **Medium shot**: `Move the camera forward` to about two metres from the spot where the people will be. What stands behind them (window, desk, board) at the size it will have behind a person seen from the waist up; the lower part of the frame is free for them.
+- **Close-up**: `Turn the camera to a close-up`: a fragment behind a head (part of a wall, a window, a few desks) is enough.
+
+Name the place for the people: `the empty chair in the center of the frame`, `the window on the right half, the floor in front of it free`.
+
 ## Which prompt
 
 | Task | Prompt |

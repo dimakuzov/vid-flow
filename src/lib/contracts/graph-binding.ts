@@ -8,7 +8,12 @@ export type ImageSource =
   /** approve/ другого этапа этого же кадра */
   | `approve:${StageId}`
   /** data/locations/<shot.location>/ — view.png, иначе первая картинка без «copy» в имени */
-  | "library:location";
+  | "library:location"
+  /**
+   * Лица персонажей: по одному на файл в approve/ этапа characters, в том же порядке.
+   * `refs/{name}_face.*` этого этапа, иначе портрет из data/characters/{name}/.
+   */
+  | "library:faces";
 
 export type ImagePick = "first" | "newest" | "all";
 
@@ -25,6 +30,11 @@ export interface ImageInput {
   max?: number;
   /** Имя файла при загрузке в ComfyUI. Плейсхолдеры: {shotId}, {episodeId}, {index}, {ext}. По умолчанию — имя файла. */
   uploadAs?: string;
+  /**
+   * Вход подключается, только если prompt.md этапа совпал с этим регэкспом (флаг i).
+   * Так агент сам решает, нужен ли вход: например, лицо — фразой `face from image N`.
+   */
+  whenPrompt?: string;
   /** Подпись для меню и сообщений об ошибке: «Утверждённая локация». */
   label: string;
 }

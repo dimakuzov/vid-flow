@@ -15,7 +15,8 @@ Build the picture from the shot text and the files in this stage's `refs/`. Put 
 Not from the raw libraries. Those have a different angle and different clothes.
 
 - Location: the one file in `shots/{shotId}/location/approve/`. This is image 1.
-- Character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. The first is image 2, the second is image 3.
+- Character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. The board takes them in alphabetical order of the file name: with `julia_s05.png` and `lena_s05.png`, Julia is image 2 and Lena is image 3. The agent task lists the numbers under «Images the graph receives».
+- Face, for a close-up only: a portrait of the character after the characters (image 3 for one person, image 4 and image 5 for two). The board sends it only if `prompt.md` contains `face from image N`. Source: `refs/{name}_face.png` of this stage, otherwise the portrait in `data/characters/{name}/` (`portrait.png`, `portret.png`, `{Name}_portret.png`, `face.png`). Rules: `playbooks/models/qwen_first_frame.en.md`, «Face for a close-up».
 
 Copies go in this stage's `refs/`: `location.png`, `{name}.png`. A manual approve can skip the upstream check, but the graph still receives these shot frames, not `view.png` and not `full_body.png`.
 

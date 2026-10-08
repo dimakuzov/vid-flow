@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { MediaFile } from "@/lib/series/types";
 import { comfyRunContext, readPngTextChunks, type ComfyRunContext } from "./png-metadata";
 
@@ -79,6 +79,7 @@ export function ImageLightbox({
   onClose,
   onIndex,
   showRunContext,
+  actions,
 }: {
   files: MediaFile[];
   index: number;
@@ -86,6 +87,8 @@ export function ImageLightbox({
   onIndex: (next: number) => void;
   /** Показать кнопку «Промпт и seed» (для output/approve: PNG из ComfyUI). */
   showRunContext?: boolean;
+  /** Кнопки для текущего файла в нижней панели. */
+  actions?: (file: MediaFile) => ReactNode;
 }) {
   const file = files[index];
 
@@ -110,13 +113,24 @@ export function ImageLightbox({
       aria-label={file.name}
       onClick={onClose}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- полноразмерный просмотр без оптимизации */}
-      <img
-        src={file.url}
-        alt={file.name}
-        className="max-h-full max-w-full object-contain"
-        onClick={(event) => event.stopPropagation()}
-      />
+      {file.kind === "video" ? (
+        <video
+          key={file.url}
+          src={file.url}
+          controls
+          autoPlay
+          className="max-h-full max-w-full object-contain"
+          onClick={(event) => event.stopPropagation()}
+        />
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element -- полноразмерный просмотр без оптимизации */
+        <img
+          src={file.url}
+          alt={file.name}
+          className="max-h-full max-w-full object-contain"
+          onClick={(event) => event.stopPropagation()}
+        />
+      )}
       <div
         className="absolute inset-x-0 bottom-0 space-y-3 bg-black/70 px-4 py-3 text-sm text-white"
         onClick={(event) => event.stopPropagation()}
@@ -124,6 +138,7 @@ export function ImageLightbox({
         {showRunContext && isPng ? <RunContextPanel key={file.url} file={file} /> : null}
         <div className="flex items-center justify-between gap-3">
           <span className="truncate">{file.name}</span>
+          {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions(file)}</div> : null}
           <span className="shrink-0 text-white/70">
             {index + 1} / {files.length}
           </span>

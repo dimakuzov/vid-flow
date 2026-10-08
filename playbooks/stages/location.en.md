@@ -57,6 +57,20 @@ Edits of a finished Krea picture (light, an object, cleanup) are pass B below; a
 
 The model that formatted the scenario may not have recognized the location. The "Из библиотеки" button next to "Референсы" (on this stage only) lists the `data/locations/` folders with a thumbnail and puts the general view into `refs/` as `{locationId}_view.png`. An existing file is not overwritten. The graph takes the first file in `refs/`, so the chosen location becomes the input right away. The "Записать в кадр" checkbox also changes `- location:` in `shot.md`. After such a pick the agent does not rebuild `refs/` (`agent_touch.json`).
 
+## The location is the background of the first frame
+
+The approved location becomes image 1 of the first frame and stays there as the background, unchanged. The first-frame prompt does not move the camera. So shoot the location the way the shot needs it. Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`); the user message wins.
+
+| Shot size | What the location shows |
+| --- | --- |
+| Long shot | The whole space where the action happens, eye level. The spot for the people is free and visible |
+| Medium shot | The view from about two metres from the spot where the people will be: what stands behind them (window, desk, board) at the size it will have behind a person seen from the waist up. The lower part of the frame is the place for the people. In ep2 the professor's medium shot worked at once because the location was already framed at the podium's distance; the girls at the window (s07) took longer because the location was a full-height window and the model kept redrawing it |
+| Close-up | A fragment behind a head is enough: part of a wall, a window, a few desks, seen close. In ep2 a close-up on a plain wooden panel was accepted on the first run, while close-ups on a wide view of the hall came out as wide shots |
+
+Write the place for the people into the prompt: `the empty chair in the center of the frame where she will sit`, `the window on the right half of the frame, the floor in front of it free`. Write only the objects that matter for the action: they are the landmarks the first frame ties scale to.
+
+Shots in the same location keep the same room: take another angle of the approved view (pass A), do not draw a new room for every shot.
+
 ## Which pass
 
 | Task | Pass |

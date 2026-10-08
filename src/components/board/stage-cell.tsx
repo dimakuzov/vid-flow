@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,10 +13,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { errorText, requestJson, stageApiPath, stagePagePath } from "@/components/stage/api";
+import { ImageLightbox } from "@/components/stage/image-lightbox";
 import { SuggestedWorkflow, WorkflowMenu } from "@/components/stage/workflow-menu";
 import { STATUS_LABELS, type StageId } from "@/lib/series/constants";
-import type { StageDetail, StageSummary } from "@/lib/series/types";
+import type { MediaFile, StageDetail, StageSummary } from "@/lib/series/types";
 import { StatusPill } from "./status-pill";
+
+/** Самый новый файл: `?v=` в url — mtime файла. */
+function newestIndex(files: MediaFile[]): number {
+  const version = (file: MediaFile) => Number(new URL(file.url, "http://x").searchParams.get("v")) || 0;
+  return files.reduce((best, file, index) => (version(file) > version(files[best]) ? index : best), 0);
+}
 
 interface StageCellProps {
   episodeId: string;
@@ -33,7 +41,50 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
   const [uploadMode, setUploadMode] = useState<"output" | "approve">("output");
   // В StageSummary нет вариантов воркфлоу: этап читается при открытии меню.
   const [detail, setDetail] = useState<StageDetail | null>(null);
+  const [viewer, setViewer] = useState<{ files: MediaFile[]; index: number } | null>(null);
+  const router = useRouter();
   const stageApi = stageApiPath(episodeId, shotId, stageId);
+  const pagePath = stagePagePath(episodeId, shotId, stageId);
+
+  /** Левая кнопка: «На проверке» — сразу новый вариант на весь экран, иначе страница этапа. */
+  async function openCell() {
+    if (stage.status !== "review") {
+      router.push(pagePath);
+      return;
+    }
+    try {
+      const data = await requestJson<StageDetail>(stageApi);
+      const files = data.output.filter((file) => file.kind === "image" || file.kind === "video");
+      if (!files.length) throw new Error("output пуст");
+      setDetail(data);
+      setViewer({ files, index: newestIndex(files) });
+    } catch {
+      router.push(pagePath);
+    }
+  }
+
+  const closeViewer = useCallback(() => setViewer(null), []);
+  const moveViewer = useCallback(
+    (index: number) => setViewer((current) => (current ? { ...current, index } : current)),
+    [],
+  );
+
+  async function approveViewed(file: MediaFile) {
+    setBusy(true);
+    try {
+      await requestJson(`${stageApi}/approve`, {
+        method: "POST",
+        body: { filenames: [file.name], from: "output" },
+        fallbackError: "Не удалось утвердить",
+      });
+      setViewer(null);
+      onChanged();
+    } catch (error) {
+      window.alert(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function openMenu(next: boolean) {
     setOpen(next);
@@ -187,7 +238,12 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     <>
       <button
         type="button"
-        onClick={() => openMenu(true)}
+        title="Левая кнопка — открыть, правая — меню действий"
+        onClick={() => void openCell()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          openMenu(true);
+        }}
         className={`group flex h-full min-h-28 w-full flex-col gap-2 rounded-xl border p-3 text-left transition ${
           stage.busy
             ? "border-sky-400/60 bg-sky-50/70"
@@ -254,8 +310,8 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
               {shotId} · действие
             </DialogTitle>
             <DialogDescription>
-              Выберите, что сделать с этапом. Полная страница откроется только по
-              «Редактировать».
+              Выберите, что сделать с этапом. Страница этапа открывается и левой кнопкой по
+              клетке.
             </DialogDescription>
           </DialogHeader>
 
@@ -351,6 +407,31 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
           />
         </DialogContent>
       </Dialog>
+
+      {viewer ? (
+        <ImageLightbox
+          files={viewer.files}
+          index={viewer.index}
+          onClose={closeViewer}
+          onIndex={moveViewer}
+          showRunContext
+          actions={(file) => (
+            <>
+              <button
+                type="button"
+                disabled={busy || detail?.state.busy}
+                onClick={() => void approveViewed(file)}
+                className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                Утвердить
+              </button>
+              <Link href={pagePath} className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white">
+                Редактировать
+              </Link>
+            </>
+          )}
+        />
+      ) : null}
     </>
   );
 }

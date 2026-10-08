@@ -195,6 +195,14 @@
       "images.image_3": [
         "903",
         0
+      ],
+      "images.image_4": [
+        "904",
+        0
+      ],
+      "images.image_5": [
+        "905",
+        0
       ]
     },
     "class_type": "TextEncodeQwenImage21",
@@ -232,6 +240,24 @@
     "class_type": "LoadImage",
     "_meta": {
       "title": "Image 3 (character 2, optional)"
+    }
+  },
+  "904": {
+    "inputs": {
+      "image": "face_1.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Face of character 1 (optional)"
+    }
+  },
+  "905": {
+    "inputs": {
+      "image": "face_2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Face of character 2 (optional)"
     }
   }
 }

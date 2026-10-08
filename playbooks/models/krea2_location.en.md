@@ -25,6 +25,12 @@ There is no negative prompt: `ConditioningZeroOut` and cfg 1. Everything you nee
 
 The picture goes into Qwen3-VL together with the text. Krea 2 takes its meaning and style and draws a new image; it does not edit the picture [5]. The room on the reference will not be kept: different layout, different windows. If you need the same room from another angle, use the `location_views` graph. Here the reference is for mood, an object, or a material (in the user's graph it was a table).
 
+The graph takes one picture: the first file in `refs/`. A second reference (in ep2, a photo of a faceted glass next to the canteen photo) is not sent. Describe that object in words: `a faceted Soviet glass of strong tea in a metal holder`.
+
+### Shot size
+
+The approved location becomes the background of the first frame as it is. Write the camera for the shot size from the first words of the shot text; the user message wins. Long shot: `wide composition, eye level`, the whole space. Medium shot: `eye level, about two metres from <the spot>`, what stands behind the people at the size it will have behind a person seen from the waist up, the lower part of the frame free. Close-up: `close view of <part of a wall, a window>`, a fragment is enough. Name the place for the people: `the empty chair in the center of the frame`.
+
 ## `prompt.md` template
 
 One coherent paragraph in English, no lists, no markup [6]. No `## …` headings: the graph has one branch.
