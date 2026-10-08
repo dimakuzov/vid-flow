@@ -1,0 +1,120 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "final_wan_720",
+  "graph": "wan22_i2v_sketch_turbo_api.json",
+  "stage": "final_render",
+  "label": "Финал Wan от первого кадра, 720×1280",
+  "description": "Тот же промпт и первый кадр, что у эскиза, в 720×1280. Длительность — как у утверждённого превью.",
+  "playbook": "models/wan_video.en.md",
+  "order": 3,
+  "inputs": {
+    "start": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "uploadAs": "{shotId}_start{ext}",
+      "label": "Утверждённый первый кадр"
+    },
+    "preview": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "min": 0,
+      "label": "Утверждённое превью (только длительность)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "stage": "video_preview",
+      "required": true,
+      "label": "prompt.md эскиза (video_preview)"
+    },
+    "seconds": {
+      "kind": "number",
+      "from": "media:duration",
+      "of": "preview",
+      "min": 2,
+      "max": 12,
+      "label": "Длительность превью"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "97",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "start"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:93",
+          "field": "text"
+        }
+      ],
+      "value": {
+        "input": "text"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:86",
+          "field": "noise_seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:161",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "seconds"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "108",
+          "field": "filename_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/final/{shotId}_wan720"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "width"
+        }
+      ],
+      "value": {
+        "const": 720
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "height"
+        }
+      ],
+      "value": {
+        "const": 1280
+      }
+    }
+  ]
+}

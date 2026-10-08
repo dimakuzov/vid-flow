@@ -18,7 +18,7 @@
 | PrimitiveFloat 129:161 | `value` | Секунды: меню длительности, иначе `N sec` в `prompt.md` (2–12). Иначе 5 из графа |
 | SaveVideo 108 | `filename_prefix` | `frameboard/video/{shotId}_i2v` или `_flf`; финал — `frameboard/final/...` |
 
-Негатив 129:89, шаги, CFG, LoRA, 384×672 и переключатели turbo не трогать. Промпт: `playbooks/models/wan_video.md`.
+Негатив 129:89, шаги, CFG, LoRA и переключатели turbo не трогать. Размер доска ставит через манифест: 576×1024 (в файле графа 384×672). Промпт: `playbooks/models/wan_video.md`.
 
 ## Модели
 

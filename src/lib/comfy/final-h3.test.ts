@@ -49,12 +49,32 @@ before(() => {
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-test("по умолчанию — 768 с face pass", () => {
+test("по умолчанию — финал Wan 720×1280; H3 768 с face pass — первый из H3", () => {
   const choices = listWorkflowChoices(EP, "s01", "final_render");
-  assert.equal(choices.find((choice) => choice.isDefault)?.id, "final_h3_768_face");
+  assert.equal(choices.find((choice) => choice.isDefault)?.id, "final_wan_720");
+  assert.equal(choices.find((choice) => choice.id.startsWith("final_h3"))?.id, "final_h3_768_face");
   const data = creatorData("final_h3_768_face", "Static shot. Lena holds her hand to her chest.");
   assert.equal(data.short_edge, 768);
   assert.equal(data.face.on, true);
+});
+
+test("Wan: эскиз 576×1024, финал Wan 720×1280 с промптом эскиза", () => {
+  fs.writeFileSync(path.join(stageDir(EP, "s01", "video_preview"), "prompt.md"), "Static shot. Lena turns her head. 5 sec");
+  fs.writeFileSync(path.join(stageDir(EP, "s01", "final_render"), "prompt.md"), "[Shot 1] H3 text, not for Wan.");
+  const build = (stageId: "video_preview" | "final_render", workflow: string) => {
+    const loaded = stageBindings(stageId).find((item) => item.id === workflow)!;
+    assert.equal(loaded.error, null, loaded.error ?? "");
+    return buildPrompt(loaded.binding!, structuredClone(loaded.graph!), { episodeId: EP, shotId: "s01", stageId, random: () => 7 }).prompt;
+  };
+  for (const workflow of ["video_i2v", "video_flf"]) {
+    if (workflow === "video_flf") put(path.join(stageDir(EP, "s01", "video_preview"), "refs", "end.png"));
+    const wan = build("video_preview", workflow)["129:98"].inputs;
+    assert.deepEqual([wan.width, wan.height], [576, 1024], workflow);
+  }
+  const final = build("final_render", "final_wan_720");
+  assert.deepEqual([final["129:98"].inputs.width, final["129:98"].inputs.height], [720, 1280]);
+  assert.equal(final["129:93"].inputs.text, "Static shot. Lena turns her head. 5 sec");
+  assert.equal(final["108"].inputs.filename_prefix, "frameboard/final/s01_wan720");
 });
 
 test("промпт без фиксированной фразы: доска ставит её в начало и указание следовать @vid-1 в конец", () => {

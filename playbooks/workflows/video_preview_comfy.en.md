@@ -18,7 +18,7 @@ Before queueing, only these change:
 | PrimitiveFloat 129:161 | `value` | Seconds: the duration menu, otherwise `N sec` in `prompt.md` (2–12). Otherwise 5 from the graph |
 | SaveVideo 108 | `filename_prefix` | `frameboard/video/{shotId}_i2v` or `_flf`; final: `frameboard/final/...` |
 
-Do not touch the negative 129:89, steps, CFG, LoRA, 384×672, or the turbo switches. Prompt: `playbooks/models/wan_video.en.md`.
+Do not touch the negative 129:89, steps, CFG, LoRA, or the turbo switches. Size: the board sets 576×1024 through the manifest (the graph file says 384×672). Prompt: `playbooks/models/wan_video.en.md`.
 
 ## Models
 

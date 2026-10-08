@@ -10,7 +10,8 @@ The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Con
 
 | manifest id | order | Graph | When |
 | --- | --- | --- | --- |
-| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | default, shots with faces |
+| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, the sketch's prompt and first frame, the preview's length | default |
+| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | H3, shots with faces |
 | `final_h3` | 5 | same graph, 1152, face pass | faces and the shot needs the higher resolution |
 | `final_h3_768` | 6 | same graph, 768, no face pass | no people, small faces, faster and less memory |
 | `final_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | fallback: repeat the Wan sketch on new seeds |

@@ -137,13 +137,13 @@ Sign: two or three rewrites give no shift, the model stubbornly does it “its w
 ## 7. Wan 2.2 settings
 
 - **Turbo:** LoRA lightx2v 4 steps, CFG 1, split 2. Sketches only like this.
-- **Sketch resolution:** 384×672.
+- **Sketch resolution:** 576×1024 (set by the `video_i2v` / `video_flf` manifests; the graph file still says 384×672). The final Wan variant `final_wan_720` renders 720×1280. Measured on s03 with the same prompt and seed: 432×768 — 35 s, 576×1024 — 70 s, 720×1280 — 128 s.
 - **FPS 16, length = duration × 16 + 1:**
   - 3 s = 49 frames;
   - 5 s = 81 frames;
   - 6 s = 97 frames.
 - **Up to 5 seconds** the model is most reliable: it was trained at that length. 6–7 s work. At 8 s S2 got worse; the 6 s variant was approved.
-- **The first frame must be exactly 9:16.** If it is not, WanImageToVideo stretches it to 384×672. Our frames 1152×2080 are slightly off 9:16.
+- **The first frame must be exactly 9:16.** If it is not, WanImageToVideo stretches it to the run size (576×1024 for the sketch). Our frames 1152×2080 are slightly off 9:16.
 - **FLF (first + last frame):** a separate graph `wan22_flf_sketch_turbo_api.json`. It is the same graph with `WanFirstLastFrameToVideo` instead of `WanImageToVideo` and an `end_image`. All other nodes and settings are the same. An FLF prompt describes only the transition, not the frames.
 
 ---

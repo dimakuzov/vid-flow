@@ -10,7 +10,8 @@
 
 | id манифеста | order | Граф | Когда |
 | --- | --- | --- | --- |
-| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | по умолчанию, кадры с лицами |
+| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, промпт и первый кадр эскиза, длина превью | по умолчанию |
+| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | H3, кадры с лицами |
 | `final_h3` | 5 | тот же граф, 1152, face pass | лица, и кадру нужно разрешение выше |
 | `final_h3_768` | 6 | тот же граф, 768, без face pass | кадров без людей, мелкие лица, быстрее и легче по памяти |
 | `final_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | запасной: повторить эскиз Wan на новых seed |

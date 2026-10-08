@@ -106,6 +106,28 @@
       "value": {
         "template": "frameboard/video/{shotId}_flf"
       }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "width"
+        }
+      ],
+      "value": {
+        "const": 576
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "height"
+        }
+      ],
+      "value": {
+        "const": 1024
+      }
     }
   ]
 }
