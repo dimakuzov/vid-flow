@@ -41,16 +41,20 @@ export function RefFiles({
   usedNames,
   onSelect,
   onOpen,
-  onDelete,
+  excluded,
+  onToggleExclude,
 }: {
   files: MediaFile[];
   selectedName: string | null;
   usedNames: string[];
   onSelect: (name: string) => void;
   onOpen: (file: MediaFile) => void;
-  /** Нет — этап занят, удалять refs/ нельзя. */
-  onDelete?: (name: string) => void;
+  /** Убранные из графа файлы этапа (MediaFile.relativePath). */
+  excluded: string[];
+  /** Убрать из графа (true) или вернуть (false). Нет — этап занят. */
+  onToggleExclude?: (file: MediaFile, exclude: boolean) => void;
 }) {
+  const removed = new Set(excluded);
   const selected = files.find((file) => file.name === selectedName) ?? null;
   const used = new Set(usedNames);
 
@@ -75,7 +79,10 @@ export function RefFiles({
             selected={file.name === selectedName}
             onSelect={() => onSelect(file.name)}
             onOpen={() => onOpen(file)}
-            onDelete={onDelete ? () => onDelete(file.name) : undefined}
+            excluded={removed.has(file.relativePath)}
+            onToggleExclude={
+              onToggleExclude ? () => onToggleExclude(file, !removed.has(file.relativePath)) : undefined
+            }
             caption={`${refRole(file.name)}${used.has(file.name) ? " · использован" : ""}`}
           />
         ))}

@@ -103,7 +103,7 @@ test("входы первого кадра: утверждённые локац�
   assert.deepEqual(location.files.map((file) => file.name), ["cafe_view.png"]);
   assert.deepEqual(people.files.map((file) => file.name), ["katya_s01.png", "mark_s01.png"]);
   assert.match(location.files[0].url, /^\/api\/media\/episodes\/e01\/shots\/s01\/location\/approve\//);
-  assert.equal(location.fromRefs, false);
+  assert.deepEqual(location.excluded, []);
   // Та же сводка — в StageDetail.
   assert.equal(getStageDetail("e01", "s01", "first_frame").inputs.length, inputs.length);
 });
@@ -149,6 +149,6 @@ test("входы персонажей: база из библиотеки и о�
   assert.match(mark!.source, /^пусто: нет папки data\/characters\/mark\//);
 
   const outfit = inputs.find((input) => input.label === "Образцы одежды");
-  assert.equal(outfit?.fromRefs, true);
+  assert.deepEqual(outfit?.excluded, []);
   assert.deepEqual(outfit?.files.map((file) => file.name), ["katya_outfit.png"]);
 });

@@ -280,6 +280,7 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     output: listMediaFiles(path.join(dir, "output")),
     approve: listMediaFiles(path.join(dir, "approve")),
     inputs: stageInputs(episodeId, shotId, stageId),
+    excluded: settings.excluded ?? [],
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
     state,

@@ -1,12 +1,18 @@
 import fs from "fs";
 import path from "path";
 import type { ImageInput, ImageSource } from "../contracts/graph-binding";
-import { promptEnablesInput, resolveImageInput, stageBindings, type ShotContext } from "../comfy/binding";
+import {
+  excludedInputFiles,
+  promptEnablesInput,
+  resolveImageInput,
+  stageBindings,
+  type ShotContext,
+} from "../comfy/binding";
 import { resolveWorkflowId } from "../comfy/workflows";
 import { STAGE_LABELS, type StageId } from "./constants";
 import { listMediaFiles, mediaKind, mediaUrlPath } from "./media";
 import { getCharactersRoot, getDataRoot, getLocationsRoot, stageDir, toPosix } from "./paths";
-import { readRunSettings } from "./run-settings";
+import { excludedFiles, readRunSettings } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
 import type { MediaFile, StageInput } from "./types";
 
@@ -87,35 +93,42 @@ function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): st
   return `approve этапа ${STAGE_LABELS[stage] ?? stage}`;
 }
 
+function mediaFiles(files: string[]): MediaFile[] {
+  return files.map(mediaFileAt).filter((file): file is MediaFile => file !== null);
+}
+
 /** Вход манифеста: первый непустой источник, как при запуске (resolveImageInput). */
 function bindingInput(ctx: ShotContext, input: ImageInput): StageInput {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
+  const excluded = mediaFiles(excludedInputFiles(ctx, input));
   if (!promptEnablesInput(ctx, input)) {
     // Вход по фразе в промпте: показываем, что уйдёт, если промпт его позовёт.
-    const files = resolveImageInput(ctx, { ...input, whenPrompt: undefined });
     return {
       label: input.label,
       source: "сейчас не уйдёт: prompt.md этот вход не зовёт",
-      fromRefs: false,
-      files: files.map(mediaFileAt).filter((file): file is MediaFile => file !== null),
+      files: mediaFiles(resolveImageInput(ctx, { ...input, whenPrompt: undefined })),
+      excluded,
     };
   }
   for (const source of sources) {
     const files = resolveImageInput(ctx, { ...input, from: source });
     if (files.length) {
-      return {
-        label: input.label,
-        source: sourceLabel(ctx, source, files),
-        fromRefs: source === "refs",
-        files: files.map(mediaFileAt).filter((file): file is MediaFile => file !== null),
-      };
+      return { label: input.label, source: sourceLabel(ctx, source, files), files: mediaFiles(files), excluded };
     }
   }
   return {
     label: input.label,
     source: `пусто: ${sources.map((source) => sourceLabel(ctx, source, [])).join(" или ")}`,
-    fromRefs: false,
     files: [],
+    excluded,
+  };
+}
+
+/** Делит файлы на оставленные и убранные пользователем из графа. */
+function splitExcluded(files: MediaFile[], excluded: Set<string>): { files: MediaFile[]; excluded: MediaFile[] } {
+  return {
+    files: files.filter((file) => !excluded.has(file.relativePath)),
+    excluded: files.filter((file) => excluded.has(file.relativePath)),
   };
 }
 
@@ -138,27 +151,21 @@ function workflowInputs(ctx: ShotContext): StageInput[] {
 /** Этап персонажей (воркфлоу доски нет): база каждого персонажа и образцы одежды из refs/. */
 function characterInputs(ctx: ShotContext): StageInput[] {
   const { episodeId, shotId, stageId } = ctx;
+  const excluded = excludedFiles(episodeId, shotId, stageId);
   const inputs: StageInput[] = readShotMeta(episodeId, shotId).characters.map((name) => {
     const folder = libraryFolder(getCharactersRoot(), name);
-    const files = folder
-      ? characterBaseFiles(folder)
-          .map(mediaFileAt)
-          .filter((file): file is MediaFile => file !== null)
-      : [];
     return {
       label: `Персонаж ${name}`,
       source: folder
         ? `библиотека ${dataLabel(folder)}`
         : `пусто: нет папки ${dataLabel(path.join(getCharactersRoot(), name))}`,
-      fromRefs: false,
-      files,
+      ...splitExcluded(folder ? mediaFiles(characterBaseFiles(folder)) : [], excluded),
     };
   });
   inputs.push({
     label: "Образцы одежды",
     source: "refs/ этого этапа",
-    fromRefs: true,
-    files: listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "refs")),
+    ...splitExcluded(listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "refs")), excluded),
   });
   return inputs;
 }

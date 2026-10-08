@@ -7,7 +7,7 @@ import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
 import { getPlaybooksRoot, stageDir } from "../series/paths";
-import { readRunSettings } from "../series/run-settings";
+import { excludedFiles, readRunSettings } from "../series/run-settings";
 import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
 import { LLM_TASK, readAgentDispatch } from "./files";
@@ -193,6 +193,17 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   }
   const images = renderGraphImages(episodeId, shotId, stageId, workflow?.id);
   if (images) lines.push("", images);
+  const excluded = [...excludedFiles(episodeId, shotId, stageId)];
+  if (excluded.length) {
+    lines.push(
+      "",
+      "## Removed from the graph by the user",
+      "",
+      "These files stay on disk but the graph does not get them. Do not refer to them and do not count them in the image numbers:",
+      "",
+      ...excluded.map((item) => `- data/${item}`),
+    );
+  }
   if (refsNote) lines.push("", "## refs.md", "", refsNote);
   lines.push("", "Write the new prompt.md.");
   return { system, user: lines.join("\n") + "\n" };

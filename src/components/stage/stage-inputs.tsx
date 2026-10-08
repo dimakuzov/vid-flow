@@ -5,20 +5,20 @@ import { MediaCard } from "./media-card";
 
 /**
  * «Что уйдёт в граф»: входы этапа по умолчанию, включая approve других этапов и библиотеки.
- * Только просмотр. Удалить можно только файлы refs/ этого этапа.
+ * Любой файл можно убрать из графа и вернуть; с диска ничего не удаляется.
  */
 export function StageInputs({
   inputs,
   boardRuns,
   onOpen,
-  onDeleteRef,
+  onToggleExclude,
 }: {
   inputs: StageInput[];
   /** true — этап запускает доска (есть воркфлоу), false — граф гоняет агент. */
   boardRuns: boolean;
   onOpen: (files: MediaFile[], file: MediaFile) => void;
-  /** Нет — этап занят, refs/ удалять нельзя. */
-  onDeleteRef?: (name: string) => void;
+  /** Убрать из графа (true) или вернуть (false). Нет — этап занят, входы не меняются. */
+  onToggleExclude?: (file: MediaFile, exclude: boolean) => void;
 }) {
   if (!inputs.length) return null;
   return (
@@ -27,6 +27,7 @@ export function StageInputs({
         Что уйдёт в граф{" "}
         <span className="font-normal text-stone-400">
           {boardRuns ? "по умолчанию, при выбранном воркфлоу" : "агент берёт эти файлы по плейбуку"}
+          {" · «Убрать» не удаляет файл, а только не отдаёт его в граф"}
         </span>
       </div>
       {inputs.map((input) => (
@@ -37,7 +38,7 @@ export function StageInputs({
               {input.source}
             </span>
           </div>
-          {input.files.length ? (
+          {input.files.length || input.excluded.length ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {input.files.map((file) => (
                 <MediaCard
@@ -45,7 +46,17 @@ export function StageInputs({
                   file={file}
                   compact
                   onOpen={() => onOpen(input.files, file)}
-                  onDelete={input.fromRefs && onDeleteRef ? () => onDeleteRef(file.name) : undefined}
+                  onToggleExclude={onToggleExclude ? () => onToggleExclude(file, true) : undefined}
+                />
+              ))}
+              {input.excluded.map((file) => (
+                <MediaCard
+                  key={`excluded-${file.relativePath}`}
+                  file={file}
+                  compact
+                  excluded
+                  onOpen={() => onOpen(input.excluded, file)}
+                  onToggleExclude={onToggleExclude ? () => onToggleExclude(file, false) : undefined}
                 />
               ))}
             </div>

@@ -21,10 +21,10 @@ export interface StageInput {
   label: string;
   /** Откуда файлы: «approve этапа Локация», «refs/ этого этапа», «библиотека data/locations/cafe/». */
   source: string;
-  /** true — файлы из refs/ этого этапа (их можно удалить на странице). */
-  fromRefs: boolean;
   /** Пусто — источник пока пустой, граф этот вход не получит. */
   files: MediaFile[];
+  /** Файлы входа, которые пользователь убрал из графа (на диске остаются, их можно вернуть). */
+  excluded: MediaFile[];
 }
 
 export interface StageSummary {
@@ -114,6 +114,8 @@ export interface StageDetail {
   approve: MediaFile[];
   /** Что уйдёт в граф по умолчанию, включая approve других этапов и библиотеки. */
   inputs: StageInput[];
+  /** Убранные из графа файлы этапа: пути как MediaFile.relativePath (run_settings.json). */
+  excluded: string[];
   playbooks: string[];
   relativeDir: string;
   state: StageState;

@@ -32,6 +32,7 @@ import { startAgentRun } from "../agent/runner";
 import { STAGES, type StageId } from "./constants";
 import { readTextIfExists, writeText } from "./media";
 import { updateStageDocs } from "./mutations";
+import { excludedFiles } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
 import { readShotSpeech, SPEECH_FILE, stageHasSpeech } from "./speech";
 import { assertStageFree, writeStageState } from "./stage-state";
@@ -222,6 +223,19 @@ function renderDuration(episodeId: string, shotId: string, stageId: StageId, wor
     : `\n${durationTaskLine(seconds)} Длительность доска ставит сама: \`N sec\` в prompt.md не пиши.\n`;
 }
 
+/** Файлы, убранные пользователем из графа этапа: блок с пустой строкой перед ним, иначе пусто. */
+function renderExcluded(episodeId: string, shotId: string, stageId: StageId): string {
+  const excluded = [...excludedFiles(episodeId, shotId, stageId)];
+  if (!excluded.length) return "";
+  return `
+### Убрано пользователем из графа
+
+Файлы остаются на диске, но граф их не получает. Не используй их, не считай в номерах картинок, не удаляй и не возвращай:
+
+${excluded.map((item) => `- \`data/${item}\``).join("\n")}
+`;
+}
+
 /** Номера картинок графа первого кадра (`image N`): блок с пустой строкой перед ним, иначе пусто. */
 function renderImages(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
   const text = renderGraphImages(episodeId, shotId, stageId, workflow);
@@ -338,7 +352,7 @@ ${textOrEmpty(request.current.workflowNote)}
 ### refs/
 
 ${bulletFiles(path.join(dir, "refs"))}
-
+${renderExcluded(episodeId, shotId, stageId)}
 ### output/
 
 ${bulletFiles(path.join(dir, "output"))}

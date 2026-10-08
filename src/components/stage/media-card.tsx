@@ -18,6 +18,20 @@ function DeleteButton({ name, onDelete }: { name: string; onDelete: () => void }
   );
 }
 
+/** «Убрать из графа» / «Вернуть»: файл остаётся на диске. */
+function ExcludeButton({ excluded, onToggle }: { excluded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="shrink-0 text-stone-500 underline hover:text-stone-800"
+      title={excluded ? "Снова отдавать этот файл в граф" : "Не отдавать файл в граф. С диска он не удаляется"}
+    >
+      {excluded ? "Вернуть" : "Убрать"}
+    </button>
+  );
+}
+
 export function MediaCard({
   file,
   selected,
@@ -28,6 +42,8 @@ export function MediaCard({
   onApprove,
   onDelete,
   compact,
+  excluded,
+  onToggleExclude,
 }: {
   file: MediaFile;
   selected?: boolean;
@@ -40,12 +56,17 @@ export function MediaCard({
   onDelete?: () => void;
   /** Миниатюра: картинка ниже, для списка входов. */
   compact?: boolean;
+  /** Файл убран пользователем из графа этапа: карточка бледная, подпись «убран из графа». */
+  excluded?: boolean;
+  /** Убрать из графа / вернуть. Нет — переключателя нет (этап занят). */
+  onToggleExclude?: () => void;
 }) {
+  const shownCaption = [excluded ? "убран из графа" : "", caption ?? ""].filter(Boolean).join(" · ");
   return (
     <div
       className={`w-full min-w-0 rounded-xl border p-2 text-left ${
         selected ? "border-teal-700 bg-teal-50" : "border-stone-200 bg-white"
-      }`}
+      } ${excluded ? "opacity-50" : ""}`}
     >
       {file.kind === "image" ? (
         <button
@@ -83,17 +104,19 @@ export function MediaCard({
             className="min-w-0 flex-1 truncate text-left text-xs text-stone-600"
           >
             {selected ? "Выбрано · " : ""}
-            {caption ? `${caption} · ` : ""}
+            {shownCaption ? `${shownCaption} · ` : ""}
             {file.name}
           </button>
+          {onToggleExclude ? <ExcludeButton excluded={Boolean(excluded)} onToggle={onToggleExclude} /> : null}
           {onDelete ? <DeleteButton name={file.name} onDelete={onDelete} /> : null}
         </div>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-600">
           <span className="truncate">
-            {caption ? `${caption} · ` : ""}
+            {shownCaption ? `${shownCaption} · ` : ""}
             {file.name}
           </span>
+          {onToggleExclude ? <ExcludeButton excluded={Boolean(excluded)} onToggle={onToggleExclude} /> : null}
           {onRemove ? (
             <button type="button" onClick={onRemove} className="shrink-0 text-stone-500 underline">
               Убрать

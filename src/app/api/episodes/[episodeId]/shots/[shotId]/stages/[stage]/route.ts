@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
-import { readRunSettings, updateRunSettings } from "@/lib/series/run-settings";
+import { readRunSettings, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
+import { assertStageFree } from "@/lib/series/stage-state";
 import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { effectiveWorkflowId, getStageDetail } from "@/lib/series/scanner";
@@ -55,7 +56,15 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       runDuration?: number | string | null;
       /** Прямая речь кадра (speech.md). Только на видео-этапах, на других игнорируется. */
       speech?: string;
+      /** Убрать файл из графа этапа или вернуть (путь как MediaFile.relativePath). Файл не удаляется. */
+      exclude?: { path?: string; excluded?: boolean };
     };
+    if (body.exclude) {
+      if (typeof body.exclude.path !== "string") throw new Error("Не указан файл");
+      // Граф или агент могут как раз читать входы: менять их можно только у свободного этапа.
+      assertStageFree(episodeId, shotId, stageId);
+      setExcluded(episodeId, shotId, stageId, body.exclude.path, body.exclude.excluded !== false);
+    }
     const patch: { workflow?: string | null; durationSec?: number | null } = {};
     if (typeof body.runWorkflow === "string") {
       patch.workflow = body.runWorkflow.trim()

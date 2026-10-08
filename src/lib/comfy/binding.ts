@@ -16,9 +16,9 @@ import type {
   TextTemplate,
 } from "../contracts/graph-binding";
 import { STAGES, type StageId } from "../series/constants";
-import { readTextIfExists } from "../series/media";
+import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
-import { readRunSettings } from "../series/run-settings";
+import { excludedFiles, readRunSettings } from "../series/run-settings";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech, speechPhrases } from "../series/speech";
 
@@ -380,15 +380,35 @@ export function promptEnablesInput(ctx: ShotContext, input: ImageInput): boolean
   return new RegExp(input.whenPrompt, "i").test(prompt);
 }
 
-/** Картинки входа: первый непустой источник, затем pick. Вход с whenPrompt без совпадения — пусто. */
+/** Файл убран пользователем из графа этапа (run_settings.json, excluded). */
+function isExcluded(excluded: Set<string>, file: string): boolean {
+  if (!excluded.size) return false;
+  const media = mediaUrlPath(file);
+  return media !== null && excluded.has(media);
+}
+
+/**
+ * Картинки входа: первый непустой источник, затем pick. Вход с whenPrompt без совпадения — пусто.
+ * Убранные пользователем файлы пропускаются; источник, где остались только они, считается пустым.
+ */
 export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[] {
   if (!promptEnablesInput(ctx, input)) return [];
+  const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
-    const files = sourceFiles(ctx, source, input.kind);
+    const files = sourceFiles(ctx, source, input.kind).filter((file) => !isExcluded(excluded, file));
     if (files.length) return pickImages(files, input);
   }
   return [];
+}
+
+/** Убранные пользователем файлы этого входа (из всех его источников) — чтобы их можно было вернуть. */
+export function excludedInputFiles(ctx: ShotContext, input: ImageInput): string[] {
+  const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
+  if (!excluded.size) return [];
+  const sources = Array.isArray(input.from) ? input.from : [input.from];
+  const files = sources.flatMap((source) => sourceFiles(ctx, source, input.kind));
+  return [...new Set(files)].filter((file) => isExcluded(excluded, file));
 }
 
 function imageMin(input: ImageInput): number {

@@ -198,8 +198,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       return `${filename} убран из approve`;
     });
 
-  /** Удалить файл с диска насовсем, после подтверждения. Ответ маршрута — StageDetail. */
-  const deleteFile = (folder: "output" | "refs", filename: string) => {
+  /** Удалить файл из output/ насовсем, после подтверждения. Ответ маршрута — StageDetail. */
+  const deleteFile = (folder: "output", filename: string) => {
     if (!window.confirm(`Удалить файл ${filename} навсегда?`)) return;
     void act(async () => {
       const data = await requestJson<StageDetail>(`${stageApi}/files`, {
@@ -208,12 +208,25 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         fallbackError: "Не удалось удалить файл",
       });
       stage.merge(data);
-      if (folder === "output") setSelectedOutput((prev) => prev.filter((item) => item !== filename));
-      else setSelectedRef((current) => (current === filename ? null : current));
+      setSelectedOutput((prev) => prev.filter((item) => item !== filename));
       return `${filename} удалён из ${folder}/`;
     });
   };
-  const deleteRef = stageBusy ? undefined : (name: string) => deleteFile("refs", name);
+
+  /** Убрать файл из графа этапа или вернуть. С диска ничего не удаляется. */
+  const toggleExclude = (file: MediaFile, exclude: boolean) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { exclude: { path: file.relativePath, excluded: exclude } },
+        fallbackError: "Не удалось изменить входы",
+      });
+      stage.merge(data);
+      return exclude
+        ? `${file.name} убран из графа. Файл остался на диске, «Вернуть» отдаст его снова.`
+        : `${file.name} снова уходит в граф.`;
+    });
+  const excludeToggle = stageBusy || busy ? undefined : toggleExclude;
 
   const approveSelected = (names = selectedOutput) => {
     if (!names.length) {
@@ -405,7 +418,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               inputs={detail.inputs}
               boardRuns={canRun}
               onOpen={(files, file) => openImage(files, file, false)}
-              onDeleteRef={busy ? undefined : deleteRef}
+              onToggleExclude={excludeToggle}
             />
             <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
             {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
@@ -415,7 +428,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               usedNames={usedRefNames(detail.refs, detail.output, selectedOutput, shotId)}
               onSelect={(name) => setSelectedRef((current) => (current === name ? null : name))}
               onOpen={(file) => openImage(detail.refs, file, false)}
-              onDelete={busy ? undefined : deleteRef}
+              excluded={detail.excluded}
+              onToggleExclude={excludeToggle}
             />
             <details className="text-xs text-stone-500">
               <summary className="cursor-pointer">Заметка refs.md</summary>
