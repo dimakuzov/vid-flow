@@ -29,6 +29,13 @@
 
 Исключение: если в low-res ролике мерцание или шум, которые не нужны в финале (S4), — «use @vid-1 as a reference for the movements only».
 
+**Строка про движение** закрывает тело. H3 перестраивал композицию, двигал камеру и пересобирал кадр; строка делает превью явным планом:
+> Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.
+
+Доска гарантирует обе: если в теле нет `use @vid-1 as a reference`, она ставит фиксированную фразу первой; если нет `Follow @vid-1 exactly` — дописывает строку про движение в конец (`steps` манифеста). Нужен свой вариант (S4) — напишите его сами, второй копии доска не добавит.
+
+Что на самом деле получил H3 — смотреть в метаданных самого файла видео или в `data/comfy_queue/<id>.json`. Не открывать видео для проверки в интерфейсе ComfyUI: веб-часть ноды Continuity перезаписывает `creator_data` своим пустым состоянием (пустой промпт, без ассетов, 16:9), и сохранённый воркфлоу показывает уже его.
+
 **Исходник для Refine** — оригинальный промпт из Wan, без изменений. Не промпт старой H3-генерации: действие там могло быть другим (S6: в старом тексте вода краснела, в утверждённом Wan-ролике — смывается).
 
 ---
@@ -135,13 +142,13 @@
 
 Для агента: `playbooks/models/minimax_h3.en.md` (тот же смысл по-английски).
 
-Этап `final_render`, граф `playbooks/workflows/comfy/minimax_h3_creator_api.json` (одна нода `MiniMaxH3Creator`, настройки из шаблона `vera_final_1152`). Два варианта в меню:
+Этап `final_render`, граф `playbooks/workflows/comfy/minimax_h3_creator_api.json` (одна нода `MiniMaxH3Creator`, настройки из шаблона `vera_final_1152`). Три варианта в меню:
 
 | id | Что | Когда |
 |---|---|---|
-| `final_h3` | 1152, face pass включён | по умолчанию, кадры с лицами |
+| `final_h3_768_face` | 768, face pass включён | по умолчанию, лица в кадре |
+| `final_h3` | 1152, face pass включён | лица, и кадру нужно разрешение выше |
 | `final_h3_768` | 768, face pass выключен | кадров без людей, мелкие лица, нужно быстрее или не хватает памяти |
-| `final_h3_768_face` | 768, face pass включён | лица в кадре, 1152 не нужен или не хватает памяти |
 
 Wan-варианты `final_i2v` / `final_flf` остались запасными.
 

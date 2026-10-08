@@ -6,7 +6,7 @@
   "label": "Финал MiniMax H3, 768, face pass",
   "description": "768 и face pass: лица перерисовываются отдельно. Для кадров с лицами, когда 1152 не нужен или не хватает памяти.",
   "playbook": "models/minimax_h3.en.md",
-  "order": 7,
+  "order": 4,
   "inputs": {
     "video": {
       "kind": "video",
@@ -191,7 +191,21 @@
       "value": {
         "input": "text",
         "section": "body",
-        "required": true
+        "required": true,
+        "steps": [
+          {
+            "ensure": "The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it.",
+            "at": "start",
+            "unless": "use @vid-1 as a reference",
+            "separator": " "
+          },
+          {
+            "ensure": "Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.",
+            "at": "end",
+            "unless": "Follow @vid-1 exactly",
+            "separator": "\n\n"
+          }
+        ]
       }
     },
     {

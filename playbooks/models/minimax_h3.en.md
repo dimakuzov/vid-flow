@@ -30,6 +30,13 @@ Built from the final renders of the “Vera” clip (S1–S28). This is only abo
 
 Exception: if the low-res video has flicker or noise that the final must not have (S4) — “use @vid-1 as a reference for the movements only”.
 
+**The motion line** closes the body. H3 kept recomposing the shot, moving the camera and rebuilding the frame; the line makes the preview an explicit plan:
+> Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.
+
+The board guarantees both: if the body lacks `use @vid-1 as a reference`, it puts the fixed phrase first; if it lacks `Follow @vid-1 exactly`, it adds the motion line at the end (manifest `steps`). Write them yourself when you need a variant (S4), and the board will not add a second copy.
+
+To see what H3 really got, read the metadata of the output video file itself, or `data/comfy_queue/<id>.json`. Do not open the video in the ComfyUI interface to check it: the Continuity node's frontend overwrites `creator_data` with its own empty state (empty prompt, no assets, 16:9), and the saved workflow shows that instead.
+
 **The source to refine** is the original Wan prompt, unchanged (`video_preview/prompt.md`). Not the prompt of an older H3 render: its action may differ (S6: in the old text the water turned red, in the approved Wan video it washes away).
 
 ---
@@ -138,9 +145,9 @@ Stage `final_render`, graph `playbooks/workflows/comfy/minimax_h3_creator_api.js
 
 | id | What | When |
 |---|---|---|
-| `final_h3` | 1152, face pass on | default, shots with faces |
+| `final_h3_768_face` | 768, face pass on | default, faces in the shot |
+| `final_h3` | 1152, face pass on | faces, and the shot needs the higher resolution |
 | `final_h3_768` | 768, face pass off | no people, small faces, faster or less memory |
-| `final_h3_768_face` | 768, face pass on | faces in the shot, 1152 not needed or memory is short |
 
 `final_i2v` / `final_flf` (Wan) remain as a fallback. To propose another variant, write its id in `suggestedWorkflow` of `agent_request.json`.
 
