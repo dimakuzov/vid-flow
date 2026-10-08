@@ -77,6 +77,9 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,40}$/.test(binding.id)) fail("id: латиница, цифры, _ и -");
   if (!STAGES.includes(binding.stage)) fail(`неизвестный этап ${binding.stage}`);
   if (typeof binding.order !== "number") fail("нет order");
+  if (binding.defaultWhen !== undefined && binding.defaultWhen !== "speech" && binding.defaultWhen !== "silent") {
+    fail(`defaultWhen: speech или silent (сейчас ${binding.defaultWhen})`);
+  }
   for (const [id, node] of Object.entries(graph)) {
     if (!node || typeof node.class_type !== "string" || !node.inputs || typeof node.inputs !== "object") {
       fail(`граф ${binding.graph}: нода ${id} не в формате API`);
@@ -444,6 +447,31 @@ export function russianLine(text: string, names: string[] = []): string | null {
   return null;
 }
 
+/** Для сравнения реплик: регистр, пробелы, кавычки и многоточие не считаются. */
+function speechKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[’‘`]/g, "'")
+    .replace(/…/g, "...")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Каждая реплика из speech.md стоит в тексте дословно (вход с requireSpeech). Иначе модель,
+ * которая сама озвучивает кадр, не будет двигать губами под нужные слова.
+ */
+export function assertSpeechInText(text: string, speech: string, where = "prompt.md"): void {
+  const body = speechKey(text);
+  const missing = speechPhrases(speech).filter((phrase) => !body.includes(speechKey(phrase)));
+  if (missing.length) {
+    throw new Error(
+      `В ${where} нет реплик из speech.md: ${missing.map((line) => `«${line}»`).join(", ")}. ` +
+        "Их нужно вписать дословно, как диалог: отправь рекомендацию агенту или впиши сам.",
+    );
+  }
+}
+
 /** Путь или имя файла: модель видит картинки по номерам (image 2), а не по путям. */
 const FILE_REFERENCE =
   /(?:^|[\s"'(`])(?:data|shots|refs|approve|output|characters|locations)\/|[\w-]+\.(?:png|jpe?g|webp|mp4|webm)\b/i;
@@ -806,6 +834,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       }
       assertModelText(texts[name], where, allowed);
       if (input.sections) splitSections(texts[name], input.sections, where);
+      if (input.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), where);
     }
   }
   if (missing.length) throw new Error(`Для «${binding.label}» не хватает: ${missing.join(", ")}.`);

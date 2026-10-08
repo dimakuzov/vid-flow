@@ -46,7 +46,8 @@
         "soundscape"
       ],
       "untitled": "body",
-      "label": "prompt.md"
+      "label": "prompt.md",
+      "requireSpeech": true
     },
     "wan": {
       "kind": "text",
@@ -200,9 +201,9 @@
             "separator": " "
           },
           {
-            "ensure": "Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.",
+            "ensure": "@img-1 is the required first frame: the video opens exactly on it. @vid-1 is the required motion guide: every person and every object moves exactly as in @vid-1, with the same timing, the same positions and the same camera. This is a quality pass over @vid-1: re-render it in much higher detail and realism, with sharp, clean faces, eyes, skin, hair, fabric, light and textures, free of the blur, noise and artifacts of @vid-1. Where someone speaks, re-animate the mouth and face so the lips pronounce every word of the dialogue with precise lip sync. Do not add, remove or move people or objects, and do not change the composition.",
             "at": "end",
-            "unless": "Follow @vid-1 exactly",
+            "unless": "required motion guide",
             "separator": "\n\n"
           }
         ]

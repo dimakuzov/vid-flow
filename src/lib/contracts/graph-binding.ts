@@ -57,6 +57,11 @@ export interface TextInput {
    * имя раздела — только в него. По умолчанию `all`.
    */
   untitled?: string;
+  /**
+   * true — каждая реплика из speech.md кадра должна стоять в этом тексте дословно, иначе запуск —
+   * ошибка с недостающими репликами. Для моделей, которые сами озвучивают и двигают губы (MiniMax H3).
+   */
+  requireSpeech?: boolean;
   label: string;
 }
 
@@ -169,6 +174,11 @@ export interface GraphBinding {
   playbook?: string;
   /** Порядок в меню. Вариант по умолчанию — первый по order, у которого есть все обязательные входы. */
   order: number;
+  /**
+   * Когда вариант может быть по умолчанию: `speech` — только если в кадре есть реплики (speech.md),
+   * `silent` — только если их нет. Нет поля — всегда. Подходящего нет — первый доступный.
+   */
+  defaultWhen?: "speech" | "silent";
   /** Старое имя для совместимости (`i2v`, `flf`). */
   aliases?: string[];
   inputs: Record<string, BindingInput>;

@@ -30,10 +30,10 @@ Built from the final renders of the “Vera” clip (S1–S28). This is only abo
 
 Exception: if the low-res video has flicker or noise that the final must not have (S4) — “use @vid-1 as a reference for the movements only”.
 
-**The motion line** closes the body. H3 kept recomposing the shot, moving the camera and rebuilding the frame; the line makes the preview an explicit plan:
-> Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.
+**The closing line** ends the body. H3 kept recomposing the shot, moving the camera and rebuilding the frame, and drew faces poorly; the line makes the first frame and the preview hard requirements, gives H3 freedom on quality, and asks for new lip movement:
+> @img-1 is the required first frame: the video opens exactly on it. @vid-1 is the required motion guide: every person and every object moves exactly as in @vid-1, with the same timing, the same positions and the same camera. This is a quality pass over @vid-1: re-render it in much higher detail and realism, with sharp, clean faces, eyes, skin, hair, fabric, light and textures, free of the blur, noise and artifacts of @vid-1. Where someone speaks, re-animate the mouth and face so the lips pronounce every word of the dialogue with precise lip sync. Do not add, remove or move people or objects, and do not change the composition.
 
-The board guarantees both: if the body lacks `use @vid-1 as a reference`, it puts the fixed phrase first; if it lacks `Follow @vid-1 exactly`, it adds the motion line at the end (manifest `steps`). Write them yourself when you need a variant (S4), and the board will not add a second copy.
+The board guarantees both: if the body lacks `use @vid-1 as a reference`, it puts the fixed phrase first; if it lacks `required motion guide`, it adds the closing line at the end (manifest `steps`). Write them yourself when you need a variant (S4), and the board will not add a second copy.
 
 To see what H3 really got, read the metadata of the output video file itself, or `data/comfy_queue/<id>.json`. Do not open the video in the ComfyUI interface to check it: the Continuity node's frontend overwrites `creator_data` with its own empty state (empty prompt, no assets, 16:9), and the saved workflow shows that instead.
 
@@ -172,13 +172,13 @@ Stage `final_render`, graph `playbooks/workflows/comfy/minimax_h3_creator_api.js
 <Subject 2> is the <location> from @img-1 and @vid-1, <2–3 key objects>.
 
 ## summary
-[reference generation] <one sentence: shot type, who, what they do>
+[video editing] The target video is an edited version of @vid-1: <one sentence: shot type, who, what they do>, re-rendered at much higher quality.
 
 ## retention_analysis
 <Subject 1> (appears in [Shot 1]): fully_preserved - <what is retained>.
 
 ## soundscape
-<environment sound and the lines of characters in the frame>
+<environment sound only; the lines go in ## body>
 ```
 
 Rules:
@@ -187,4 +187,19 @@ Rules:
 3. `@img-N` numbers follow the table above. Two characters: `@img-2` is the first by file name, `@img-3` the second. A character whose face is not visible gets no reference: say so in the message to the user instead of inventing a label.
 4. Start from `video_preview/prompt.md` (the approved Wan prompt), not from an older final.
 5. No Russian text: the board refuses such a `prompt.md`. The only exception is the lines below.
-6. Lines. If the task has lines (section «Реплики», in text mode `Lines`), put them in `## soundscape` word for word, in quotes, in their own language, each with the speaker by look: `The young woman in the red dress says: "Мама, я дома."` Do not translate, shorten or add lines. The board lets exactly these lines through the language check. No lines — only the environment.
+6. Lines: see «Dialogue» below. No lines — `## soundscape` is the environment only.
+
+**Dialogue** (the shot has lines in `speech.md`, section «Реплики» / `Lines`). MiniMax voices the shot and moves the lips itself, so every line goes into `## body` word for word, as a numbered dialogue, in the node's own grammar (Continuity refine guide: `families/h3/prompts/base-en.txt`, §4.4): the speaker by look and position in the frame, a stable speaker ID `(S1)`, `(S2)`, and the words inside `<d>[English] …</d>`. Use the first frame prompt from the task to know who is on the left and who is on the right. The ambient sound goes to `## soundscape`, never the lines (the guide: dialogue belongs in the description and is not repeated in the soundscape).
+
+```text
+1. The young woman on the left (S1) says: <d>[English] Don't mind him. He just wants the attention. And you gave it to him.</d>
+2. The young woman on the right (S2) says: <d>[English] But why?</d>
+3. The young woman on the left (S1) says: <d>[English] Everybody wants it. I am Julia, by the way.</d>
+4. The young woman on the right (S2) says: <d>[English] I am Lena. Nice to meet you.</d>
+```
+
+`## soundscape`: `Ambient sound of a quiet lecture hall, soft whispers and intimate conversation.`
+
+Do not translate, shorten or add lines. A speaker keeps the same ID for the whole shot. The board refuses to run H3 when a line of `speech.md` is missing from `prompt.md`. A shot with lines is H3 by default (`final_h3_768_face`); a shot without lines is Wan by default (`final_wan_720`).
+
+**`## summary`** for this pass starts with the task type `[video editing]`: `The target video is an edited version of @vid-1: the same motion and composition, re-rendered at much higher quality, with the lips re-animated to the dialogue.`

@@ -29,10 +29,10 @@
 
 Исключение: если в low-res ролике мерцание или шум, которые не нужны в финале (S4), — «use @vid-1 as a reference for the movements only».
 
-**Строка про движение** закрывает тело. H3 перестраивал композицию, двигал камеру и пересобирал кадр; строка делает превью явным планом:
-> Follow @vid-1 exactly from the first frame to the last: it is the plan of this shot. Keep its camera and framing, the same positions of the people and the objects, and the same movements with the same timing. Do not add, remove or rearrange anything that is not in @vid-1, and do not move the camera unless @vid-1 moves.
+**Закрывающая строка** завершает тело. H3 перестраивал композицию, двигал камеру и плохо рисовал лица; строка делает первый кадр и превью обязательными, даёт H3 свободу в качестве и просит заново анимировать губы:
+> @img-1 is the required first frame: the video opens exactly on it. @vid-1 is the required motion guide: every person and every object moves exactly as in @vid-1, with the same timing, the same positions and the same camera. This is a quality pass over @vid-1: re-render it in much higher detail and realism, with sharp, clean faces, eyes, skin, hair, fabric, light and textures, free of the blur, noise and artifacts of @vid-1. Where someone speaks, re-animate the mouth and face so the lips pronounce every word of the dialogue with precise lip sync. Do not add, remove or move people or objects, and do not change the composition.
 
-Доска гарантирует обе: если в теле нет `use @vid-1 as a reference`, она ставит фиксированную фразу первой; если нет `Follow @vid-1 exactly` — дописывает строку про движение в конец (`steps` манифеста). Нужен свой вариант (S4) — напишите его сами, второй копии доска не добавит.
+Доска гарантирует обе: если в теле нет `use @vid-1 as a reference`, она ставит фиксированную фразу первой; если нет `required motion guide` — дописывает закрывающую строку в конец (`steps` манифеста). Нужен свой вариант (S4) — напишите его сами, второй копии доска не добавит.
 
 Что на самом деле получил H3 — смотреть в метаданных самого файла видео или в `data/comfy_queue/<id>.json`. Не открывать видео для проверки в интерфейсе ComfyUI: веб-часть ноды Continuity перезаписывает `creator_data` своим пустым состоянием (пустой промпт, без ассетов, 16:9), и сохранённый воркфлоу показывает уже его.
 
@@ -174,17 +174,32 @@ Wan-варианты `final_i2v` / `final_flf` остались запасным
 <Subject 1> is the young woman from @img-1 and @img-2 (her face and clothing as in @img-2), <волосы, одежда>.
 
 ## summary
-[reference generation] <одна фраза>
+[video editing] The target video is an edited version of @vid-1: <одна фраза>, re-rendered at much higher quality.
 
 ## retention_analysis
 <Subject 1> (appears in [Shot 1]): fully_preserved - <что сохраняется>.
 
 ## soundscape
-<звук окружения и реплики в кадре>
+<только звук окружения; реплики — в ## body>
 ```
 
 - `body` обязателен. Текст без заголовков целиком считается `body`.
 - `subject_definitions`, `summary`, `retention_analysis` можно не писать: тогда их выводит нода. Лучше писать: ошибки рефайнера (раздел 4.1) правятся именно здесь.
 - Номера `@img-N` должны совпадать с таблицей выше. Два персонажа: `@img-2` — первый по имени файла, `@img-3` — второй.
 - Русского текста быть не должно: доска такой `prompt.md` не отправит. Исключение — реплики ниже.
-- Реплики. Если в задаче есть реплики (раздел «Реплики», в text-режиме `Lines`), они идут в `## soundscape` дословно, в кавычках, на своём языке, с говорящим по внешности: `The young woman in the red dress says: "Мама, я дома."` Не переводить, не сокращать, не добавлять. Ровно эти реплики доска пропускает через проверку языка. Реплик нет — только звук окружения.
+- Реплики: см. «Диалог» ниже. Реплик нет — в `## soundscape` только звук окружения.
+
+**Диалог** (у кадра есть реплики в `speech.md`, раздел «Реплики» / `Lines`). MiniMax сам озвучивает кадр и двигает губами, поэтому каждая реплика идёт в `## body` дословно, нумерованным диалогом, в грамматике самой ноды (инструкция refine в Continuity: `families/h3/prompts/base-en.txt`, §4.4): говорящий по внешности и месту в кадре, постоянный ID `(S1)`, `(S2)`, слова — внутри `<d>[English] …</d>`. Кто слева и кто справа — по промпту первого кадра из задачи. Звук окружения — в `## soundscape`, реплики туда не идут (по инструкции ноды диалог описывается в теле и в soundscape не повторяется).
+
+```text
+1. The young woman on the left (S1) says: <d>[English] Don't mind him. He just wants the attention. And you gave it to him.</d>
+2. The young woman on the right (S2) says: <d>[English] But why?</d>
+3. The young woman on the left (S1) says: <d>[English] Everybody wants it. I am Julia, by the way.</d>
+4. The young woman on the right (S2) says: <d>[English] I am Lena. Nice to meet you.</d>
+```
+
+`## soundscape`: `Ambient sound of a quiet lecture hall, soft whispers and intimate conversation.`
+
+Реплики не переводить, не сокращать, не добавлять. У говорящего один ID на весь кадр. Если какой-то реплики из `speech.md` нет в `prompt.md`, доска H3 не запустит. Кадр с репликами по умолчанию идёт в H3 (`final_h3_768_face`), без реплик — в Wan (`final_wan_720`).
+
+**`## summary`** для этого прохода начинается с типа задачи `[video editing]`: `The target video is an edited version of @vid-1: the same motion and composition, re-rendered at much higher quality, with the lips re-animated to the dialogue.`

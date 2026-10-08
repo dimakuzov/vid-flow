@@ -137,7 +137,7 @@ Sign: two or three rewrites give no shift, the model stubbornly does it “its w
 ## 7. Wan 2.2 settings
 
 - **Turbo:** LoRA lightx2v 4 steps, CFG 1, split 2. Sketches only like this.
-- **Sketch resolution:** 576×1024 (set by the `video_i2v` / `video_flf` manifests; the graph file still says 384×672). The final Wan variant `final_wan_720` renders 720×1280. Measured on s03 with the same prompt and seed: 432×768 — 35 s, 576×1024 — 70 s, 720×1280 — 128 s.
+- **Sketch resolution:** 576×1024 (set by the `video_i2v` / `video_flf` manifests; the graph file still says 384×672). The final Wan variant `final_wan_720` renders 720×1280. Measured on s03 with the same prompt and seed: 432×768 — 35 s, 576×1024 — 70 s, 720×1280 — 128 s. At 720×1280 Wan invents background details, so the board ends the final prompt with: `The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.`
 - **FPS 16, length = duration × 16 + 1:**
   - 3 s = 49 frames;
   - 5 s = 81 frames;

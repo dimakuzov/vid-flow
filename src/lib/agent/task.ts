@@ -183,6 +183,18 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     refs.length ? refs.map((name) => `- ${name}`).join("\n") : "(none)",
   ];
   if (stageHasSpeech(stageId)) {
+    // Кто где стоит в кадре — из промпта первого кадра: нужно для реплик «Person 1 (left) says».
+    const firstFrame = readTextIfExists(path.join(stageDir(episodeId, shotId, "first_frame"), "prompt.md")).trim();
+    if (firstFrame) {
+      lines.push(
+        "",
+        "## First frame prompt.md (who is where in the frame; for reference only, not to copy)",
+        "",
+        firstFrame,
+      );
+    }
+  }
+  if (stageHasSpeech(stageId)) {
     const speech = readShotSpeech(episodeId, shotId).trim();
     lines.push(
       "",

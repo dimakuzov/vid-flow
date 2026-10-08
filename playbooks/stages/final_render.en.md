@@ -10,8 +10,8 @@ The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Con
 
 | manifest id | order | Graph | When |
 | --- | --- | --- | --- |
-| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, the sketch's prompt and first frame, the preview's length | default |
-| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | H3, shots with faces |
+| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, the sketch's prompt and first frame, the preview's length | default for a shot **without lines** |
+| `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | default for a shot **with lines** (`speech.md`): MiniMax voices it and moves the lips |
 | `final_h3` | 5 | same graph, 1152, face pass | faces and the shot needs the higher resolution |
 | `final_h3_768` | 6 | same graph, 768, no face pass | no people, small faces, faster and less memory |
 | `final_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | fallback: repeat the Wan sketch on new seeds |
@@ -19,7 +19,9 @@ The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Con
 
 H3 needs a file in `video_preview/approve/` and in `first_frame/approve/`. Character references come from this stage's `refs/`, otherwise from `characters/approve/` (up to two). If a face is not visible in the shot, put only the needed file into `refs/` or choose `final_h3_768`.
 
-The board makes sure the H3 prompt holds to the preview: if the `body` of `prompt.md` lacks the fixed phrase (`use @vid-1 as a reference`), the board puts it first; if it lacks `Follow @vid-1 exactly`, the board adds the motion line at the end. Details: `playbooks/models/minimax_h3.en.md`, «The fixed phrase».
+The board makes sure the H3 prompt holds to the preview: if the `body` of `prompt.md` lacks the fixed phrase (`use @vid-1 as a reference`), the board puts it first; if it lacks `required motion guide`, the board adds the closing line at the end (first frame and preview required, quality free, lips re-animated). H3 does not run when a line of `speech.md` is missing from `prompt.md`.
+
+The Wan final gets one more line at the end of the sketch prompt: the background stays as in the first frame, no new people, nobody walks behind, doors and windows stay as they are. At 720×1280 Wan otherwise invents details (people in the back, opening doors). Details: `playbooks/models/minimax_h3.en.md`, «The fixed phrase».
 
 The agent may propose another variant through `suggestedWorkflow`.
 

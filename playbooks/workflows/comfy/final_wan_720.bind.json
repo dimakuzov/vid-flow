@@ -4,7 +4,7 @@
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "final_render",
   "label": "Финал Wan от первого кадра, 720×1280",
-  "description": "Тот же промпт и первый кадр, что у эскиза, в 720×1280. Длительность — как у утверждённого превью.",
+  "description": "Тот же промпт и первый кадр, что у эскиза, в 720×1280. По умолчанию для кадров без реплик.",
   "playbook": "models/wan_video.en.md",
   "order": 3,
   "inputs": {
@@ -58,7 +58,15 @@
         }
       ],
       "value": {
-        "input": "text"
+        "input": "text",
+        "steps": [
+          {
+            "ensure": "The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.",
+            "at": "end",
+            "unless": "no new people appear",
+            "separator": " "
+          }
+        ]
       }
     },
     {
@@ -116,5 +124,6 @@
         "const": 1280
       }
     }
-  ]
+  ],
+  "defaultWhen": "silent"
 }

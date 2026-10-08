@@ -1,6 +1,7 @@
 import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, WorkflowChoice } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
+import { readShotSpeech } from "../series/speech";
 import { missingInputs, stageBindings, type LoadedBinding } from "./binding";
 
 /*
@@ -14,7 +15,8 @@ export function listWorkflowChoices(
   shotId: string,
   stageId: StageId,
 ): WorkflowChoice[] {
-  const choices = stageBindings(stageId).map((item): WorkflowChoice => {
+  const loaded = stageBindings(stageId);
+  const choices = loaded.map((item): WorkflowChoice => {
     const binding = item.binding!;
     // Сломанный манифест виден в меню, но недоступен: причина — в missing.
     const missing = item.error ? [item.error] : missingInputs({ episodeId, shotId, stageId }, binding);
@@ -28,7 +30,16 @@ export function listWorkflowChoices(
       playbook: binding.playbook ?? null,
     };
   });
-  const fallback = choices.find((choice) => choice.available) ?? choices[0];
+  // По умолчанию — первый доступный, чей defaultWhen подходит кадру: с репликами — `speech`, без — `silent`.
+  const speaks = readShotSpeech(episodeId, shotId).trim().length > 0;
+  const fits = (index: number) => {
+    const when = loaded[index].binding?.defaultWhen;
+    return !when || when === (speaks ? "speech" : "silent");
+  };
+  const fallback =
+    choices.find((choice, index) => choice.available && fits(index)) ??
+    choices.find((choice) => choice.available) ??
+    choices[0];
   if (fallback) fallback.isDefault = true;
   return choices;
 }

@@ -73,21 +73,45 @@ test("Wan: эскиз 576×1024, финал Wan 720×1280 с промптом э
   }
   const final = build("final_render", "final_wan_720");
   assert.deepEqual([final["129:98"].inputs.width, final["129:98"].inputs.height], [720, 1280]);
-  assert.equal(final["129:93"].inputs.text, "Static shot. Lena turns her head. 5 sec");
+  assert.equal(
+    final["129:93"].inputs.text,
+    "Static shot. Lena turns her head. 5 sec The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.",
+  );
   assert.equal(final["108"].inputs.filename_prefix, "frameboard/final/s01_wan720");
 });
 
-test("промпт без фиксированной фразы: доска ставит её в начало и указание следовать @vid-1 в конец", () => {
+test("промпт без фиксированной фразы: доска ставит её в начало, требования к первому кадру, превью и качеству — в конец", () => {
   for (const workflow of ["final_h3", "final_h3_768", "final_h3_768_face"]) {
     const body = creatorData(workflow, "Static shot. Lena holds her hand to her chest.").segments[0].refined.body as string;
     assert.match(body, /^The scene begins from @img-1, the same camera position.*use @vid-1 as a reference/, workflow);
-    assert.match(body, /Static shot\. Lena holds her hand to her chest\.\n\nFollow @vid-1 exactly from the first frame to the last/);
+    assert.match(body, /Static shot\. Lena holds her hand to her chest\.\n\n@img-1 is the required first frame/);
+    assert.match(body, /@vid-1 is the required motion guide.*This is a quality pass over @vid-1.*precise lip sync/);
   }
 });
 
-test("агент уже написал фразу и указание — доска их не дублирует", () => {
+test("агент уже написал фразу и требования — доска их не дублирует", () => {
   const written =
-    "[Shot 1] The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it. Lena stands still.\n\nFollow @vid-1 exactly, every movement.";
+    "[Shot 1] The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it. Lena stands still.\n\n@vid-1 is the required motion guide for everything.";
   const body = creatorData("final_h3_768_face", written).segments[0].refined.body as string;
   assert.equal(body, written);
+});
+
+test("с репликами: по умолчанию MiniMax, и без дословных реплик H3 не запускается", () => {
+  fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Julia: Don't mind him.\nLena: But why?\n");
+  try {
+    const choices = listWorkflowChoices(EP, "s01", "final_render");
+    assert.equal(choices.find((choice) => choice.isDefault)?.id, "final_h3_768_face");
+    assert.throws(
+      () => creatorData("final_h3_768_face", "1. The young woman on the left (S1) says: <d>[English] Don’t mind him.</d>"),
+      /нет реплик из speech\.md: «But why\?»/,
+    );
+    const body = creatorData(
+      "final_h3_768_face",
+      "1. The young woman on the left (S1) says: <d>[English] Don’t mind him.</d>\n2. The young woman on the right (S2) says: <d>[English] But why?</d>",
+    ).segments[0].refined.body as string;
+    assert.match(body, /\(S2\) says: <d>\[English\] But why\?<\/d>/);
+  } finally {
+    fs.rmSync(path.join(shotDir(EP, "s01"), "speech.md"), { force: true });
+  }
+  assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, "final_wan_720");
 });
