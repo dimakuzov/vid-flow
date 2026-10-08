@@ -1,0 +1,306 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "final_h3_768_face",
+  "graph": "minimax_h3_creator_api.json",
+  "stage": "final_render",
+  "label": "Финал MiniMax H3, 768, face pass",
+  "description": "768 и face pass: лица перерисовываются отдельно. Для кадров с лицами, когда 1152 не нужен или не хватает памяти.",
+  "playbook": "models/minimax_h3.en.md",
+  "order": 7,
+  "inputs": {
+    "video": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "uploadAs": "{shotId}_final_ref{ext}",
+      "label": "Утверждённое превью (low-res Wan)"
+    },
+    "first": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "uploadAs": "{shotId}_final_first{ext}",
+      "label": "Утверждённый первый кадр"
+    },
+    "people": {
+      "kind": "image",
+      "from": [
+        "refs",
+        "approve:characters"
+      ],
+      "pick": "all",
+      "min": 0,
+      "max": 2,
+      "uploadAs": "{shotId}_final_char{index}{ext}",
+      "label": "Референсы персонажей (refs/ финала, иначе approve персонажей)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "sections": [
+        "body",
+        "subject_definitions",
+        "summary",
+        "retention_analysis",
+        "soundscape"
+      ],
+      "untitled": "body",
+      "label": "prompt.md"
+    },
+    "wan": {
+      "kind": "text",
+      "from": "prompt",
+      "stage": "video_preview",
+      "required": false,
+      "label": "prompt.md превью (исходный Wan-промпт)"
+    },
+    "duration": {
+      "kind": "number",
+      "from": "media:duration",
+      "of": "video",
+      "min": 1,
+      "max": 20,
+      "label": "Длительность превью"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "short_edge"
+        }
+      ],
+      "value": {
+        "const": 768
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "face.on"
+        }
+      ],
+      "value": {
+        "const": true
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "output_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/final/{shotId}_h3"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.assets.0.filename"
+        }
+      ],
+      "value": {
+        "input": "video"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.assets.1.filename"
+        }
+      ],
+      "value": {
+        "input": "first"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.assets.2.filename"
+        }
+      ],
+      "value": {
+        "input": "people",
+        "index": 0
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "1",
+            "field": "creator_data",
+            "json": "segments.0.assets.2"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.assets.3.filename"
+        }
+      ],
+      "value": {
+        "input": "people",
+        "index": 1
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "1",
+            "field": "creator_data",
+            "json": "segments.0.assets.3"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.refined.body"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "body",
+        "required": true
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.refined.sections.subject_definitions"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "subject_definitions"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "1",
+            "field": "creator_data",
+            "json": "segments.0.refined.sections.subject_definitions"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.refined.sections.summary"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "summary"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "1",
+            "field": "creator_data",
+            "json": "segments.0.refined.sections.summary"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.refined.sections.retention_analysis"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "retention_analysis"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "1",
+            "field": "creator_data",
+            "json": "segments.0.refined.sections.retention_analysis"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.soundscape"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "section": "soundscape"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.prompt"
+        },
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.refined.source"
+        }
+      ],
+      "value": {
+        "input": "wan"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "1",
+          "field": "creator_data",
+          "json": "segments.0.duration_s"
+        }
+      ],
+      "value": {
+        "input": "duration"
+      }
+    }
+  ]
+}

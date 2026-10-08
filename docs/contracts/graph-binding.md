@@ -218,7 +218,7 @@ playbooks/workflows/comfy/
 | `location_views` | location | `location_views_multiple_angles.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
-| `final_h3`, `final_h3_768` | final_render | `minimax_h3_creator_api.json` (MiniMax H3) |
+| `final_h3`, `final_h3_768`, `final_h3_768_face` | final_render | `minimax_h3_creator_api.json` (MiniMax H3) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
 
 Составлены по `stage-run.ts` на момент контракта: собранный по ним prompt должен совпадать с текущим (кроме случайных seed).

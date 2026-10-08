@@ -111,7 +111,7 @@ Only the environment and the lines of characters in the frame. No voice-over, no
 
 ## 6. Other settings that affect the result
 
-- **Face pass** — off when there are no people in the frame: the detector found a “face” in a picture on a mug (S4) and redrew that area. On the board: variant `final_h3_768` has the face pass off.
+- **Face pass** — off when there are no people in the frame: the detector found a “face” in a picture on a mug (S4) and redrew that area. On the board: variant `final_h3_768` has the face pass off, `final_h3_768_face` is the same 768 with the face pass on.
 - **Character reference**: a 512×512 portrait for close-ups; for small faces, the character from the environment (already in the shot's clothes).
 - **Duration** = the length of the low-res video. If there are more seconds than action, the model invents a continuation (S16). The board sets it from the video.
 - **Seed** is random. If the result is almost good, first try a new seed, then edit the text.
@@ -140,6 +140,7 @@ Stage `final_render`, graph `playbooks/workflows/comfy/minimax_h3_creator_api.js
 |---|---|---|
 | `final_h3` | 1152, face pass on | default, shots with faces |
 | `final_h3_768` | 768, face pass off | no people, small faces, faster or less memory |
+| `final_h3_768_face` | 768, face pass on | faces in the shot, 1152 not needed or memory is short |
 
 `final_i2v` / `final_flf` (Wan) remain as a fallback. To propose another variant, write its id in `suggestedWorkflow` of `agent_request.json`.
 

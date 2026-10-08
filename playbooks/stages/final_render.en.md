@@ -12,6 +12,7 @@ The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Con
 | --- | --- | --- | --- |
 | `final_h3` | 5 | `minimax_h3_creator_api.json`, 1152, face pass | default, shots with faces |
 | `final_h3_768` | 6 | same graph, 768, no face pass | no people, small faces, faster and less memory |
+| `final_h3_768_face` | 7 | same graph, 768, face pass | shots with faces when 1152 is not needed or memory is short |
 | `final_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | fallback: repeat the Wan sketch on new seeds |
 | `final_flf` | 20 | `wan22_flf_sketch_turbo_api.json` | fallback when the sketch was FLF (last frame in this stage's `refs/`) |
 
