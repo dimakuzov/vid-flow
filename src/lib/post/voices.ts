@@ -46,7 +46,7 @@ export function writeVoiceConfig(character: string, input: Partial<VoiceConfig>)
   const voiceId = typeof input.voice_id === "string" ? input.voice_id.trim() : "";
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(voiceId)) throw new Error("voice_id: скопируйте id голоса из ElevenLabs (латиница и цифры)");
   const modelId = typeof input.model_id === "string" && input.model_id.trim() ? input.model_id.trim() : DEFAULT_MODEL_ID;
-  if (!/^[a-z0-9_]{3,64}$/.test(modelId)) throw new Error("model_id: например eleven_multilingual_v2");
+  if (!/^[a-z0-9_]{3,64}$/.test(modelId)) throw new Error("model_id: например eleven_v3");
   const prefix = typeof input.text_prefix === "string" ? input.text_prefix.trim() : DEFAULT_TEXT_PREFIX;
   if (prefix.length > 200) throw new Error("Тег перед фразой: не длиннее 200 символов");
   const config: VoiceConfig = { voice_id: voiceId, model_id: modelId, text_prefix: prefix };

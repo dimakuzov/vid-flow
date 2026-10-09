@@ -7,7 +7,8 @@ import type { Alignment } from "./align";
  * символы, поэтому повторов здесь нет — их решает пользователь. ELEVENLABS_URL — другой адрес (тесты).
  */
 
-export const DEFAULT_MODEL_ID = "eleven_multilingual_v2";
+/** Модель проекта: v3 понимает аудиотеги (`[strong Russian accent]`). */
+export const DEFAULT_MODEL_ID = "eleven_v3";
 export const OUTPUT_FORMAT = "mp3_44100_128";
 
 export interface VoiceSettings {

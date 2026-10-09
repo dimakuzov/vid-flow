@@ -164,7 +164,8 @@ test("реплики из speech.md: порядок кадров, персона
 });
 
 test("без галочки разрешения в ElevenLabs ничего не уходит", async () => {
-  writeVoiceConfig("julia", { voice_id: "voiceJulia01", seed: 7, voice_settings: { stability: 0.6 } });
+  // Склейку запросов проверяем на v2: у v3 её нет.
+  writeVoiceConfig("julia", { voice_id: "voiceJulia01", model_id: "eleven_multilingual_v2", seed: 7, voice_settings: { stability: 0.6 } });
   await assert.rejects(enqueueVoiceJob(EP, { characters: ["Julia"] }), /Разрешить платную отправку в ElevenLabs/);
   await assert.rejects(enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: false }), /Разрешить платную/);
   await assert.rejects(enqueueVoiceJob(EP, { characters: ["Lena"], allowPaid: true }), /нет voice.json/);
@@ -281,12 +282,17 @@ test("перегенерация персонажа: новая версия, р
 
   // Тег не попадает в текст реплик и манифест.
   assert.ok(lines.every((item) => !item.text.includes("[strong")));
+  // Модель по умолчанию — v3: пустая строка между репликами и previous_text вместо previous_request_ids.
   // Пустой тег — фраза уходит как есть.
   writeVoiceConfig("Julia", { voice_id: "voiceJulia01", text_prefix: "" });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(getCharactersRoot(), "Julia", "voice.json"), "utf8")).model_id, "eleven_v3");
   const before = seen.length;
   const plain = await runVoiceJob(EP, (await enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true })).id);
   assert.equal(plain.status, "done", plain.error);
-  assert.equal(seen[before].body.text, "Don't mind him.");
+  // Без <break> и тега обе реплики влезают в лимит 60: один запрос, реплики через пустую строку.
+  assert.equal(seen.length, before + 1);
+  assert.equal(seen[before].body.text, "Don't mind him.\n\nEverybody wants it. I am Julia, by the way.");
+  assert.equal(seen[before].body.previous_request_ids, undefined);
 
   // Текст реплики изменился в speech.md: подрезка сброшена, озвучка устарела, место осталось.
   fs.writeFileSync(path.join(shotDir(EP, "s03"), "speech.md"), "Everybody wants it.\n");

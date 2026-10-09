@@ -96,7 +96,7 @@ function VoiceForm({
 }) {
   const config = character.config;
   const [voiceId, setVoiceId] = useState(config?.voice_id ?? "");
-  const [modelId, setModelId] = useState(config?.model_id ?? "eleven_multilingual_v2");
+  const [modelId, setModelId] = useState(config?.model_id ?? "eleven_v3");
   const [stability, setStability] = useState(String(config?.voice_settings?.stability ?? ""));
   const [similarity, setSimilarity] = useState(String(config?.voice_settings?.similarity_boost ?? ""));
   const [style, setStyle] = useState(String(config?.voice_settings?.style ?? ""));

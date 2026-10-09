@@ -42,7 +42,7 @@ data/episodes/{ep}/post/
 
 ## Голос и озвучка
 
-`voice.json` → `{ "voice_id", "model_id", "text_prefix", "voice_settings": { stability, similarity_boost, style, speed, use_speaker_boost }, "seed" }`. `model_id` по умолчанию `eleven_multilingual_v2` (проект работает на `eleven_v3`).
+`voice.json` → `{ "voice_id", "model_id", "text_prefix", "voice_settings": { stability, similarity_boost, style, speed, use_speaker_boost }, "seed" }`. `model_id` по умолчанию `eleven_v3` (модель проекта).
 
 `text_prefix` — аудиотег, который доска дописывает перед **каждой** фразой персонажа при **каждой** отправке: `[strong Russian accent] Who is that guy?`. Поля нет — `[strong Russian accent]`; пустая строка — без тега. В `speech.md`, `lines.json`, манифест и субтитры тег не попадает; реплика в таймстемпах ищется без него, так что начало речи — первое слово. Модели v2 теги не понимают и прочтут вслух.
 
