@@ -1,0 +1,149 @@
+import path from "path";
+import { collectPost, type LineVoiceStatus } from "./collect";
+import type { VoiceConfig } from "./elevenlabs";
+import { postDir, TIMELINE_FPS } from "./paths";
+import { listTimelines, readManifest, DEFAULT_SIZE } from "./timeline";
+import { readLatestVoiceJob, type VoiceJob } from "./voice-job";
+import { listVoiceVersions, planCharacterVoice, readVoiceConfig } from "./voices";
+
+/*
+ * Что показывает секция «Пост» на доске. Только чтение.
+ */
+
+export interface PostLineView {
+  id: string;
+  shotId: string;
+  order: number;
+  character: string;
+  text: string;
+  at: number;
+  atManual: boolean;
+  trimIn: number;
+  trimOut: number;
+  voice: LineVoiceStatus;
+  clip: {
+    version: number;
+    in: number;
+    out: number;
+    autoIn: number;
+    autoOut: number;
+    speechStart: number;
+    speechEnd: number;
+    /** Файл озвучки персонажа; отрезок играет страница. */
+    url: string;
+  } | null;
+}
+
+export interface PostCharacterView {
+  name: string;
+  lines: number;
+  /** Реплик без актуальной озвучки (нет её или текст изменился). */
+  pending: number;
+  config: VoiceConfig | null;
+  current: { version: number; createdAt: string; chars: number } | null;
+  versions: number[];
+  /** Символов уйдёт в ElevenLabs при озвучке (оценка стоимости); 0 — нет voice.json. */
+  chars: number;
+}
+
+export interface PostState {
+  episodeId: string;
+  fps: number;
+  keyConfigured: boolean;
+  lines: PostLineView[];
+  characters: PostCharacterView[];
+  shots: { shotId: string; hasFinal: boolean; duration: number | null; fps: number | null; hasAudio: boolean }[];
+  timelines: { name: string; url: string }[];
+  manifest: {
+    timeline: string;
+    builtAt: string;
+    width: number;
+    height: number;
+    lines: number;
+    warnings: string[];
+    skipped: { id: string; reason: string }[];
+  } | null;
+  defaultSize: { width: number; height: number };
+  job: VoiceJob | null;
+}
+
+export function postFileUrl(episodeId: string, relative: string, version?: number): string {
+  const query = new URLSearchParams({ path: relative });
+  if (version !== undefined) query.set("v", String(version));
+  return `/api/episodes/${encodeURIComponent(episodeId)}/post/file?${query}`;
+}
+
+export async function getPostState(episodeId: string): Promise<PostState> {
+  const { lines, finals, voices } = await collectPost(episodeId);
+  const root = postDir(episodeId);
+
+  const names: string[] = [];
+  for (const line of lines) if (line.character && !names.includes(line.character)) names.push(line.character);
+  const characters = names.map((name): PostCharacterView => {
+    const own = lines.filter((line) => line.character === name);
+    const config = readVoiceConfig(name);
+    const voice = voices.get(name.toLowerCase()) ?? null;
+    return {
+      name,
+      lines: own.length,
+      pending: own.filter((line) => line.voice !== "ok").length,
+      config,
+      current: voice ? { version: voice.version, createdAt: voice.createdAt, chars: voice.chars } : null,
+      versions: listVoiceVersions(episodeId, name),
+      chars: config ? planCharacterVoice(own, config).chars : 0,
+    };
+  });
+
+  const manifest = readManifest(episodeId);
+  return {
+    episodeId,
+    fps: TIMELINE_FPS,
+    keyConfigured: Boolean(process.env.ELEVENLABS_API_KEY?.trim()),
+    lines: lines.map((line) => ({
+      id: line.id,
+      shotId: line.shotId,
+      order: line.order,
+      character: line.character,
+      text: line.text,
+      at: line.at,
+      atManual: line.atManual,
+      trimIn: line.trimIn,
+      trimOut: line.trimOut,
+      voice: line.voice,
+      clip: line.clip
+        ? {
+            version: line.clip.version,
+            in: line.clip.in,
+            out: line.clip.out,
+            autoIn: line.clip.autoIn,
+            autoOut: line.clip.autoOut,
+            speechStart: line.clip.speechStart,
+            speechEnd: line.clip.speechEnd,
+            url: postFileUrl(episodeId, path.relative(root, line.clip.source).split(path.sep).join("/"), line.clip.version),
+          }
+        : null,
+    })),
+    characters,
+    shots: [...finals.values()].map((final) => ({
+      shotId: final.shotId,
+      hasFinal: Boolean(final.file),
+      duration: final.probe?.duration ?? null,
+      fps: final.probe?.fps ?? null,
+      hasAudio: Boolean(final.probe?.hasAudio),
+    })),
+    timelines: listTimelines(episodeId).map((name) => ({ name, url: postFileUrl(episodeId, `timeline/${name}`) })),
+    manifest: manifest
+      ? {
+          timeline: manifest.timeline,
+          builtAt: manifest.builtAt,
+          width: manifest.width,
+          height: manifest.height,
+          lines: manifest.lines.length,
+          warnings: manifest.warnings,
+          skipped: manifest.skipped,
+        }
+      : null,
+    defaultSize: manifest ? { width: manifest.width, height: manifest.height } : DEFAULT_SIZE,
+    job: readLatestVoiceJob(episodeId),
+  };
+}

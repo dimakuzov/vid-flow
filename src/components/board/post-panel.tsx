@@ -1,0 +1,564 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { errorText, requestJson } from "@/components/stage/api";
+import { Button } from "@/components/ui/button";
+import type { PostCharacterView, PostLineView, PostState } from "@/lib/post/state";
+import type { VoiceJob } from "@/lib/post/voice-job";
+
+/*
+ * Секция «Пост» под таблицей кадров (docs/contracts/post.md): озвучка реплик в ElevenLabs
+ * и таймлайн для DaVinci Resolve. Субтитры — следующая часть.
+ */
+
+const SIZES = [
+  { label: "720×1280", width: 720, height: 1280 },
+  { label: "768×1344", width: 768, height: 1344 },
+  { label: "1080×1920", width: 1080, height: 1920 },
+];
+
+const VOICE_LABELS: Record<PostLineView["voice"], string> = {
+  ok: "",
+  "no-voice": "нет озвучки",
+  stale: "текст изменился — перегенерировать",
+  "no-character": "нет имени в speech.md",
+};
+
+function postApi(episodeId: string, tail = ""): string {
+  return `/api/episodes/${encodeURIComponent(episodeId)}/post${tail}`;
+}
+
+function seconds(value: number): string {
+  return `${Math.round(value * 100) / 100}`;
+}
+
+function jobText(job: VoiceJob): string {
+  if (job.status === "pending") return "Озвучка поставлена…";
+  if (job.status === "running") return `Озвучка идёт: ${job.progress ?? "запросы в ElevenLabs"}`;
+  if (job.status === "error") return `Озвучка не удалась: ${job.error ?? "ошибка"}`;
+  const versions = job.results.map((item) => `${item.character} v${item.version}`).join(", ");
+  return `Озвучено: ${versions} (${job.chars} символов)`;
+}
+
+/** Поле секунд: правка уходит на сервер по Enter или при уходе с поля. */
+function SecondsInput({
+  value,
+  onCommit,
+  title,
+  disabled,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  title: string;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(seconds(value));
+  const [seen, setSeen] = useState(value);
+  if (seen !== value) {
+    setSeen(value);
+    setDraft(seconds(value));
+  }
+  const commit = () => {
+    const parsed = Number(draft.replace(",", "."));
+    if (!Number.isFinite(parsed)) {
+      setDraft(seconds(value));
+      return;
+    }
+    if (Math.abs(parsed - value) > 0.0005) onCommit(parsed);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      title={title}
+      disabled={disabled}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+      }}
+      className="w-16 rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-right font-mono text-xs disabled:bg-stone-100 disabled:text-stone-400"
+    />
+  );
+}
+
+function VoiceForm({
+  character,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  character: PostCharacterView;
+  busy: boolean;
+  onSave: (body: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const config = character.config;
+  const [voiceId, setVoiceId] = useState(config?.voice_id ?? "");
+  const [modelId, setModelId] = useState(config?.model_id ?? "eleven_multilingual_v2");
+  const [stability, setStability] = useState(String(config?.voice_settings?.stability ?? ""));
+  const [similarity, setSimilarity] = useState(String(config?.voice_settings?.similarity_boost ?? ""));
+  const [style, setStyle] = useState(String(config?.voice_settings?.style ?? ""));
+  const [speed, setSpeed] = useState(String(config?.voice_settings?.speed ?? ""));
+  const [seed, setSeed] = useState(config?.seed === undefined ? "" : String(config.seed));
+
+  const num = (value: string) => (value.trim() === "" ? undefined : Number(value.replace(",", ".")));
+  const field = "rounded-md border border-stone-300 bg-white px-2 py-1 text-xs";
+  return (
+    <div className="mt-2 grid gap-2 rounded-lg border border-stone-200 bg-white p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+      <label className="flex flex-col gap-1 sm:col-span-2">
+        voice_id (из ElevenLabs → Voices)
+        <input className={`${field} font-mono`} value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1 sm:col-span-2">
+        model_id
+        <input className={`${field} font-mono`} value={modelId} onChange={(event) => setModelId(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1">
+        stability
+        <input className={field} value={stability} placeholder="0.5" onChange={(event) => setStability(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1">
+        similarity_boost
+        <input className={field} value={similarity} placeholder="0.75" onChange={(event) => setSimilarity(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1">
+        style
+        <input className={field} value={style} placeholder="0" onChange={(event) => setStyle(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1">
+        speed
+        <input className={field} value={speed} placeholder="1.0" onChange={(event) => setSpeed(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1">
+        seed (тот же голос при повторе)
+        <input className={field} value={seed} onChange={(event) => setSeed(event.target.value)} />
+      </label>
+      <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            onSave({
+              character: character.name,
+              voice_id: voiceId,
+              model_id: modelId,
+              voice_settings: {
+                stability: num(stability),
+                similarity_boost: num(similarity),
+                style: num(style),
+                speed: num(speed),
+              },
+              seed: num(seed),
+            })
+          }
+        >
+          Сохранить голос
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          Отмена
+        </Button>
+        <span className="text-stone-500">Пишется в data/characters/{character.name}/voice.json, общий для всех эпизодов.</span>
+      </div>
+    </div>
+  );
+}
+
+export function PostPanel({ episodeId }: { episodeId: string }) {
+  const [state, setState] = useState<PostState | null>(null);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[] | null>(null);
+  const [allowPaid, setAllowPaid] = useState(false);
+  const [size, setSize] = useState<string | null>(null);
+  const audio = useRef<HTMLAudioElement | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setState(await requestJson<PostState>(postApi(episodeId)));
+      setError("");
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }, [episodeId]);
+
+  useEffect(() => {
+    // Первая загрузка: setState внутри load вызывается после ответа сервера.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const jobActive = state?.job?.status === "pending" || state?.job?.status === "running";
+  useEffect(() => {
+    if (!jobActive) return;
+    const timer = setInterval(() => void load(), 2000);
+    return () => clearInterval(timer);
+  }, [jobActive, load]);
+
+  async function act(run: () => Promise<PostState | null>, done = "") {
+    setBusy(true);
+    setMessage("");
+    try {
+      const next = await run();
+      if (next) setState(next);
+      else await load();
+      if (done) setMessage(done);
+    } catch (err) {
+      setMessage(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const patchLine = (id: string, patch: Record<string, number | null>) =>
+    act(() => requestJson<PostState>(postApi(episodeId, "/lines"), { method: "PATCH", body: { id, ...patch } }));
+
+  function play(line: PostLineView) {
+    if (!line.clip) return;
+    const { url, in: start, out: end } = line.clip;
+    audio.current?.pause();
+    const player = new Audio(url);
+    audio.current = player;
+    player.addEventListener("loadedmetadata", () => {
+      player.currentTime = start;
+      void player.play();
+    });
+    player.addEventListener("timeupdate", () => {
+      if (player.currentTime >= end) player.pause();
+    });
+  }
+
+  if (!state) {
+    return (
+      <section className="rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-2xl text-stone-900">Пост</h2>
+        <p className="mt-2 text-sm text-stone-600">{error || "Загрузка…"}</p>
+      </section>
+    );
+  }
+
+  const voiceable = state.characters.filter((item) => item.config);
+  const chosen = selected ?? voiceable.filter((item) => item.pending > 0).map((item) => item.name);
+  const chosenChars = state.characters.filter((item) => chosen.includes(item.name)).reduce((sum, item) => sum + item.chars, 0);
+  const sizeChoice =
+    SIZES.find((item) => item.label === size) ??
+    SIZES.find((item) => item.width === state.defaultSize.width && item.height === state.defaultSize.height) ??
+    SIZES[0];
+  const latest = state.timelines[state.timelines.length - 1];
+
+  return (
+    <section className="min-w-0 rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="font-[family-name:var(--font-display)] text-2xl text-stone-900">Пост</h2>
+        <button type="button" onClick={() => void load()} className="text-sm text-teal-800 underline-offset-4 hover:underline">
+          Обновить
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
+          <h3 className="text-base font-semibold text-stone-900">Озвучка и проект DaVinci</h3>
+          <p className="mt-1 max-w-3xl text-sm text-stone-600">
+            Реплики берутся из «Реплик» кадров (speech.md). Один файл озвучки на персонажа со всеми его репликами —
+            голос не меняется между фразами. В таймлайне каждая реплика — отрезок этого файла, край клипа в Resolve можно потянуть.
+          </p>
+
+          {state.job ? (
+            <p
+              className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+                state.job.status === "error"
+                  ? "border-red-300 bg-red-50 text-red-950"
+                  : state.job.status === "done"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                    : "border-sky-300 bg-sky-50 text-sky-950"
+              }`}
+            >
+              {jobText(state.job)}
+            </p>
+          ) : null}
+
+          <h4 className="mt-4 text-sm font-medium text-stone-800">Голоса</h4>
+          {state.characters.length === 0 ? (
+            <p className="mt-1 text-sm text-stone-500">Реплик нет: заполните «Реплики» на этапах превью или финала кадров.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {state.characters.map((character) => (
+                <li key={character.name} className="rounded-lg border border-stone-200 bg-white/80 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <label className="flex items-center gap-2 font-medium text-stone-900">
+                      <input
+                        type="checkbox"
+                        disabled={!character.config || jobActive}
+                        checked={chosen.includes(character.name)}
+                        onChange={(event) =>
+                          setSelected(
+                            event.target.checked
+                              ? [...chosen, character.name]
+                              : chosen.filter((name) => name !== character.name),
+                          )
+                        }
+                      />
+                      {character.name}
+                    </label>
+                    <span className="text-xs text-stone-500">реплик: {character.lines}</span>
+                    {character.config ? (
+                      <span className="font-mono text-xs text-stone-500">
+                        {character.config.voice_id.slice(0, 10)}… · {character.config.model_id}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-800">нет voice.json</span>
+                    )}
+                    {character.current ? (
+                      <span className="text-xs text-stone-600">
+                        озвучка v{character.current.version}
+                        {character.pending ? `, без актуальной озвучки: ${character.pending}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-stone-500">не озвучен</span>
+                    )}
+                    {character.versions.length > 1 ? (
+                      <select
+                        className="rounded-md border border-stone-300 bg-white px-1 py-0.5 text-xs"
+                        value={character.current?.version ?? ""}
+                        disabled={busy || jobActive}
+                        title="Какая версия озвучки идёт в таймлайн"
+                        onChange={(event) =>
+                          act(() =>
+                            requestJson<PostState>(postApi(episodeId, "/voices"), {
+                              method: "POST",
+                              body: { character: character.name, version: Number(event.target.value) },
+                            }),
+                          )
+                        }
+                      >
+                        {character.versions.map((version) => (
+                          <option key={version} value={version}>
+                            v{version}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    {character.config ? <span className="text-xs text-stone-500">{character.chars} симв.</span> : null}
+                    <button
+                      type="button"
+                      className="text-xs text-teal-800 underline-offset-4 hover:underline"
+                      onClick={() => setEditing(editing === character.name ? null : character.name)}
+                    >
+                      {character.config ? "Голос" : "Задать голос"}
+                    </button>
+                  </div>
+                  {editing === character.name ? (
+                    <VoiceForm
+                      key={character.name}
+                      character={character}
+                      busy={busy}
+                      onCancel={() => setEditing(null)}
+                      onSave={(body) =>
+                        act(async () => {
+                          const next = await requestJson<PostState>(postApi(episodeId, "/voices"), { method: "PUT", body });
+                          setEditing(null);
+                          return next;
+                        }, `Голос ${character.name} сохранён`)
+                      }
+                    />
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {state.characters.length ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm">
+              <label className="flex items-center gap-2 text-amber-950">
+                <input type="checkbox" checked={allowPaid} disabled={jobActive} onChange={(event) => setAllowPaid(event.target.checked)} />
+                Разрешить платную отправку в ElevenLabs
+              </label>
+              <span className="text-xs text-amber-900">
+                {chosen.length ? `${chosen.join(", ")}: ${chosenChars} символов` : "Отметьте персонажей"}
+              </span>
+              <Button
+                size="sm"
+                disabled={!allowPaid || !chosen.length || busy || jobActive || !state.keyConfigured}
+                onClick={() =>
+                  act(async () => {
+                    await requestJson<VoiceJob>(postApi(episodeId, "/voice-job"), {
+                      method: "POST",
+                      body: { characters: chosen, allowPaid: true },
+                    });
+                    // Разрешение — на один запуск.
+                    setAllowPaid(false);
+                    setSelected(null);
+                    return null;
+                  })
+                }
+              >
+                {chosen.some((name) => state.characters.find((item) => item.name === name)?.current)
+                  ? "Перегенерировать"
+                  : "Озвучить"}
+              </Button>
+              {!state.keyConfigured ? (
+                <span className="text-xs text-red-800">Нет ELEVENLABS_API_KEY в .env.local — впишите ключ и перезапустите доску.</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {state.lines.length ? (
+            <>
+              <h4 className="mt-4 text-sm font-medium text-stone-800">Реплики</h4>
+              <p className="mt-1 text-xs text-stone-500">
+                «Место» — секунда от начала кадра, где начинается речь (для кадров со своим звуком — по паузам в нём).
+                «Начало» и «Конец» — сдвиг границ отрезка, секунды (минус — раньше). Правки переживают перегенерацию, пока текст реплики не изменился.
+              </p>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-[0.12em] text-stone-500">
+                    <tr>
+                      <th className="px-2 py-1">№</th>
+                      <th className="px-2 py-1">Кадр</th>
+                      <th className="px-2 py-1">Персонаж</th>
+                      <th className="px-2 py-1">Текст</th>
+                      <th className="px-2 py-1">Место</th>
+                      <th className="px-2 py-1">Начало</th>
+                      <th className="px-2 py-1">Конец</th>
+                      <th className="px-2 py-1">Звук</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.lines.map((line) => (
+                      <tr key={line.id} className="border-t border-stone-200 align-top">
+                        <td className="px-2 py-1.5 text-xs text-stone-500">{line.order}</td>
+                        <td className="px-2 py-1.5 font-mono text-xs">{line.shotId}</td>
+                        <td className="px-2 py-1.5">{line.character || "—"}</td>
+                        <td className="px-2 py-1.5 text-stone-800">{line.text}</td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <SecondsInput
+                            value={line.at}
+                            title="Секунды от начала кадра"
+                            disabled={busy}
+                            onCommit={(value) => void patchLine(line.id, { at: value })}
+                          />
+                          {line.atManual ? (
+                            <button
+                              type="button"
+                              className="ml-1 text-xs text-teal-800 underline-offset-4 hover:underline"
+                              title="Вернуть авто-место"
+                              onClick={() => void patchLine(line.id, { at: null })}
+                            >
+                              авто
+                            </button>
+                          ) : (
+                            <span className="ml-1 text-xs text-stone-400">авто</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <SecondsInput
+                            value={line.trimIn}
+                            title="Сдвиг начала отрезка, секунды"
+                            disabled={busy}
+                            onCommit={(value) => void patchLine(line.id, { trimIn: value })}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <SecondsInput
+                            value={line.trimOut}
+                            title="Сдвиг конца отрезка, секунды"
+                            disabled={busy}
+                            onCommit={(value) => void patchLine(line.id, { trimOut: value })}
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap text-xs">
+                          {line.clip ? (
+                            <button
+                              type="button"
+                              className="text-teal-800 underline-offset-4 hover:underline"
+                              title={`v${line.clip.version}: ${seconds(line.clip.in)}–${seconds(line.clip.out)} с`}
+                              onClick={() => play(line)}
+                            >
+                              ▶ {seconds(line.clip.out - line.clip.in)} с
+                            </button>
+                          ) : (
+                            <span className={line.voice === "stale" ? "text-amber-800" : "text-stone-400"}>
+                              {VOICE_LABELS[line.voice]}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+
+          <h4 className="mt-4 text-sm font-medium text-stone-800">Таймлайн для Resolve</h4>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2 text-stone-700">
+              Кадр
+              <select
+                className="rounded-md border border-stone-300 bg-white px-2 py-1 text-xs"
+                value={sizeChoice.label}
+                onChange={(event) => setSize(event.target.value)}
+              >
+                {SIZES.map((item) => (
+                  <option key={item.label} value={item.label}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-stone-500">{state.fps} fps</span>
+            </label>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || jobActive}
+              onClick={() =>
+                act(async () => {
+                  const manifest = await requestJson<{ timeline: string; lines: unknown[] }>(postApi(episodeId, "/timeline"), {
+                    method: "POST",
+                    body: { width: sizeChoice.width, height: sizeChoice.height },
+                  });
+                  setMessage(`Собран ${manifest.timeline.replace("timeline/", "")}: реплик ${manifest.lines.length}`);
+                  return null;
+                })
+              }
+            >
+              Собрать таймлайн
+            </Button>
+            {latest ? (
+              <a href={latest.url} className="text-teal-800 underline-offset-4 hover:underline" download>
+                Скачать {latest.name}
+              </a>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs text-stone-500">
+            Resolve: File → Import → Timeline, выбрать .fcpxml. Видео — финалы кадров; звук финалов — выключенная дорожка для сверки с губами;
+            ниже — дорожка на персонажа. Бесплатно, локально.
+            {state.timelines.length > 1 ? ` Прошлые версии: ${state.timelines.slice(0, -1).map((item) => item.name).join(", ")}.` : ""}
+          </p>
+          {state.manifest && (state.manifest.warnings.length || state.manifest.skipped.length) ? (
+            <ul className="mt-2 space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-950">
+              {state.manifest.skipped.map((item) => (
+                <li key={item.id}>
+                  {item.id}: не в таймлайне — {item.reason}
+                </li>
+              ))}
+              {state.manifest.warnings.map((text) => (
+                <li key={text}>{text}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          {message ? <p className="mt-3 text-sm text-stone-700">{message}</p> : null}
+        </div>
+
+        <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-4">
+          <h3 className="text-base font-semibold text-stone-500">Субтитры</h3>
+          <p className="mt-1 text-sm text-stone-500">После озвучки: по готовому видео с настоящей озвучкой.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
