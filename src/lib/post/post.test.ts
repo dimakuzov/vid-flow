@@ -23,6 +23,7 @@ import { collectPost } from "./collect";
 import { synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
 import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
+import { buildProject } from "./build";
 import { enqueueSpeechDetect } from "./speech-detect";
 import { getPostState } from "./state";
 import { buildTimeline } from "./timeline";
@@ -402,6 +403,18 @@ test("речь в финале (Whisper): реплика встаёт под г�
   ({ lines } = await collectPost(EP));
   assert.equal(lines.find((item) => item.id === "s02-1")!.window, null);
   assert.equal((await getPostState(EP)).shots.find((shot) => shot.shotId === "s02")!.speech.status, "stale");
+});
+
+test("«Собрать проект» сам распознаёт речь там, где её нет, и не ждёт выключенный ComfyUI", async () => {
+  // После прошлого теста финал s02 заменён — распознавание устарело. ComfyUI в тестах нет: задание не уйдёт.
+  const before = fs.readdirSync(getComfyQueueRoot()).filter((name) => name.startsWith("post-speech-e01-s02-")).length;
+  const started = Date.now();
+  const manifest = await buildProject(EP, { stallMs: 300, pollMs: 50 });
+  assert.ok(Date.now() - started < 10_000, "не висит");
+  const after = fs.readdirSync(getComfyQueueRoot()).filter((name) => name.startsWith("post-speech-e01-s02-")).length;
+  assert.equal(after, before + 1, "распознавание s02 поставлено заново");
+  assert.match(manifest.warnings[0], /^s02: распознавание речи не ушло в ComfyUI/);
+  assert.ok(fs.existsSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", ""))), "проект собран");
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */

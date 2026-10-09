@@ -221,11 +221,13 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
 
   const jobActive = state?.job?.status === "pending" || state?.job?.status === "running";
   const speechActive = Boolean(state?.shots.some((shot) => shot.speech.status === "queued" || shot.speech.status === "running"));
+  // Сборка ждёт распознавание речи на сервере: пока идёт — обновляем статусы кадров.
+  const [building, setBuilding] = useState(false);
   useEffect(() => {
-    if (!jobActive && !speechActive) return;
+    if (!jobActive && !speechActive && !building) return;
     const timer = setInterval(() => void load(), 3000);
     return () => clearInterval(timer);
-  }, [jobActive, speechActive, load]);
+  }, [jobActive, speechActive, building, load]);
 
   async function act(run: () => Promise<PostState | null>, done = "") {
     setBusy(true);
@@ -440,24 +442,11 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             <>
               <h4 className="mt-4 text-sm font-medium text-stone-800">Речь в кадрах — под губы</h4>
               <p className="mt-1 text-xs text-stone-500">
-                Whisper находит в финале кадра, где звучит каждая реплика. Озвучка ставится на это место и ускоряется
-                или замедляется до длины речи в видео (от {SPEED_RANGE}, тон не меняется). Локальный ComfyUI, бесплатно.
+                «Собрать проект» сначала распознаёт (Whisper, локальный ComfyUI, бесплатно), где в финале кадра звучит каждая
+                реплика. Озвучка ставится на это место и ускоряется или замедляется до длины речи в видео (от {SPEED_RANGE},
+                тон не меняется). Уже распознанные кадры повторно не распознаются, пока не заменён финал.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || speechActive}
-                  onClick={() =>
-                    act(async () => {
-                      const result = await requestJson<{ queued: string[] }>(postApi(episodeId, "/speech"), { method: "POST", body: {} });
-                      setMessage(result.queued.length ? `Распознавание поставлено: ${result.queued.join(", ")}` : "Все кадры уже распознаны");
-                      return null;
-                    })
-                  }
-                >
-                  Распознать речь
-                </Button>
                 {state.shots
                   .filter((shot) => shot.hasAudio)
                   .map((shot) => (
@@ -631,16 +620,21 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
               disabled={busy || jobActive}
               onClick={() =>
                 act(async () => {
-                  const manifest = await requestJson<{ timeline: string; kdenlive?: string; lines: unknown[] }>(
-                    postApi(episodeId, "/timeline"),
-                    { method: "POST", body: { width: sizeChoice.width, height: sizeChoice.height } },
-                  );
-                  setMessage(`Собран ${(manifest.kdenlive ?? manifest.timeline).replace("timeline/", "")}: реплик ${manifest.lines.length}`);
+                  setBuilding(true);
+                  try {
+                    const manifest = await requestJson<{ timeline: string; kdenlive?: string; lines: unknown[] }>(
+                      postApi(episodeId, "/timeline"),
+                      { method: "POST", body: { width: sizeChoice.width, height: sizeChoice.height } },
+                    );
+                    setMessage(`Собран ${(manifest.kdenlive ?? manifest.timeline).replace("timeline/", "")}: реплик ${manifest.lines.length}`);
+                  } finally {
+                    setBuilding(false);
+                  }
                   return null;
                 })
               }
             >
-              Собрать проект
+              {building ? (speechActive ? "Распознаю речь…" : "Собираю…") : "Собрать проект"}
             </Button>
             {project ? (
               <a href={project.url} className="text-teal-800 underline-offset-4 hover:underline" download>

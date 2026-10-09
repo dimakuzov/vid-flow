@@ -18,6 +18,8 @@ import { manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson }
 export interface TimelineOptions {
   width?: number;
   height?: number;
+  /** Заметки сборки (например, кадры, где речь не распознана) — в начало `warnings`. */
+  notes?: string[];
 }
 
 export const DEFAULT_SIZE = { width: 720, height: 1280 };
@@ -132,7 +134,7 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
   const shotIds = listShotIds(episodeId);
   for (const shotId of shotIds) finals.set(shotId, await readShotFinal(episodeId, shotId));
   const { lines } = await collectPost(episodeId, finals);
-  const warnings: string[] = [];
+  const warnings: string[] = [...(options.notes ?? [])];
   const skipped: Manifest["skipped"] = [];
 
   // Кадры подряд.

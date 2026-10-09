@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { enqueueComfyJob, readComfyJob } from "../comfy/queue";
@@ -114,7 +115,7 @@ export async function enqueueSpeechDetect(
       continue;
     }
     const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-    const jobId = `post-speech-${episodeId}-${shotId}-${stamp}`.slice(0, 81);
+    const jobId = `post-speech-${episodeId}-${shotId}-${stamp}-${crypto.randomBytes(2).toString("hex")}`.slice(0, 81);
     const upload = `fb_${episodeId}_${shotId}_${path.basename(final.file)}`;
     const prompt = JSON.parse(JSON.stringify(graph)) as ApiPrompt;
     prompt[nodes.load].inputs.video = upload;

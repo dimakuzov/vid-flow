@@ -68,7 +68,7 @@ data/episodes/{ep}/post/
 
 ## Речь в кадрах — под губы
 
-У финалов H3/HeyGen есть своя речь с липсинком. «Распознать речь» (`POST .../post/speech`) ставит в очередь доски (`data/comfy_queue`, локальный ComfyUI, бесплатно) граф `playbooks/workflows/comfy/create_subtitles_file_from_video.json` (ComfyUI-Whisper, JSON не правится): видео из `final_render/approve/` подставляется в `VHS_LoadVideo`, задание с `saveText: true`. Слова Whisper (`PreviewAny` от `words_alignment`) — `{ value, start, end }`.
+У финалов H3/HeyGen есть своя речь с липсинком. «Собрать проект» (`POST .../post/timeline`) сначала ставит распознавание кадрам, где его нет, оно упало или финал заменён, ждёт его (задание, не ушедшее в ComfyUI за 90 с, не ждёт — кадр собирается без подгонки, заметка в `warnings`) и потом собирает. `POST .../post/speech` ставит в очередь доски (`data/comfy_queue`, локальный ComfyUI, бесплатно) граф `playbooks/workflows/comfy/create_subtitles_file_from_video.json` (ComfyUI-Whisper, JSON не правится): видео из `final_render/approve/` подставляется в `VHS_LoadVideo`, задание с `saveText: true`. Слова Whisper (`PreviewAny` от `words_alignment`) — `{ value, start, end }`.
 
 - Распознавание привязано к файлу финала (имя, размер, время): финал заменили — статус `stale`, рамок нет до нового прогона («заново»).
 - Слова сопоставляются с репликами кадра по тексту (выравнивание с сохранением порядка, лишние слова Whisper не мешают). Найдено меньше 40 % слов реплики — рамки нет.
