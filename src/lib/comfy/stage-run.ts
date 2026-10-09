@@ -20,7 +20,12 @@ export function queueStageRun(
   episodeId: string,
   shotId: string,
   stageId: StageId,
-  options?: { workflow?: string | null; fromAgent?: boolean },
+  options?: {
+    workflow?: string | null;
+    fromAgent?: boolean;
+    /** Разрешение пользователя на платный запуск в Comfy Cloud — на этот один запуск. */
+    allowCloud?: boolean;
+  },
 ): { id: string; message: string } {
   // Ручной запуск закрыт, пока идёт операция. Из цикла после ответа агента — разрешён.
   if (!options?.fromAgent) assertStageFree(episodeId, shotId, stageId);
@@ -36,6 +41,11 @@ export function queueStageRun(
     );
   }
   const { binding, graph } = requireStageBinding(stageId, workflow);
+  if (binding.target === "cloud" && !options?.allowCloud) {
+    throw new Error(
+      `«${binding.label}» идёт в Comfy Cloud и тратит кредиты. Поставьте галочку «Разрешить платную отправку в Comfy Cloud» на странице этапа и нажмите «Запустить».`,
+    );
+  }
   const built = buildPrompt(binding, graph, { episodeId, shotId, stageId });
   const job = enqueueComfyJob({
     id: `${shotId}-${binding.id}-${Date.now()}`,
@@ -44,6 +54,7 @@ export function queueStageRun(
     shotId,
     stageId,
     workflow: binding.id,
+    ...(binding.target === "cloud" ? { target: "cloud" as const } : {}),
     prompt: built.prompt,
     uploads: built.uploads.map((upload) => ({ path: relativeToCwd(upload.path), filename: upload.filename })),
     saveTo: relativeToCwd(path.join(stageDir(episodeId, shotId, stageId), "output")),
@@ -57,6 +68,9 @@ export function queueStageRun(
   startComfyQueue();
   return {
     id: job.id,
-    message: `В очереди Comfy: ${job.id}. Прогон идёт там, файлы появятся в output/.`,
+    message:
+      binding.target === "cloud"
+        ? `Отправляется в Comfy Cloud: ${job.id}. Файлы появятся в output/, когда облако закончит.`
+        : `В очереди Comfy: ${job.id}. Прогон идёт там, файлы появятся в output/.`,
   };
 }

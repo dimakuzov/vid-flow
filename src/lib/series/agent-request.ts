@@ -409,6 +409,8 @@ export function submitAgentRequest(options: {
   provider?: string;
   /** Модель провайдера. Нет — модель провайдера по умолчанию. */
   model?: string;
+  /** Разрешение на платный запуск в Comfy Cloud после ответа агента (один запуск). */
+  allowCloud?: boolean;
 }): AgentRequestFile {
   const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
@@ -499,6 +501,7 @@ export function submitAgentRequest(options: {
     requestId: request.id,
     state: boardQueues ? "wait" : "agent",
     workflow,
+    ...(options.allowCloud ? { allowCloud: true } : {}),
     updatedAt: request.createdAt,
   });
   writeAgentRequest(request);

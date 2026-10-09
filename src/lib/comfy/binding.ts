@@ -77,8 +77,13 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,40}$/.test(binding.id)) fail("id: латиница, цифры, _ и -");
   if (!STAGES.includes(binding.stage)) fail(`неизвестный этап ${binding.stage}`);
   if (typeof binding.order !== "number") fail("нет order");
-  if (binding.defaultWhen !== undefined && binding.defaultWhen !== "speech" && binding.defaultWhen !== "silent") {
-    fail(`defaultWhen: speech или silent (сейчас ${binding.defaultWhen})`);
+  if (binding.defaultWhen !== undefined && !["speech", "dialogue", "silent"].includes(binding.defaultWhen)) {
+    fail(`defaultWhen: speech, dialogue или silent (сейчас ${binding.defaultWhen})`);
+  }
+  if (binding.target !== undefined && binding.target !== "cloud") fail(`target: только cloud (сейчас ${binding.target})`);
+  if (binding.target === "cloud") {
+    const cost = binding.cost;
+    if (!cost || !(cost.credits > 0) || !(cost.perSeconds > 0)) fail("target cloud: нужна цена cost { credits, perSeconds }");
   }
   for (const [id, node] of Object.entries(graph)) {
     if (!node || typeof node.class_type !== "string" || !node.inputs || typeof node.inputs !== "object") {
@@ -706,6 +711,13 @@ function inRange(value: number, input: NumberInput): boolean {
   return (input.min == null || value >= input.min) && (input.max == null || value <= input.max);
 }
 
+/** Число, прижатое к min..max входа (clamp: true). */
+function clampToRange(value: number, input: NumberInput): number {
+  const low = input.min ?? value;
+  const high = input.max ?? value;
+  return Math.min(high, Math.max(low, value));
+}
+
 function numberValue(
   input: NumberInput,
   promptMd: string,
@@ -721,6 +733,7 @@ function numberValue(
     const seconds = file ? videoDurationSeconds(file) : null;
     if (seconds == null) return null;
     const rounded = Math.round(seconds);
+    if (input.clamp) return clampToRange(rounded, input);
     return inRange(rounded, input) ? rounded : null;
   }
   return secondsInText(promptMd, input);
@@ -858,7 +871,8 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   for (const slot of binding.slots) {
     const value = slot.value;
     if ("seed" in value) {
-      for (const target of slot.targets) writeTarget(target, seed());
+      const limit = typeof value.max === "number" && value.max > 0 ? value.max : null;
+      for (const target of slot.targets) writeTarget(target, limit ? seed() % (limit + 1) : seed());
       continue;
     }
     if ("const" in value) {

@@ -35,6 +35,8 @@ export async function POST(request: Request, context: StageRouteContext) {
       speech?: unknown;
       /** «Запомнить для кадра»: provider и model становятся агентом кадра (agent.json). */
       rememberForShot?: unknown;
+      /** Галочка «Разрешить платную отправку в Comfy Cloud»: доска запустит облако после ответа агента. */
+      allowCloud?: unknown;
     };
     if (typeof body.speech === "string" && stageHasSpeech(stageId)) writeShotSpeech(episodeId, shotId, body.speech);
     const submitted = submitAgentRequest({
@@ -53,6 +55,7 @@ export async function POST(request: Request, context: StageRouteContext) {
             : undefined,
       provider: typeof body.provider === "string" ? body.provider : undefined,
       model: typeof body.model === "string" ? body.model : undefined,
+      allowCloud: body.allowCloud === true,
     });
 
     // Агент кадра меняется только вместе с принятым запросом.

@@ -21,6 +21,11 @@ export interface ComfyJob {
   stageId?: string;
   /** id манифеста графа (graph-binding). */
   workflow?: string;
+  /**
+   * `cloud` — задание идёт в Comfy Cloud (cloud.comfy.org), а не в локальный ComfyUI. Платно:
+   * ставится только с разрешением пользователя и никогда не отправляется повторно сам.
+   */
+  target?: "cloud";
   prompt: ApiPrompt;
   /** Файлы для POST /upload/image перед отправкой. path — от cwd, внутри data/ или playbooks/. */
   uploads?: { path: string; filename?: string }[];

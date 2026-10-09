@@ -46,6 +46,13 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const rememberForShot = rememberChoice ?? !detail.shotAgent;
   const stageBusy = detail.state.busy;
   const canRun = detail.workflows.length > 0;
+  // Выбранный (или по умолчанию) воркфлоу: облачный — только с галочкой, на один запуск.
+  const activeWorkflow =
+    detail.workflows.find((item) => item.id === detail.workflow) ??
+    detail.workflows.find((item) => item.isDefault) ??
+    null;
+  const cloudCost = activeWorkflow?.cloud ?? null;
+  const [allowCloud, setAllowCloud] = useState(false);
 
   /** Действие кнопки: блокирует кнопки, показывает результат или ошибку. */
   async function act(work: () => Promise<string | void>) {
@@ -100,10 +107,12 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             ...(agent.selected ? { provider: agent.selected } : {}),
             ...(agent.model ? { model: agent.model } : {}),
             ...(agent.selected && rememberForShot && !agent.isInitial ? { rememberForShot: true } : {}),
+            ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
           },
           fallbackError: "Не отправлено",
         },
       );
+      setAllowCloud(false);
       stage.reset(data.stage);
       // Запрос ушёл — обратно к таблице, как «← Таблица».
       router.push(episodePagePath(episodeId));
@@ -115,9 +124,14 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       await saveDocs();
       const data = await requestJson<{ message: string; stage?: StageDetail }>(`${stageApi}/run`, {
         method: "POST",
-        body: detail.workflow ? { runWorkflow: detail.workflow } : {},
+        body: {
+          ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
+          ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
+        },
         fallbackError: "Не запущено",
       });
+      // Разрешение — на один запуск.
+      setAllowCloud(false);
       if (data.stage) stage.merge(data.stage);
       else await stage.reload();
       return data.message;
@@ -343,9 +357,25 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             />
           </div>
           {!stageBusy ? (
-            <Button disabled={busy} onClick={runStage}>
+            <Button disabled={busy || (Boolean(cloudCost) && !allowCloud)} onClick={runStage}>
               Запустить
             </Button>
+          ) : null}
+          {cloudCost && !stageBusy ? (
+            <label className="flex w-full items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={allowCloud}
+                disabled={busy}
+                onChange={(event) => setAllowCloud(event.target.checked)}
+              />
+              <span>
+                Разрешить платную отправку в Comfy Cloud — на один запуск. Около {cloudCost.credits} кредитов за{" "}
+                {cloudCost.perSeconds} с видео. Действует и для «Отправить агенту»: облако запустится после
+                его ответа.
+              </span>
+            </label>
           ) : null}
           <div className="w-full">
             <SuggestedWorkflow

@@ -96,11 +96,13 @@ test("агент уже написал фразу и требования — д
   assert.equal(body, written);
 });
 
-test("с репликами: по умолчанию MiniMax, и без дословных реплик H3 не запускается", () => {
+test("один говорящий — по умолчанию MiniMax, двое — HeyGen; без дословных реплик H3 не запускается", () => {
+  fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Julia: Don't mind him.\n");
+  assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, "final_h3_768_face");
   fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Julia: Don't mind him.\nLena: But why?\n");
   try {
     const choices = listWorkflowChoices(EP, "s01", "final_render");
-    assert.equal(choices.find((choice) => choice.isDefault)?.id, "final_h3_768_face");
+    assert.equal(choices.find((choice) => choice.isDefault)?.id, "final_heygen");
     assert.throws(
       () => creatorData("final_h3_768_face", "1. The young woman on the left (S1) says: <d>[English] Don’t mind him.</d>"),
       /нет реплик из speech\.md: «But why\?»/,

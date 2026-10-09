@@ -1,0 +1,45 @@
+{
+  "3": {
+    "inputs": {
+      "filename_prefix": "frameboard/final/heygen",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video-preview": "",
+      "video": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "5": {
+    "inputs": {
+      "image": "first_frame.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "9": {
+    "inputs": {
+      "model": "heygen-video-1",
+      "model.prompt": "Start exactly from the first frame. <scene in order, the lines in quotes, each tied to a described person>. Each person's lips move only on their own line. Audio: <sounds>. No music.",
+      "model.duration": 9,
+      "model.resolution": "768p",
+      "model.seed": 2548349596,
+      "model.image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "HeyGenImageToVideoNode",
+    "_meta": {
+      "title": "HeyGen Video 1.0 Image to Video"
+    }
+  }
+}

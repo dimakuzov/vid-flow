@@ -27,6 +27,8 @@ export interface AgentDispatch {
   workflow?: string;
   /** Старое поле: i2v / flf. Читается, если нет workflow. */
   videoWorkflow?: string;
+  /** Пользователь разрешил платный запуск в Comfy Cloud после ответа агента (один запуск). */
+  allowCloud?: boolean;
   jobId?: string;
   error?: string;
   updatedAt: string;

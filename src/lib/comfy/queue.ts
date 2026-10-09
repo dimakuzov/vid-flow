@@ -12,6 +12,14 @@ import {
   submitComfyPrompt,
   uploadComfyImage,
 } from "./client";
+import {
+  cancelCloudJob,
+  downloadCloudFile,
+  readCloudJob,
+  renameUploads,
+  submitCloudPrompt,
+  uploadCloudImage,
+} from "./cloud";
 import { registerLoop } from "../background";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
 
@@ -22,6 +30,13 @@ export type { ComfyJob };
 
 const running = new Set<string>();
 const HISTORY_TIMEOUT_MS = 15 * 60 * 1000;
+/** Облако опрашивается реже локального ComfyUI: видео там идёт минутами. */
+const CLOUD_POLL_MS = 15 * 1000;
+const lastCloudPoll = new Map<string, number>();
+
+function isCloud(job: ComfyJob): boolean {
+  return job.target === "cloud";
+}
 let draining = false;
 
 function processAlive(pid: number): boolean {
@@ -159,7 +174,80 @@ function listJobs(): ComfyJob[] {
   return jobs;
 }
 
+/**
+ * Comfy Cloud: загрузить файлы, подставить облачные имена в граф, отправить один раз.
+ * Ошибка на любом шаге — задание error, без повтора: отправка платная.
+ */
+async function submitCloudJob(job: ComfyJob): Promise<void> {
+  fs.mkdirSync(resolveSaveDir(job.saveTo), { recursive: true });
+  const names = new Map<string, string>();
+  for (const upload of job.uploads || []) {
+    const source = resolveReadable(upload.path);
+    const filename = upload.filename || path.basename(source);
+    names.set(filename, await uploadCloudImage(fs.readFileSync(source), filename));
+  }
+  if (cancelledMeanwhile(job.id)) return;
+  const promptId = await submitCloudPrompt(renameUploads(job.prompt, names));
+  if (cancelledMeanwhile(job.id)) {
+    await cancelCloudJob(promptId);
+    return;
+  }
+  job.promptId = promptId;
+  job.status = "running";
+  job.submittedAt = new Date().toISOString();
+  job.queuePosition = null;
+  job.error = undefined;
+  writeJob(job);
+}
+
+/** Опрос облака: готово — скачать файлы в saveTo, ошибка — error. Сбой сети — спросить позже. */
+async function finishCloudJob(job: ComfyJob): Promise<void> {
+  if (!job.promptId) return;
+  const last = lastCloudPoll.get(job.id) ?? 0;
+  if (Date.now() - last < CLOUD_POLL_MS) return;
+  lastCloudPoll.set(job.id, Date.now());
+  // Сбой сети или облака при опросе — не провал: прогон уже оплачен, спросим снова.
+  let cloud: Awaited<ReturnType<typeof readCloudJob>>;
+  try {
+    cloud = await readCloudJob(job.promptId);
+  } catch {
+    return;
+  }
+  if (cloud.status === "pending" || cloud.status === "in_progress") return;
+  if (cloud.status === "cancelled") {
+    if (cancelledMeanwhile(job.id)) return;
+    job.status = "cancelled";
+    job.finishedAt = new Date().toISOString();
+    writeJob(job);
+    return;
+  }
+  if (cloud.status === "failed") throw new ComfyRejectedError(cloud.error || "Comfy Cloud: прогон завершился с ошибкой");
+  const saveDir = resolveSaveDir(job.saveTo);
+  fs.mkdirSync(saveDir, { recursive: true });
+  const files = listHistoryImages({ outputs: cloud.outputs });
+  if (!files.length) throw new Error("Comfy Cloud не вернул файлов");
+  // Сначала скачать всё: не скачалось — повторим на следующем опросе, файлов не дублируя.
+  let downloaded: { name: string; bytes: Buffer }[];
+  try {
+    downloaded = await Promise.all(
+      files.map(async (file) => ({ name: path.basename(file.filename), bytes: await downloadCloudFile(file) })),
+    );
+  } catch {
+    return;
+  }
+  const saved = downloaded.map((file) => writeUnique(saveDir, file.name, file.bytes));
+  if (cancelledMeanwhile(job.id)) return;
+  lastCloudPoll.delete(job.id);
+  job.status = "done";
+  job.files = saved;
+  job.finishedAt = new Date().toISOString();
+  job.error = undefined;
+  job.nodeErrors = undefined;
+  writeJob(job);
+}
+
 async function submitJob(job: ComfyJob): Promise<void> {
+  if (isCloud(job)) return submitCloudJob(job);
   const saveDir = resolveSaveDir(job.saveTo);
   fs.mkdirSync(saveDir, { recursive: true });
   for (const upload of job.uploads || []) {
@@ -201,6 +289,7 @@ function writeUnique(dir: string, name: string, bytes: Buffer): string {
 type QueueSnapshot = { running: string[]; pending: string[] } | null;
 
 async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
+  if (isCloud(job)) return finishCloudJob(job);
   if (!job.promptId) return;
   const history = await readComfyHistory(job.promptId);
   if (!history) {
@@ -266,7 +355,10 @@ function stillSame(job: ComfyJob): boolean {
 export async function cancelComfyJob(id: string): Promise<void> {
   const job = readComfyJob(id);
   if (!job || job.status === "done" || job.status === "error" || job.status === "cancelled") return;
-  if (job.promptId) await cancelComfyPrompt(job.promptId);
+  if (job.promptId) {
+    if (isCloud(job)) await cancelCloudJob(job.promptId);
+    else await cancelComfyPrompt(job.promptId);
+  }
   job.status = "cancelled";
   job.error = undefined;
   job.queuePosition = null;
@@ -295,8 +387,19 @@ export async function drainComfyQueue(): Promise<void> {
     let offline = false;
     for (const job of jobs) {
       const needsSubmit = job.status === "pending" || (job.status === "running" && !job.promptId);
-      if (!needsSubmit || offline || running.has(job.id) || !claimJob(job.id)) continue;
+      if (!needsSubmit || running.has(job.id)) continue;
+      if (offline && !isCloud(job)) continue;
+      if (!claimJob(job.id)) continue;
       if (!stillSame(job)) {
+        releaseJob(job.id);
+        continue;
+      }
+      if (isCloud(job) && job.status === "running") {
+        // Прошлая отправка в облако прервалась (перезапуск доски): могла уже списать кредиты.
+        // Сами не повторяем — решает пользователь.
+        failJob(job, new Error(
+          "Отправка в Comfy Cloud прервалась на середине. Проверьте задания на cloud.comfy.org, прежде чем запускать снова: кредиты могли уже списаться.",
+        ));
         releaseJob(job.id);
         continue;
       }
@@ -309,7 +412,7 @@ export async function drainComfyQueue(): Promise<void> {
       } catch (error) {
         if (cancelledMeanwhile(job.id)) {
           // Отменённое задание оставляем отменённым.
-        } else if (comfyOffline(error)) {
+        } else if (comfyOffline(error) && !isCloud(job)) {
           offline = true;
           job.status = "pending";
           job.promptId = undefined;
@@ -332,7 +435,7 @@ export async function drainComfyQueue(): Promise<void> {
     // Одна выборка GET /queue на проход: место в очереди для всех отправленных заданий.
     const sent = jobs.filter((job) => job.status === "running" && job.promptId);
     let queue: QueueSnapshot = null;
-    if (sent.length) {
+    if (sent.some((job) => !isCloud(job))) {
       try {
         queue = await readComfyQueue();
       } catch {

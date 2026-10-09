@@ -81,6 +81,11 @@ export interface NumberInput {
   /** Для settings:seconds обязательны: по ним строится меню длительности. */
   min?: number;
   max?: number;
+  /**
+   * true — число вне min..max прижимается к границе, а не отбрасывается (иначе осталось бы
+   * значение графа). Для платных моделей: 4-секундное превью не должно превратиться в 9 секунд.
+   */
+  clamp?: boolean;
   label: string;
 }
 
@@ -130,8 +135,8 @@ export type SlotValue =
    * required — пустой раздел даёт ошибку (без whenEmpty).
    */
   | { input: string; section?: string; required?: boolean; steps?: TextStep[]; templates?: TextTemplate[] }
-  /** Новое случайное целое для каждого прогона. */
-  | { seed: "random" }
+  /** Новое случайное целое для каждого прогона; max — верхняя граница ноды (HeyGen: 2^32 − 1). */
+  | { seed: "random"; max?: number }
   /** Строка-шаблон: {shotId}, {episodeId}, {stageId}, {workflow}. */
   | { template: string }
   /** Готовое значение как есть: число, true/false, строка, объект. */
@@ -176,9 +181,17 @@ export interface GraphBinding {
   order: number;
   /**
    * Когда вариант может быть по умолчанию: `speech` — только если в кадре есть реплики (speech.md),
-   * `silent` — только если их нет. Нет поля — всегда. Подходящего нет — первый доступный.
+   * `dialogue` — реплики от двух и более говорящих, `silent` — реплик нет. Нет поля — всегда.
+   * Подходящего нет — первый доступный.
    */
-  defaultWhen?: "speech" | "silent";
+  defaultWhen?: "speech" | "dialogue" | "silent";
+  /**
+   * `cloud` — прогон идёт в Comfy Cloud (платно, ключ COMFY_CLOUD_API_KEY), только с разрешением
+   * пользователя на этот запуск. Нет поля — локальный ComfyUI.
+   */
+  target?: "cloud";
+  /** Цена прогона в Comfy Cloud, для окна разрешения. */
+  cost?: CloudCost;
   /** Старое имя для совместимости (`i2v`, `flf`). */
   aliases?: string[];
   inputs: Record<string, BindingInput>;
@@ -198,4 +211,12 @@ export interface WorkflowChoice {
   isDefault: boolean;
   /** Плейбук модели (поле playbook манифеста), путь от playbooks/. Его читает агент в text-режиме. */
   playbook: string | null;
+  /** Платный запуск в Comfy Cloud: нужна галочка разрешения на странице этапа. null — локальный ComfyUI. */
+  cloud: CloudCost | null;
+}
+
+/** Цена прогона в Comfy Cloud: credits за perSeconds секунд видео. */
+export interface CloudCost {
+  credits: number;
+  perSeconds: number;
 }

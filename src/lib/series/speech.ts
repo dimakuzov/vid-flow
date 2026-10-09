@@ -33,6 +33,16 @@ export function writeShotSpeech(episodeId: string, shotId: string, text: string)
   fs.writeFileSync(file, text.endsWith("\n") ? text : `${text}\n`, "utf8");
 }
 
+/** Разные говорящие в speech.md: имена перед двоеточием (`Julia: …`), без учёта регистра. */
+export function speechSpeakers(text: string): string[] {
+  const names = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.replace(/^\s*[-*]\s+/, "").match(/^([^:«"„“]{1,40}):\s*\S/);
+    if (match) names.add(match[1].trim().toLowerCase());
+  }
+  return [...names];
+}
+
 /**
  * Реплики без имени говорящего и кавычек: `Катя: «Мама, я дома.»` → `Мама, я дома.`
  * По ним проверка языка prompt.md пропускает дословные реплики (они могут быть по-русски).

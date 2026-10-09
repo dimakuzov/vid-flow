@@ -81,7 +81,7 @@
 
 | Метод и путь | Тело / ответ |
 |---|---|
-| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
+| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot?, allowCloud? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра; `allowCloud: true` — галочка платной отправки: доска запустит облачный воркфлоу после ответа агента, один раз; хранится в `agent_dispatch.json`). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
 | `POST .../stages/{stage}/cancel` | отмена (общая с прогоном) |
 | `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }` — агент кадра и что он делает |
 | `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }` — «Сохранить» в меню агента кадра. Неизвестный провайдер или модель — 400 |

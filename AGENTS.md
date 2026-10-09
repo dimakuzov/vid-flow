@@ -55,6 +55,9 @@ ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `
 - Put playbooks inside a series folder; they are global
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 
+## Comfy Cloud
+Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only the board sends them, and only after the user ticks «Разрешить платную отправку в Comfy Cloud» on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
+
 ## Comfy queue
 Любой агент ставит прогон файлом `data/comfy_queue/<id>.json` (`status: pending`, `prompt` в формате API Comfy, `uploads`, `saveTo` внутри `data/`). Процесс доски на компьютере с ComfyUI отправляет его на `http://127.0.0.1:8188/` и пишет результат в тот же файл. Сам адрес из чужой оболочки не вызывать.
 

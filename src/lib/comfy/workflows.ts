@@ -1,7 +1,7 @@
 import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, WorkflowChoice } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
-import { readShotSpeech } from "../series/speech";
+import { readShotSpeech, speechSpeakers } from "../series/speech";
 import { missingInputs, stageBindings, type LoadedBinding } from "./binding";
 
 /*
@@ -28,13 +28,20 @@ export function listWorkflowChoices(
       missing,
       isDefault: false,
       playbook: binding.playbook ?? null,
+      cloud: binding.target === "cloud" && binding.cost ? binding.cost : null,
     };
   });
-  // По умолчанию — первый доступный, чей defaultWhen подходит кадру: с репликами — `speech`, без — `silent`.
-  const speaks = readShotSpeech(episodeId, shotId).trim().length > 0;
+  // По умолчанию — первый доступный, чей defaultWhen подходит кадру: реплики есть — `speech`,
+  // говорящих двое и больше — ещё и `dialogue`, реплик нет — `silent`.
+  const speech = readShotSpeech(episodeId, shotId);
+  const speaks = speech.trim().length > 0;
+  const dialogue = speechSpeakers(speech).length >= 2;
   const fits = (index: number) => {
     const when = loaded[index].binding?.defaultWhen;
-    return !when || when === (speaks ? "speech" : "silent");
+    if (!when) return true;
+    if (when === "silent") return !speaks;
+    if (when === "dialogue") return dialogue;
+    return speaks;
   };
   const fallback =
     choices.find((choice, index) => choice.available && fits(index)) ??
