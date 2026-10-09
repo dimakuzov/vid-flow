@@ -64,6 +64,16 @@ data/episodes/{ep}/post/
 
 `jobs/voice-*.json` → `{ id, episodeId, characters, status: pending|running|done|error, chars, allowPaid, createdAt, startedAt, finishedAt, pid, progress, results: [{ character, version }], error }`. Выполняется в процессе доски сразу после постановки, одно задание на эпизод за раз. Повторной отправки нет: задание, которое процесс не выполняет (доска перезапускалась), показывается и записывается как `error` «Озвучка прервалась…».
 
+## Проект Kdenlive
+
+«Собрать проект» пишет рядом с FCPXML `timeline/{ep}_v{N}.kdenlive` той же сборки (`src/lib/post/kdenlive.ts`, формат документа 1.1, Kdenlive 23.04+, проверено на 26.08 через `melt`). Kdenlive: File → Open. Профиль — размер кадра сборки, 24 fps. Дорожки:
+
+- «Кадры» (V1) — финалы подряд, без своего звука; кадр без финала — пустота;
+- по дорожке на персонажа (A1… в порядке первой реплики) — реплики-отрезки длинного wav, тот же вход/выход и место, что в манифесте;
+- «Звук финалов (выкл.)» (нижняя A) — звук H3/HeyGen, дорожка выключена (`hide="both"`).
+
+Реплики одного персонажа не могут наезжать на одной дорожке: конец предыдущей обрезается по началу следующей (в `warnings` есть «наезжает»). Пути к файлам абсолютные: проект открывать из `post/timeline/`, файлы озвучки и кадров не переносить.
+
 ## Таймлайн (FCPXML 1.9)
 
 Resolve: File → Import → Timeline. Секвенция 24 fps, размер кадра — выбор на доске (720×1280 по умолчанию).
@@ -85,5 +95,5 @@ Resolve: File → Import → Timeline. Секвенция 24 fps, размер �
 | `PUT .../post/voices` `{ character, voice_id, model_id?, voice_settings?, seed? }` | `voice.json` → `PostState` |
 | `POST .../post/voices` `{ character, version }` | сделать версию озвучки текущей → `PostState` |
 | `POST .../post/voice-job` `{ characters, allowPaid: true }` | озвучка (платно) → `VoiceJob` |
-| `POST .../post/timeline` `{ width?, height? }` | новая версия таймлайна → `Manifest` |
-| `GET .../post/file?path=` | файл папки поста (`.wav .mp3 .json .fcpxml .srt`), Range для звука; `.fcpxml` — на скачивание |
+| `POST .../post/timeline` `{ width?, height? }` | новая версия: `.kdenlive` и `.fcpxml` → `Manifest` (`kdenlive`, `timeline`) |
+| `GET .../post/file?path=` | файл папки поста (`.wav .mp3 .json .fcpxml .kdenlive .srt`), Range для звука; таймлайны — на скачивание |

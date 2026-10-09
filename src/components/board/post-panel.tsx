@@ -254,6 +254,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
     SIZES.find((item) => item.width === state.defaultSize.width && item.height === state.defaultSize.height) ??
     SIZES[0];
   const latest = state.timelines[state.timelines.length - 1];
+  const project = state.projects[state.projects.length - 1];
 
   return (
     <section className="min-w-0 rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
@@ -500,7 +501,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             </>
           ) : null}
 
-          <h4 className="mt-4 text-sm font-medium text-stone-800">Таймлайн для Resolve</h4>
+          <h4 className="mt-4 text-sm font-medium text-stone-800">Проект Kdenlive</h4>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2 text-stone-700">
               Кадр
@@ -523,27 +524,37 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
               disabled={busy || jobActive}
               onClick={() =>
                 act(async () => {
-                  const manifest = await requestJson<{ timeline: string; lines: unknown[] }>(postApi(episodeId, "/timeline"), {
-                    method: "POST",
-                    body: { width: sizeChoice.width, height: sizeChoice.height },
-                  });
-                  setMessage(`Собран ${manifest.timeline.replace("timeline/", "")}: реплик ${manifest.lines.length}`);
+                  const manifest = await requestJson<{ timeline: string; kdenlive?: string; lines: unknown[] }>(
+                    postApi(episodeId, "/timeline"),
+                    { method: "POST", body: { width: sizeChoice.width, height: sizeChoice.height } },
+                  );
+                  setMessage(`Собран ${(manifest.kdenlive ?? manifest.timeline).replace("timeline/", "")}: реплик ${manifest.lines.length}`);
                   return null;
                 })
               }
             >
-              Собрать таймлайн
+              Собрать проект
             </Button>
+            {project ? (
+              <a href={project.url} className="text-teal-800 underline-offset-4 hover:underline" download>
+                Скачать {project.name}
+              </a>
+            ) : null}
             {latest ? (
-              <a href={latest.url} className="text-teal-800 underline-offset-4 hover:underline" download>
-                Скачать {latest.name}
+              <a href={latest.url} className="text-xs text-stone-500 underline-offset-4 hover:underline" download>
+                FCPXML для Resolve
               </a>
             ) : null}
           </div>
+          {project ? (
+            <p className="mt-1 break-all font-mono text-xs text-stone-600" title="Откройте этот файл в Kdenlive: File → Open">
+              {project.path}
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-stone-500">
-            Resolve: File → Import → Timeline, выбрать .fcpxml. Видео — финалы кадров; звук финалов — выключенная дорожка для сверки с губами;
-            ниже — дорожка на персонажа. Бесплатно, локально.
-            {state.timelines.length > 1 ? ` Прошлые версии: ${state.timelines.slice(0, -1).map((item) => item.name).join(", ")}.` : ""}
+            Kdenlive: File → Open, выбрать .kdenlive (лучше по пути выше — файлы озвучки и кадров берутся оттуда). Дорожки: «Кадры» — финалы
+            подряд; дорожка на персонажа; внизу «Звук финалов (выкл.)» для сверки с губами. Бесплатно, локально.
+            {state.projects.length > 1 ? ` Прошлые версии: ${state.projects.slice(0, -1).map((item) => item.name).join(", ")}.` : ""}
           </p>
           {state.manifest && (state.manifest.warnings.length || state.manifest.skipped.length) ? (
             <ul className="mt-2 space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-950">

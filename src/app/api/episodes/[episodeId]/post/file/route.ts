@@ -11,6 +11,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".json": "application/json",
   ".fcpxml": "application/xml",
+  ".kdenlive": "application/xml",
   ".srt": "text/plain; charset=utf-8",
 };
 
@@ -38,7 +39,7 @@ export async function GET(request: Request, context: { params: Promise<{ episode
     "Cache-Control": "no-store",
     "Accept-Ranges": "bytes",
   };
-  if (ext === ".fcpxml") headers["Content-Disposition"] = `attachment; filename="${path.basename(absolute)}"`;
+  if (ext === ".fcpxml" || ext === ".kdenlive") headers["Content-Disposition"] = `attachment; filename="${path.basename(absolute)}"`;
   const range = request.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/);
   if (range && (range[1] || range[2])) {
     const size = body.length;

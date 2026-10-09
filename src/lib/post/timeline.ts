@@ -4,11 +4,12 @@ import { pathToFileURL } from "url";
 import { listShotIds } from "../series/paths";
 import { collectPost, type CollectedLine } from "./collect";
 import { probeMedia } from "./ffmpeg";
+import { writeKdenliveProject } from "./kdenlive";
 import { readShotFinal, writePostLines, type ShotFinal } from "./lines";
 import { manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from "./paths";
 
 /*
- * Таймлайн для DaVinci Resolve (FCPXML 1.9, Resolve: File → Import → Timeline) и манифест к нему.
+ * Таймлайн: проект Kdenlive (`kdenlive.ts`) и FCPXML 1.9 для Resolve (File → Import → Timeline), манифест к ним.
  * Видео: финалы кадров подряд (без своего звука). Звук финала H3/HeyGen — отдельной выключенной
  * дорожкой для сверки с губами. Дальше по дорожке на персонажа: каждая реплика — отрезок длинного
  * файла озвучки, так в Resolve можно потянуть край клипа. Собирается локально, бесплатно.
@@ -56,6 +57,8 @@ export interface Manifest {
   height: number;
   /** Путь от папки поста: `timeline/ep2_v3.fcpxml`. */
   timeline: string;
+  /** Проект Kdenlive той же сборки: `timeline/ep2_v3.kdenlive`. */
+  kdenlive?: string;
   duration: number;
   characters: { name: string; lane: number }[];
   shots: ManifestShot[];
@@ -68,11 +71,11 @@ export function readManifest(episodeId: string): Manifest | null {
   return readJson<Manifest>(manifestFile(episodeId));
 }
 
-export function listTimelines(episodeId: string): string[] {
+export function listTimelines(episodeId: string, ext = ".fcpxml"): string[] {
   try {
     return fs
       .readdirSync(timelineDir(episodeId))
-      .filter((name) => name.endsWith(".fcpxml"))
+      .filter((name) => name.endsWith(ext))
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   } catch {
     return [];
@@ -137,7 +140,7 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
     if (final.file && final.probe) {
       durationFrames = Math.max(1, frames(final.probe.duration));
       if (final.probe.fps && Math.abs(final.probe.fps - TIMELINE_FPS) > 0.01) {
-        warnings.push(`${shotId}: финал ${Math.round(final.probe.fps * 100) / 100} fps, таймлайн ${TIMELINE_FPS} — Resolve подгонит`);
+        warnings.push(`${shotId}: финал ${Math.round(final.probe.fps * 100) / 100} fps, таймлайн ${TIMELINE_FPS} — редактор подгонит`);
       }
     } else {
       const own = lines.filter((line) => line.shotId === shotId && line.clip);
@@ -235,7 +238,7 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
     }
     const previous = lastEnd.get(line.character);
     if (previous && previous.frame > startFrame) {
-      warnings.push(`${line.id} наезжает на ${previous.id} (${line.character}) — Resolve положит её на соседнюю дорожку`);
+      warnings.push(`${line.id} наезжает на ${previous.id} (${line.character}) — в Kdenlive конец предыдущей обрежется, в Resolve реплика уйдёт на соседнюю дорожку`);
     }
     lastEnd.set(line.character, { frame: endFrame, id: line.id });
     // Клип цепляется к тому элементу ленты, внутри которого начинается.
@@ -326,6 +329,7 @@ ${spineXml}
     skipped,
     warnings,
   };
+  manifest.kdenlive = await writeKdenliveProject(episodeId, manifest, timelineDir(episodeId), project);
   writeJson(manifestFile(episodeId), manifest);
   writePostLines(episodeId, lines);
   return manifest;

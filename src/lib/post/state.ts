@@ -54,6 +54,8 @@ export interface PostState {
   characters: PostCharacterView[];
   shots: { shotId: string; hasFinal: boolean; duration: number | null; fps: number | null; hasAudio: boolean }[];
   timelines: { name: string; url: string }[];
+  /** Проекты Kdenlive, по версиям. */
+  projects: { name: string; url: string; path: string }[];
   manifest: {
     timeline: string;
     builtAt: string;
@@ -132,6 +134,11 @@ export async function getPostState(episodeId: string): Promise<PostState> {
       hasAudio: Boolean(final.probe?.hasAudio),
     })),
     timelines: listTimelines(episodeId).map((name) => ({ name, url: postFileUrl(episodeId, `timeline/${name}`) })),
+    projects: listTimelines(episodeId, ".kdenlive").map((name) => ({
+      name,
+      url: postFileUrl(episodeId, `timeline/${name}`),
+      path: path.join(root, "timeline", name),
+    })),
     manifest: manifest
       ? {
           timeline: manifest.timeline,

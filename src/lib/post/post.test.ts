@@ -256,9 +256,31 @@ test("таймлайн: видео по порядку, звук финала в
   assert.match(xml, /<media-rep kind="original-media" src="file:\/\/\/.+\/voices\/Julia\/v1\.wav"\/>/);
   assert.ok(fs.existsSync(manifestFile(EP)));
 
+  // Проект Kdenlive той же сборки.
+  assert.equal(manifest.kdenlive, "timeline/e01_v1.kdenlive");
+  const kd = fs.readFileSync(path.join(timelineDir(EP), "e01_v1.kdenlive"), "utf8");
+  assertWellFormed(kd);
+  assert.match(kd, /<profile [^>]*width="720" height="1280"[^>]*frame_rate_num="24"/);
+  assert.match(kd, /<property name="kdenlive:docproperties.version">1.1<\/property>/);
+  assert.match(kd, /<property name="kdenlive:projectTractor">1<\/property>/);
+  // Видео: s01, s02, s03 подряд без пустот (48 + 96 + 72 кадра).
+  const video = kd.match(/<playlist id="playlist_video">([\s\S]*?)<\/playlist>/)![1];
+  assert.deepEqual([...video.matchAll(/<entry producer="(\w+)" in="(\d+)" out="(\d+)"/g)].map((m) => Number(m[3]) - Number(m[2]) + 1), [48, 96, 72]);
+  assert.ok(!video.includes("<blank"));
+  // Звук финала — выключенная дорожка; голос Julia — отрезки одного wav.
+  assert.match(kd, /<tractor id="tractor_final_audio"[\s\S]*?<track hide="both" producer="playlist_final_audio"\/>/);
+  const juliaTrack = kd.match(/<playlist id="playlist_voice0">([\s\S]*?)<\/playlist>/)![1];
+  const entries = [...juliaTrack.matchAll(/<entry producer="(\w+)" in="(\d+)" out="(\d+)"/g)];
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0][1], entries[1][1], "один источник на персонажа");
+  assert.equal(Number(entries[0][2]), julia1.sourceIn * 24);
+  const firstBlank = Number(juliaTrack.match(/<blank length="(\d+)"\/>/)![1]);
+  assert.equal(firstBlank, julia1.timelineStart * 24, "реплика стоит на своём месте");
+  assert.match(kd, /voices\/Julia\/v1\.wav<\/property>/);
+
   // Повторная сборка — новая версия, старая остаётся.
   await buildTimeline(EP, { width: 1080, height: 1920 });
-  assert.deepEqual(fs.readdirSync(timelineDir(EP)).sort(), ["e01_v1.fcpxml", "e01_v2.fcpxml"]);
+  assert.deepEqual(fs.readdirSync(timelineDir(EP)).sort(), ["e01_v1.fcpxml", "e01_v1.kdenlive", "e01_v2.fcpxml", "e01_v2.kdenlive"]);
 });
 
 test("перегенерация персонажа: новая версия, ручные место и подрезка сохраняются; изменённый текст их сбрасывает", async () => {
