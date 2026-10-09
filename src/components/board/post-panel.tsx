@@ -17,6 +17,28 @@ const SIZES = [
   { label: "1080×1920", width: 1080, height: 1920 },
 ];
 
+const SPEED_RANGE = "0.8× до 1.35×";
+
+type SpeechStatusView = PostState["shots"][number]["speech"]["status"];
+
+const SPEECH_LABELS: Record<SpeechStatusView, string> = {
+  none: "не распознан",
+  queued: "в очереди",
+  running: "распознаётся",
+  done: "готово",
+  error: "ошибка",
+  stale: "финал заменён",
+};
+
+const SPEECH_STYLES: Record<SpeechStatusView, string> = {
+  none: "border-stone-300 text-stone-500",
+  queued: "border-sky-300 bg-sky-50 text-sky-900",
+  running: "border-sky-300 bg-sky-50 text-sky-900",
+  done: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  error: "border-red-300 bg-red-50 text-red-900",
+  stale: "border-amber-300 bg-amber-50 text-amber-900",
+};
+
 const VOICE_LABELS: Record<PostLineView["voice"], string> = {
   ok: "",
   "no-voice": "нет озвучки",
@@ -198,11 +220,12 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
   }, [load]);
 
   const jobActive = state?.job?.status === "pending" || state?.job?.status === "running";
+  const speechActive = Boolean(state?.shots.some((shot) => shot.speech.status === "queued" || shot.speech.status === "running"));
   useEffect(() => {
-    if (!jobActive) return;
-    const timer = setInterval(() => void load(), 2000);
+    if (!jobActive && !speechActive) return;
+    const timer = setInterval(() => void load(), 3000);
     return () => clearInterval(timer);
-  }, [jobActive, load]);
+  }, [jobActive, speechActive, load]);
 
   async function act(run: () => Promise<PostState | null>, done = "") {
     setBusy(true);
@@ -413,15 +436,69 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             </div>
           ) : null}
 
+          {state.shots.some((shot) => shot.hasAudio) ? (
+            <>
+              <h4 className="mt-4 text-sm font-medium text-stone-800">Речь в кадрах — под губы</h4>
+              <p className="mt-1 text-xs text-stone-500">
+                Whisper находит в финале кадра, где звучит каждая реплика. Озвучка ставится на это место и ускоряется
+                или замедляется до длины речи в видео (от {SPEED_RANGE}, тон не меняется). Локальный ComfyUI, бесплатно.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy || speechActive}
+                  onClick={() =>
+                    act(async () => {
+                      const result = await requestJson<{ queued: string[] }>(postApi(episodeId, "/speech"), { method: "POST", body: {} });
+                      setMessage(result.queued.length ? `Распознавание поставлено: ${result.queued.join(", ")}` : "Все кадры уже распознаны");
+                      return null;
+                    })
+                  }
+                >
+                  Распознать речь
+                </Button>
+                {state.shots
+                  .filter((shot) => shot.hasAudio)
+                  .map((shot) => (
+                    <span
+                      key={shot.shotId}
+                      title={shot.speech.error ?? shot.speech.text}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${SPEECH_STYLES[shot.speech.status]}`}
+                    >
+                      <span className="font-mono">{shot.shotId}</span>
+                      {SPEECH_LABELS[shot.speech.status]}
+                      {shot.speech.status === "done" || shot.speech.status === "stale" || shot.speech.status === "error" ? (
+                        <button
+                          type="button"
+                          className="underline-offset-2 hover:underline"
+                          disabled={busy}
+                          onClick={() =>
+                            act(async () => {
+                              await requestJson(postApi(episodeId, "/speech"), { method: "POST", body: { shotIds: [shot.shotId], force: true } });
+                              return null;
+                            })
+                          }
+                        >
+                          заново
+                        </button>
+                      ) : null}
+                    </span>
+                  ))}
+              </div>
+            </>
+          ) : null}
+
           {state.lines.length ? (
             <>
               <h4 className="mt-4 text-sm font-medium text-stone-800">Реплики</h4>
               <p className="mt-1 text-xs text-stone-500">
-                «Место» — секунда от начала кадра, где начинается речь (для кадров со своим звуком — по паузам в нём).
+                «Место» — секунда от начала кадра, где начинается речь: по губам (если речь распознана), иначе по паузам или подряд.
+                «Губы» — где реплику произносят в видео. «Скорость» — во сколько раз быстрее звучит клип (авто — под губы).
                 «Начало» и «Конец» — сдвиг границ отрезка, секунды (минус — раньше). Правки переживают перегенерацию, пока текст реплики не изменился.
               </p>
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
+                <table className="w-full min-w-[900px] text-left text-sm">
                   <thead className="text-xs uppercase tracking-[0.12em] text-stone-500">
                     <tr>
                       <th className="px-2 py-1">№</th>
@@ -429,6 +506,8 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                       <th className="px-2 py-1">Персонаж</th>
                       <th className="px-2 py-1">Текст</th>
                       <th className="px-2 py-1">Место</th>
+                      <th className="px-2 py-1">Губы</th>
+                      <th className="px-2 py-1">Скорость</th>
                       <th className="px-2 py-1">Начало</th>
                       <th className="px-2 py-1">Конец</th>
                       <th className="px-2 py-1">Звук</th>
@@ -460,6 +539,34 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                           ) : (
                             <span className="ml-1 text-xs text-stone-400">авто</span>
                           )}
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap font-mono text-xs text-stone-600">
+                          {line.window ? `${seconds(line.window.start)}–${seconds(line.window.end)}` : "—"}
+                        </td>
+                        <td className="px-2 py-1.5 whitespace-nowrap">
+                          <SecondsInput
+                            value={line.clip?.speed ?? line.speedManual ?? 1}
+                            title="Во сколько раз быстрее (1 — как есть)"
+                            disabled={busy || !line.clip}
+                            onCommit={(value) => void patchLine(line.id, { speed: value })}
+                          />
+                          {line.speedManual !== null ? (
+                            <button
+                              type="button"
+                              className="ml-1 text-xs text-teal-800 underline-offset-4 hover:underline"
+                              title="Вернуть авто-скорость"
+                              onClick={() => void patchLine(line.id, { speed: null })}
+                            >
+                              авто
+                            </button>
+                          ) : line.clip?.fit ? (
+                            <span
+                              className={`ml-1 text-xs ${line.clip.fit.clamped ? "text-amber-800" : "text-stone-400"}`}
+                              title={line.clip.fit.clamped ? `Нужно ${line.clip.fit.wanted}× — упёрлось в предел` : "Подогнано под губы"}
+                            >
+                              {line.clip.fit.clamped ? `нужно ${line.clip.fit.wanted}×` : "губы"}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-2 py-1.5">
                           <SecondsInput

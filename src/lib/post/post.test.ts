@@ -16,12 +16,14 @@ process.env.ELEVENLABS_API_KEY = "test-key";
 process.env.POST_TTS_CHUNK_CHARS = "60";
 delete process.env.SERIES_ROOT;
 
-import { createEpisode, getCharactersRoot, shotDir, stageDir } from "../series/paths";
+import { readComfyJob } from "../comfy/queue";
+import { createEpisode, getCharactersRoot, getComfyQueueRoot, shotDir, stageDir } from "../series/paths";
 import { lineSeparator } from "./align";
 import { collectPost } from "./collect";
 import { synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
 import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
+import { enqueueSpeechDetect } from "./speech-detect";
 import { getPostState } from "./state";
 import { buildTimeline } from "./timeline";
 import { enqueueVoiceJob, runVoiceJob } from "./voice-job";
@@ -324,6 +326,82 @@ test("перегенерация персонажа: новая версия, р
   assert.equal(changed.voice, "stale");
   const state = await getPostState(EP);
   assert.equal(state.characters.find((item) => item.name === "Julia")!.pending, 1);
+});
+
+test("речь в финале (Whisper): реплика встаёт под губы, скорость под длину речи, в Kdenlive — timewarp без смены тона", async () => {
+  // Распознавание ставится только кадрам со своим звуком в финале (s02 — H3), задание — с текстовыми выходами.
+  const { queued, skipped } = await enqueueSpeechDetect(EP);
+  assert.deepEqual(queued, ["s02"]);
+  assert.deepEqual(skipped.map((item) => [item.shotId, item.reason]), [
+    ["s01", "в финале нет звука"],
+    ["s03", "в финале нет звука"],
+  ]);
+  const jobName = fs.readdirSync(getComfyQueueRoot()).find((name) => name.startsWith("post-speech-e01-s02-"))!;
+  const job = readComfyJob(jobName.replace(/\.json$/, ""))!;
+  assert.equal(job.saveText, true);
+  assert.equal(job.uploads![0].filename, "fb_e01_s02_s02_h3.mp4");
+  assert.equal(job.prompt["46"].inputs.video, "fb_e01_s02_s02_h3.mp4", "видео финала подставлено в VHS_LoadVideo");
+  assert.equal(job.prompt["47"].class_type, "Apply Whisper");
+  assert.deepEqual((await enqueueSpeechDetect(EP)).queued, [], "повторно не ставится, пока идёт");
+
+  // Ответ ComfyUI: очередь сохранила текст нод файлами (98 — слова, 92 — текст).
+  const words = [
+    { value: "Don't", start: 0.62, end: 0.8 },
+    { value: "mind", start: 0.8, end: 0.95 },
+    { value: "him.", start: 0.95, end: 1.22 },
+    { value: "But", start: 2.5, end: 2.7 },
+    { value: "why?", start: 2.7, end: 3.2 },
+  ];
+  const saveDir = path.resolve(process.cwd(), job.saveTo);
+  fs.mkdirSync(saveDir, { recursive: true });
+  fs.writeFileSync(path.join(saveDir, "98.txt"), JSON.stringify(words));
+  fs.writeFileSync(path.join(saveDir, "92.txt"), "Don't mind him. But why?");
+  fs.writeFileSync(path.join(getComfyQueueRoot(), jobName), JSON.stringify({ ...job, status: "done", files: ["92.txt", "98.txt"] }));
+
+  await updatePostLine(EP, "s02-1", { at: null });
+  let { lines } = await collectPost(EP);
+  let julia = lines.find((item) => item.id === "s02-1")!;
+  assert.deepEqual(julia.window && [julia.window.start, julia.window.end], [0.62, 1.22]);
+  assert.equal(julia.at, 0.62, "речь начинается там, где начинают говорить губы");
+  const speech = julia.clip!.speechEnd - julia.clip!.speechStart;
+  assert.equal(julia.clip!.speed, Math.round(Math.min(1.35, Math.max(0.8, speech / 0.6)) * 100) / 100);
+  assert.ok(julia.clip!.speed > 1, `озвучка ${speech} с длиннее губ 0.6 с — быстрее`);
+  assert.equal(lines.find((item) => item.id === "s02-2")!.window!.start, 2.5);
+
+  // Ручная скорость перекрывает подгонку, null возвращает авто.
+  await updatePostLine(EP, "s02-1", { speed: 1.1 });
+  ({ lines } = await collectPost(EP));
+  assert.equal(lines.find((item) => item.id === "s02-1")!.clip!.speed, 1.1);
+  await updatePostLine(EP, "s02-1", { speed: null });
+  ({ lines } = await collectPost(EP));
+  julia = lines.find((item) => item.id === "s02-1")!;
+
+  const manifest = await buildTimeline(EP);
+  const line = manifest.lines.find((item) => item.id === "s02-1")!;
+  assert.equal(line.speed, julia.clip!.speed);
+  assert.deepEqual(line.window, { start: 0.62, end: 1.22 });
+  // Начало речи на таймлайне — начало кадра s02 (2 с) + 0.62, с точностью до кадра.
+  const speechAt = line.timelineStart + (julia.clip!.speechStart - line.sourceIn) / line.speed;
+  assert.ok(Math.abs(speechAt - 2.62) <= 1 / 24 + 1e-6, `речь на ${speechAt}`);
+  assert.ok(manifest.warnings.some((text) => text.includes("только в проекте Kdenlive")));
+
+  const kd = fs.readFileSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", "")), "utf8");
+  assertWellFormed(kd);
+  const twId = `_tw${Math.round(line.speed * 100)}`;
+  const tw = kd.match(new RegExp(`<producer id="(chain\\d+${twId})"[\\s\\S]*?</producer>`))!;
+  assert.match(tw[0], /<property name="mlt_service">timewarp<\/property>/);
+  assert.match(tw[0], /<property name="warp_pitch">1<\/property>/);
+  assert.match(tw[0], new RegExp(`<property name="resource">${line.speed}:.+voices/Julia/v\\d+\\.wav</property>`));
+  const entry = kd.match(new RegExp(`<entry producer="${tw[1]}" in="(\\d+)" out="(\\d+)"`))!;
+  const sourceFrames = Math.round((line.sourceOut - line.sourceIn) * 24);
+  assert.equal(Number(entry[2]) - Number(entry[1]) + 1, Math.round(sourceFrames / line.speed), "на таймлайне клип короче в speed раз");
+
+  // Финал заменили — распознавание устарело, рамки нет до нового прогона.
+  const final = path.join(stageDir(EP, "s02", "final_render"), "approve", "s02_h3.mp4");
+  fs.appendFileSync(final, Buffer.from([0]));
+  ({ lines } = await collectPost(EP));
+  assert.equal(lines.find((item) => item.id === "s02-1")!.window, null);
+  assert.equal((await getPostState(EP)).shots.find((shot) => shot.shotId === "s02")!.speech.status, "stale");
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */

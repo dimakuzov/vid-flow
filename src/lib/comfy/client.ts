@@ -15,6 +15,8 @@ export interface ComfyHistory {
       videos?: ComfyImageRef[];
       /** MiniMaxH3Creator (ComfyUI-Continuity) отчитывается о готовом ролике под своим ключом. */
       mmc_video?: ComfyImageRef[];
+      /** Текстовый выход (PreviewAny): одна или несколько строк. */
+      text?: string[] | string;
     }
   >;
   status?: { status_str?: string; completed?: boolean; messages?: [string, Record<string, unknown>][] };
@@ -188,6 +190,16 @@ export function listHistoryImages(history: ComfyHistory): ComfyImageRef[] {
     }
   }
   return files;
+}
+
+/** Текстовые выходы нод из истории: `{ node, text }` (строки ноды склеены переводом строки). */
+export function listHistoryTexts(history: ComfyHistory): { node: string; text: string }[] {
+  const texts: { node: string; text: string }[] = [];
+  for (const [node, output] of Object.entries(history.outputs || {})) {
+    if (output.text === undefined) continue;
+    texts.push({ node, text: Array.isArray(output.text) ? output.text.join("\n") : String(output.text) });
+  }
+  return texts;
 }
 
 export async function downloadComfyImage(image: ComfyImageRef): Promise<Buffer> {

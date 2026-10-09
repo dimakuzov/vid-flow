@@ -28,6 +28,8 @@ export interface PostLine {
   /** Сдвиг начала и конца отрезка относительно авто-границ, секунды (минус — раньше). */
   trimIn: number;
   trimOut: number;
+  /** Скорость, заданная вручную; null — доска подгоняет под губы сама (или 1). */
+  speed: number | null;
 }
 
 /** Что хранится в lines.json по каждой реплике. */
@@ -41,6 +43,7 @@ interface StoredLine {
   atManual?: boolean;
   trimIn?: number;
   trimOut?: number;
+  speed?: number | null;
 }
 
 interface LinesFile {
@@ -170,7 +173,12 @@ function finite(value: unknown, fallback = 0): number {
  */
 export async function readPostLines(
   episodeId: string,
-  options: { durationOf?: (line: PostLine) => number | null; finals?: Map<string, ShotFinal> } = {},
+  options: {
+    durationOf?: (line: PostLine) => number | null;
+    finals?: Map<string, ShotFinal>;
+    /** Рамка губ реплики (секунды от начала кадра): авто-место — её начало. */
+    windowOf?: (line: PostLine) => Interval | null;
+  } = {},
 ): Promise<{ lines: PostLine[]; finals: Map<string, ShotFinal> }> {
   const stored = readStored(episodeId);
   const finals = options.finals ?? new Map<string, ShotFinal>();
@@ -196,6 +204,7 @@ export async function readPostLines(
         atManual: Boolean(saved?.atManual),
         trimIn: sameText ? finite(saved?.trimIn) : 0,
         trimOut: sameText ? finite(saved?.trimOut) : 0,
+        speed: typeof saved?.speed === "number" && saved.speed > 0 ? saved.speed : null,
       };
     });
     const places = autoPlaceShot(shotLines, finals.get(shotId)?.sounds ?? null, (index) => {
@@ -203,7 +212,8 @@ export async function readPostLines(
       return options.durationOf?.(line) ?? estimateSpeechSec(line.text);
     });
     shotLines.forEach((line, index) => {
-      line.at = places[index];
+      const window = line.atManual ? null : options.windowOf?.(line);
+      line.at = window ? Math.round(window.start * 1000) / 1000 : places[index];
     });
     lines.push(...shotLines);
   }
@@ -223,6 +233,7 @@ export function writePostLines(episodeId: string, lines: PostLine[]): void {
       atManual: line.atManual,
       trimIn: line.trimIn,
       trimOut: line.trimOut,
+      speed: line.speed,
     })),
   };
   writeJson(linesFile(episodeId), data);
@@ -233,6 +244,8 @@ export interface LinePatch {
   at?: number | null;
   trimIn?: number;
   trimOut?: number;
+  /** Число — ручная скорость; null — вернуть авто. */
+  speed?: number | null;
 }
 
 /** Правка реплики на доске. Пишет lines.json целиком (текущие реплики speech.md + правки). */
@@ -251,6 +264,11 @@ export async function updatePostLine(episodeId: string, id: string, patch: LineP
   }
   if (patch.trimIn !== undefined) line.trimIn = check(patch.trimIn, "Начало");
   if (patch.trimOut !== undefined) line.trimOut = check(patch.trimOut, "Конец");
+  if (patch.speed === null) line.speed = null;
+  else if (patch.speed !== undefined) {
+    if (!Number.isFinite(patch.speed) || patch.speed < 0.5 || patch.speed > 2) throw new Error("Скорость: от 0.5 до 2");
+    line.speed = Math.round(patch.speed * 100) / 100;
+  }
   writePostLines(episodeId, lines);
   return line;
 }

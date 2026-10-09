@@ -3,6 +3,7 @@ import { collectPost, type LineVoiceStatus } from "./collect";
 import type { VoiceConfig } from "./elevenlabs";
 import { postDir, TIMELINE_FPS } from "./paths";
 import { listTimelines, readManifest, DEFAULT_SIZE } from "./timeline";
+import type { SpeechStatus } from "./speech-detect";
 import { readLatestVoiceJob, type VoiceJob } from "./voice-job";
 import { listVoiceVersions, planCharacterVoice, readVoiceConfig } from "./voices";
 
@@ -20,6 +21,10 @@ export interface PostLineView {
   atManual: boolean;
   trimIn: number;
   trimOut: number;
+  /** Ручная скорость; null — авто. */
+  speedManual: number | null;
+  /** Где губы произносят реплику в кадре (секунды от начала кадра). */
+  window: { start: number; end: number; matched: number; total: number } | null;
   voice: LineVoiceStatus;
   clip: {
     version: number;
@@ -29,6 +34,8 @@ export interface PostLineView {
     autoOut: number;
     speechStart: number;
     speechEnd: number;
+    speed: number;
+    fit: { wanted: number; clamped: boolean } | null;
     /** Файл озвучки персонажа; отрезок играет страница. */
     url: string;
   } | null;
@@ -52,7 +59,15 @@ export interface PostState {
   keyConfigured: boolean;
   lines: PostLineView[];
   characters: PostCharacterView[];
-  shots: { shotId: string; hasFinal: boolean; duration: number | null; fps: number | null; hasAudio: boolean }[];
+  shots: {
+    shotId: string;
+    hasFinal: boolean;
+    duration: number | null;
+    fps: number | null;
+    hasAudio: boolean;
+    /** Распознавание речи в финале (Whisper). */
+    speech: { status: SpeechStatus; error: string | null; words: number; text: string };
+  }[];
   timelines: { name: string; url: string }[];
   /** Проекты Kdenlive, по версиям. */
   projects: { name: string; url: string; path: string }[];
@@ -76,7 +91,7 @@ export function postFileUrl(episodeId: string, relative: string, version?: numbe
 }
 
 export async function getPostState(episodeId: string): Promise<PostState> {
-  const { lines, finals, voices } = await collectPost(episodeId);
+  const { lines, finals, voices, speech } = await collectPost(episodeId);
   const root = postDir(episodeId);
 
   const names: string[] = [];
@@ -111,6 +126,8 @@ export async function getPostState(episodeId: string): Promise<PostState> {
       atManual: line.atManual,
       trimIn: line.trimIn,
       trimOut: line.trimOut,
+      speedManual: line.speed,
+      window: line.window,
       voice: line.voice,
       clip: line.clip
         ? {
@@ -121,6 +138,8 @@ export async function getPostState(episodeId: string): Promise<PostState> {
             autoOut: line.clip.autoOut,
             speechStart: line.clip.speechStart,
             speechEnd: line.clip.speechEnd,
+            speed: line.clip.speed,
+            fit: line.clip.fit,
             url: postFileUrl(episodeId, path.relative(root, line.clip.source).split(path.sep).join("/"), line.clip.version),
           }
         : null,
@@ -132,6 +151,15 @@ export async function getPostState(episodeId: string): Promise<PostState> {
       duration: final.probe?.duration ?? null,
       fps: final.probe?.fps ?? null,
       hasAudio: Boolean(final.probe?.hasAudio),
+      speech: (() => {
+        const detected = speech.get(final.shotId);
+        return {
+          status: detected?.status ?? "none",
+          error: detected?.error ?? null,
+          words: detected?.words.length ?? 0,
+          text: detected?.text ?? "",
+        };
+      })(),
     })),
     timelines: listTimelines(episodeId).map((name) => ({ name, url: postFileUrl(episodeId, `timeline/${name}`) })),
     projects: listTimelines(episodeId, ".kdenlive").map((name) => ({

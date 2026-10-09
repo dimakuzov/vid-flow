@@ -13,7 +13,9 @@ data/episodes/{ep}/post/
   voices/{Character}/v{N}.part{K}.mp3    ответ ElevenLabs как есть (+ .json: request-id, текст, таймстемпы)
   voices/{Character}/current.json        { version, updatedAt } — версия в работе
   manifest.json                          манифест последней сборки таймлайна
-  timeline/{ep}_v{N}.fcpxml              таймлайны, старые не затираются
+  timeline/{ep}_v{N}.fcpxml              таймлайны, старые не затираются (рядом .kdenlive той же сборки)
+  speech/{shotId}.json                   распознавание речи финала: какой финал, какое задание очереди
+  speech/{shotId}/{jobId}/*.txt          выходы Whisper (слова и фразы, JSON)
   jobs/voice-*.json                      задания озвучки
 ```
 
@@ -31,7 +33,7 @@ data/episodes/{ep}/post/
 
 Текст и персонаж — **только из `shots/{shotId}/speech.md`** (одна реплика на строку, `Имя: текст`; строка без имени — реплика единственного персонажа кадра из `shot.md`). Имя приводится к папке библиотеки (`julia` → `Julia`). Порядок — порядок кадров таблицы.
 
-`lines.json` → `{ updatedAt, lines: [{ id, shotId, character, text, order, at, atManual, trimIn, trimOut }] }`:
+`lines.json` → `{ updatedAt, lines: [{ id, shotId, character, text, order, at, atManual, trimIn, trimOut, speed }] }`:
 
 - `id` — `{shotId}-{номер строки}`: `s05-2`.
 - `at` — секунды от начала кадра, где начинается речь. `atManual: false` — доска считает место сама при каждом чтении: если в финале кадра есть свой звук (H3, HeyGen), реплики ставятся на его звучащие отрезки (`silencedetect`, границы между репликами — самые длинные паузы); иначе подряд: первая на 0.3 с, следующие через 0.4 с после конца предыдущей (длительность — по озвучке, без неё ~15 символов в секунду).
@@ -64,6 +66,16 @@ data/episodes/{ep}/post/
 
 `jobs/voice-*.json` → `{ id, episodeId, characters, status: pending|running|done|error, chars, allowPaid, createdAt, startedAt, finishedAt, pid, progress, results: [{ character, version }], error }`. Выполняется в процессе доски сразу после постановки, одно задание на эпизод за раз. Повторной отправки нет: задание, которое процесс не выполняет (доска перезапускалась), показывается и записывается как `error` «Озвучка прервалась…».
 
+## Речь в кадрах — под губы
+
+У финалов H3/HeyGen есть своя речь с липсинком. «Распознать речь» (`POST .../post/speech`) ставит в очередь доски (`data/comfy_queue`, локальный ComfyUI, бесплатно) граф `playbooks/workflows/comfy/create_subtitles_file_from_video.json` (ComfyUI-Whisper, JSON не правится): видео из `final_render/approve/` подставляется в `VHS_LoadVideo`, задание с `saveText: true`. Слова Whisper (`PreviewAny` от `words_alignment`) — `{ value, start, end }`.
+
+- Распознавание привязано к файлу финала (имя, размер, время): финал заменили — статус `stale`, рамок нет до нового прогона («заново»).
+- Слова сопоставляются с репликами кадра по тексту (выравнивание с сохранением порядка, лишние слова Whisper не мешают). Найдено меньше 40 % слов реплики — рамки нет.
+- Рамка губ реплики `[start, end]` (секунды от начала кадра): авто-место `at` = `start`; скорость клипа = длина речи озвучки / длина рамки, в пределах 0.8–1.35× (за пределами — предупреждение «нужно N×»).
+- Ручная скорость — `lines.json` → `speed` (число; `null` — авто), правится на доске.
+- Скорость есть только в проекте Kdenlive: продюсер MLT `timewarp` с `warp_pitch=1` (тон не меняется, как «Изменить скорость» с компенсацией тона). В FCPXML клипы без ускорения (предупреждение в манифесте).
+
 ## Проект Kdenlive
 
 «Собрать проект» пишет рядом с FCPXML `timeline/{ep}_v{N}.kdenlive` той же сборки (`src/lib/post/kdenlive.ts`, формат документа 1.1, Kdenlive 23.04+, проверено на 26.08 через `melt`). Kdenlive: File → Open. Профиль — размер кадра сборки, 24 fps. Дорожки:
@@ -91,9 +103,10 @@ Resolve: File → Import → Timeline. Секвенция 24 fps, размер �
 | Метод и путь | Что делает |
 |---|---|
 | `GET /api/episodes/{ep}/post` | `PostState`: реплики с отрезками, голоса, финалы, таймлайны, последнее задание |
-| `PATCH .../post/lines` `{ id, at?, trimIn?, trimOut? }` | правка реплики (`at: null` — вернуть авто) → `PostState` |
+| `PATCH .../post/lines` `{ id, at?, trimIn?, trimOut?, speed? }` | правка реплики (`at: null`, `speed: null` — вернуть авто) → `PostState` |
 | `PUT .../post/voices` `{ character, voice_id, model_id?, voice_settings?, seed? }` | `voice.json` → `PostState` |
 | `POST .../post/voices` `{ character, version }` | сделать версию озвучки текущей → `PostState` |
 | `POST .../post/voice-job` `{ characters, allowPaid: true }` | озвучка (платно) → `VoiceJob` |
+| `POST .../post/speech` `{ shotIds?, force? }` | распознать речь финалов (Whisper, очередь ComfyUI) → `{ queued, skipped }` |
 | `POST .../post/timeline` `{ width?, height? }` | новая версия: `.kdenlive` и `.fcpxml` → `Manifest` (`kdenlive`, `timeline`) |
 | `GET .../post/file?path=` | файл папки поста (`.wav .mp3 .json .fcpxml .kdenlive .srt`), Range для звука; таймлайны — на скачивание |

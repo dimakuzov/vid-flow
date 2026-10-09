@@ -43,6 +43,10 @@ export interface ManifestLine {
   sourceIn: number;
   sourceOut: number;
   at: number;
+  /** Скорость клипа (подгонка под губы или ручная); на таймлайне клип короче/длиннее в столько раз. */
+  speed: number;
+  /** Рамка губ в кадре (секунды от начала кадра), если речь в финале распознана. */
+  window: { start: number; end: number } | null;
   timelineStart: number;
   timelineEnd: number;
   /** Дорожка FCPXML (отрицательная — под видео). */
@@ -221,17 +225,25 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
       continue;
     }
     const shot = spine.find((item) => item.shotId === line.shotId)!;
+    const speed = line.clip.speed;
     let sourceIn = line.clip.in;
     const shotStart = shot.startFrame / TIMELINE_FPS;
-    let start = shotStart + line.at - (line.clip.speechStart - sourceIn);
+    // Начало речи — на `at`; запас перед ним на таймлайне сжат или растянут скоростью.
+    let start = shotStart + line.at - (line.clip.speechStart - sourceIn) / speed;
     if (start < 0) {
-      sourceIn -= start;
+      sourceIn -= start * speed;
       start = 0;
     }
     const startFrame = frames(start);
     const inFrame = frames(sourceIn);
-    const durationFrames = Math.max(1, frames(line.clip.out) - inFrame);
-    const endFrame = startFrame + durationFrames;
+    const sourceFrames = Math.max(1, frames(line.clip.out) - inFrame);
+    const durationFrames = sourceFrames;
+    const endFrame = startFrame + Math.max(1, Math.round(sourceFrames / speed));
+    if (line.clip.fit?.clamped) {
+      warnings.push(
+        `${line.id}: чтобы попасть в губы, нужна скорость ${line.clip.fit.wanted}× — стоит ${line.clip.speed}× (предел), поправьте реплику или рамку`,
+      );
+    }
     const lane = laneOf(line.character);
     if (line.at > shot.durationFrames / TIMELINE_FPS) {
       warnings.push(`${line.id}: место ${line.at} с позже конца кадра ${line.shotId}`);
@@ -256,14 +268,19 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
       text: line.text,
       source: path.relative(postRoot, line.clip.source).split(path.sep).join("/"),
       sourceIn: inFrame / TIMELINE_FPS,
-      sourceOut: (inFrame + durationFrames) / TIMELINE_FPS,
+      sourceOut: (inFrame + sourceFrames) / TIMELINE_FPS,
       at: line.at,
+      speed,
+      window: line.window ? { start: line.window.start, end: line.window.end } : null,
       timelineStart: startFrame / TIMELINE_FPS,
       timelineEnd: endFrame / TIMELINE_FPS,
       lane,
     });
   }
   const endFrame = Math.max(totalFrames, ...manifestLines.map((line) => frames(line.timelineEnd)));
+  if (manifestLines.some((line) => line.speed !== 1)) {
+    warnings.push("Скорость реплик (подгонка под губы) есть только в проекте Kdenlive; в FCPXML клипы без ускорения");
+  }
 
   const spineXml = spine
     .map((item) => {

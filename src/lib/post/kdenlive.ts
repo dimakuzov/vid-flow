@@ -43,26 +43,37 @@ interface Source {
 }
 
 interface Clip {
+  /** Кадр таймлайна. */
   start: number;
+  /** Вход и длина в кадрах источника (без скорости). */
   in: number;
   length: number;
   source: Source;
+  /** Скорость; ≠1 — клип через `timewarp` с сохранением тона. */
+  speed: number;
+}
+
+/** Длина клипа на таймлайне и его вход в кадрах продюсера (у `timewarp` кадры уже со скоростью). */
+function timelineSpan(clip: Clip): { in: number; length: number } {
+  if (clip.speed === 1) return { in: clip.in, length: clip.length };
+  return { in: Math.round(clip.in / clip.speed), length: Math.max(1, Math.round(clip.length / clip.speed)) };
 }
 
 /** Плейлист дорожки: пустоты `blank` и клипы по порядку. Наезд обрезает конец предыдущего клипа. */
-function playlistXml(id: string, clips: Clip[], producerOf: (source: Source) => string, audio: boolean): string {
+function playlistXml(id: string, clips: Clip[], producerOf: (clip: Clip) => string, audio: boolean): string {
   const sorted = [...clips].sort((a, b) => a.start - b.start);
   const body: string[] = [];
   let cursor = 0;
   sorted.forEach((clip, index) => {
     const next = sorted[index + 1];
-    const length = Math.max(1, next ? Math.min(clip.length, next.start - clip.start) : clip.length);
+    const span = timelineSpan(clip);
+    const length = Math.max(1, next ? Math.min(span.length, next.start - clip.start) : span.length);
     if (clip.start > cursor) body.push(`  <blank length="${clip.start - cursor}"/>`);
     const start = Math.max(clip.start, cursor);
-    const inPoint = clip.in + (start - clip.start);
+    const inPoint = span.in + (start - clip.start);
     const out = inPoint + Math.max(1, length - (start - clip.start)) - 1;
     body.push(
-      `  <entry producer="${producerOf(clip.source)}" in="${inPoint}" out="${out}">\n   ${prop("kdenlive:id", clip.source.kdenliveId)}\n  </entry>`,
+      `  <entry producer="${producerOf(clip)}" in="${inPoint}" out="${out}">\n   ${prop("kdenlive:id", clip.source.kdenliveId)}\n  </entry>`,
     );
     cursor = start + (out - inPoint + 1);
   });
@@ -112,7 +123,7 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
   for (const shot of manifest.shots) {
     if (!shot.file) continue;
     const src = await source(path.join(episodeDir, shot.file), shot.shotId);
-    const clip = { start: frames(shot.start), in: 0, length: frames(shot.duration), source: src };
+    const clip = { start: frames(shot.start), in: 0, length: frames(shot.duration), source: src, speed: 1 };
     videoClips.push(clip);
     if (shot.hasAudio && src.hasAudio) finalAudioClips.push(clip);
   }
@@ -124,6 +135,7 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
       in: frames(line.sourceIn),
       length: Math.max(1, frames(line.sourceOut) - frames(line.sourceIn)),
       source: src,
+      speed: line.speed ?? 1,
     });
   }
   const totalFrames = Math.max(1, frames(manifest.duration));
@@ -148,8 +160,40 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
     return `<chain id="${id}" out="${src.length - 1}">\n  ${lines.join("\n  ")}\n</chain>`;
   };
   const used = { video: new Set<Source>(), audio: new Set<Source>() };
-  const videoProducer = (src: Source) => (used.video.add(src), `${src.binId}_video`);
-  const audioProducer = (src: Source) => (used.audio.add(src), `${src.binId}_audio`);
+  const warped = new Map<string, { src: Source; speed: number }>();
+  const videoProducer = (clip: Clip) => (used.video.add(clip.source), `${clip.source.binId}_video`);
+  const audioProducer = (clip: Clip) => {
+    if (clip.speed === 1) {
+      used.audio.add(clip.source);
+      return `${clip.source.binId}_audio`;
+    }
+    const id = `${clip.source.binId}_tw${Math.round(clip.speed * 100)}`;
+    warped.set(id, { src: clip.source, speed: clip.speed });
+    return id;
+  };
+  // Ускоренный (замедленный) звук без смены тона: MLT `timewarp`, `warp_pitch=1` — как «Изменить скорость»
+  // с компенсацией тона в Kdenlive. Кадры продюсера — уже со скоростью.
+  const timewarpXml = (id: string, src: Source, speed: number) => {
+    const file = src.file.split(path.sep).join("/");
+    const length = Math.max(1, Math.ceil(src.length / speed));
+    return `<producer id="${id}" in="0" out="${length - 1}">
+  ${prop("length", length)}
+  ${prop("eof", "pause")}
+  ${prop("resource", `${speed}:${file}`)}
+  ${prop("mlt_service", "timewarp")}
+  ${prop("warp_speed", speed)}
+  ${prop("warp_resource", file)}
+  ${prop("warp_pitch", 1)}
+  ${prop("seekable", 1)}
+  ${prop("audio_index", src.hasVideo ? 1 : 0)}
+  ${prop("video_index", src.hasVideo ? 0 : -1)}
+  ${prop("kdenlive:clipname", src.name)}
+  ${prop("kdenlive:folderid", -1)}
+  ${prop("kdenlive:id", src.kdenliveId)}
+  ${prop("set.test_audio", 0)}
+  ${prop("set.test_image", 1)}
+</producer>`;
+  };
 
   // Дорожки снизу вверх: звук финалов, персонажи (последний — ниже), видео.
   const tracks: { id: string; name: string; audio: boolean; muted: boolean; playlist: string }[] = [];
@@ -232,6 +276,7 @@ ${track.audio ? AUDIO_TRACK_FILTERS(track.id) : ""}
 ${all.map((src) => chainXml(src.binId, src, "bin")).join("\n")}
 ${[...used.video].map((src) => chainXml(`${src.binId}_video`, src, "video")).join("\n")}
 ${[...used.audio].map((src) => chainXml(`${src.binId}_audio`, src, "audio")).join("\n")}
+${[...warped.entries()].map(([id, item]) => timewarpXml(id, item.src, item.speed)).join("\n")}
 <producer id="black_track" in="0" out="${totalFrames - 1}">
   ${prop("length", 2147483647)}
   ${prop("eof", "continue")}
