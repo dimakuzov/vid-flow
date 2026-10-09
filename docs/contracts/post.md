@@ -42,11 +42,13 @@ data/episodes/{ep}/post/
 
 ## Голос и озвучка
 
-`voice.json` → `{ "voice_id", "model_id", "voice_settings": { stability, similarity_boost, style, speed, use_speaker_boost }, "seed" }`. `model_id` по умолчанию `eleven_multilingual_v2`.
+`voice.json` → `{ "voice_id", "model_id", "text_prefix", "voice_settings": { stability, similarity_boost, style, speed, use_speaker_boost }, "seed" }`. `model_id` по умолчанию `eleven_multilingual_v2` (проект работает на `eleven_v3`).
+
+`text_prefix` — аудиотег, который доска дописывает перед **каждой** фразой персонажа при **каждой** отправке: `[strong Russian accent] Who is that guy?`. Поля нет — `[strong Russian accent]`; пустая строка — без тега. В `speech.md`, `lines.json`, манифест и субтитры тег не попадает; реплика в таймстемпах ищется без него, так что начало речи — первое слово. Модели v2 теги не понимают и прочтут вслух.
 
 Озвучка персонажа — одна новая версия `v{N}`:
 
-1. Все реплики персонажа по порядку, через `\n<break time="1.0s" />\n` (для `eleven_v3` — пустая строка: `<break>` он не понимает).
+1. Все реплики персонажа по порядку, каждая с `text_prefix`, через `\n<break time="1.0s" />\n` (для `eleven_v3` — пустая строка: `<break>` он не понимает).
 2. Куски не длиннее `POST_TTS_CHUNK_CHARS` (по умолчанию 2500) символов, реплика не режется. Каждый кусок — `POST /v1/text-to-speech/{voice_id}/with-timestamps?output_format=mp3_44100_128`; следующий получает `previous_request_ids` (до 3 последних `request-id`), у `eleven_v3` склейки запросов нет — `previous_text`.
 3. Куски → `v{N}.wav` (44.1 кГц, моно), между кусками 1 с тишины.
 4. Реплика в ответе ищется по тексту в `alignment.characters`. Край звука уточняется по тишине (`silencedetect`, −35 дБ, 0.2 с): конец — начало тишины после реплики (затухание, выдох), начало — конец тишины перед ней. Отрезок: звук + 0.12 с до и 0.2 с после, но не дальше середины паузы до соседней реплики.

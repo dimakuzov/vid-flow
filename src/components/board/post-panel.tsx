@@ -102,6 +102,7 @@ function VoiceForm({
   const [style, setStyle] = useState(String(config?.voice_settings?.style ?? ""));
   const [speed, setSpeed] = useState(String(config?.voice_settings?.speed ?? ""));
   const [seed, setSeed] = useState(config?.seed === undefined ? "" : String(config.seed));
+  const [prefix, setPrefix] = useState(config?.text_prefix ?? "[strong Russian accent]");
 
   const num = (value: string) => (value.trim() === "" ? undefined : Number(value.replace(",", ".")));
   const field = "rounded-md border border-stone-300 bg-white px-2 py-1 text-xs";
@@ -114,6 +115,10 @@ function VoiceForm({
       <label className="flex flex-col gap-1 sm:col-span-2">
         model_id
         <input className={`${field} font-mono`} value={modelId} onChange={(event) => setModelId(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-4">
+        Тег перед каждой фразой (аудиотег v3; в текст реплик и субтитры не попадает; пусто — без тега)
+        <input className={`${field} font-mono`} value={prefix} onChange={(event) => setPrefix(event.target.value)} />
       </label>
       <label className="flex flex-col gap-1">
         stability
@@ -151,6 +156,7 @@ function VoiceForm({
                 speed: num(speed),
               },
               seed: num(seed),
+              text_prefix: prefix,
             })
           }
         >
@@ -307,6 +313,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                     {character.config ? (
                       <span className="font-mono text-xs text-stone-500">
                         {character.config.voice_id.slice(0, 10)}… · {character.config.model_id}
+                        {character.config.text_prefix ? ` · ${character.config.text_prefix}` : ""}
                       </span>
                     ) : (
                       <span className="text-xs text-amber-800">нет voice.json</span>

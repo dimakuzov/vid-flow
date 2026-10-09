@@ -18,12 +18,20 @@ export interface VoiceSettings {
   speed?: number;
 }
 
+/** Тег v3 перед каждой фразой, если в voice.json поля `text_prefix` нет. */
+export const DEFAULT_TEXT_PREFIX = "[strong Russian accent]";
+
 /** `data/characters/{Name}/voice.json`. */
 export interface VoiceConfig {
   voice_id: string;
   model_id: string;
   voice_settings?: VoiceSettings;
   seed?: number;
+  /**
+   * Дописывается перед каждой фразой персонажа при отправке (аудиотег v3), в текст реплик не попадает.
+   * Пусто — без тега. Модели v2 теги не понимают и прочтут вслух.
+   */
+  text_prefix: string;
 }
 
 export function elevenBase(): string {

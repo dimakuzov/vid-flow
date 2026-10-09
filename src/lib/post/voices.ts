@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getCharactersRoot } from "../series/paths";
 import { chunkLines, isV3Model, locateLines, refineBounds, type LineBounds } from "./align";
-import { DEFAULT_MODEL_ID, ttsWithTimestamps, type VoiceConfig } from "./elevenlabs";
+import { DEFAULT_MODEL_ID, DEFAULT_TEXT_PREFIX, ttsWithTimestamps, type VoiceConfig } from "./elevenlabs";
 import { detectSilences, joinToWav } from "./ffmpeg";
 import type { PostLine } from "./lines";
 import { characterKey, libraryCharacterDir, readJson, voicesDir, writeJson } from "./paths";
@@ -32,7 +32,13 @@ export function readVoiceConfig(character: string): VoiceConfig | null {
     model_id: typeof data.model_id === "string" && data.model_id.trim() ? data.model_id.trim() : DEFAULT_MODEL_ID,
     voice_settings: data.voice_settings && typeof data.voice_settings === "object" ? data.voice_settings : undefined,
     seed: typeof data.seed === "number" ? data.seed : undefined,
+    text_prefix: typeof data.text_prefix === "string" ? data.text_prefix.trim() : DEFAULT_TEXT_PREFIX,
   };
+}
+
+/** Текст фразы, который уходит в ElevenLabs: тег персонажа + реплика. */
+export function ttsLineText(config: VoiceConfig, text: string): string {
+  return config.text_prefix ? `${config.text_prefix} ${text}` : text;
 }
 
 /** Форма на доске. Папки персонажа нет — создаётся `data/characters/{Name}/`. */
@@ -41,7 +47,9 @@ export function writeVoiceConfig(character: string, input: Partial<VoiceConfig>)
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(voiceId)) throw new Error("voice_id: скопируйте id голоса из ElevenLabs (латиница и цифры)");
   const modelId = typeof input.model_id === "string" && input.model_id.trim() ? input.model_id.trim() : DEFAULT_MODEL_ID;
   if (!/^[a-z0-9_]{3,64}$/.test(modelId)) throw new Error("model_id: например eleven_multilingual_v2");
-  const config: VoiceConfig = { voice_id: voiceId, model_id: modelId };
+  const prefix = typeof input.text_prefix === "string" ? input.text_prefix.trim() : DEFAULT_TEXT_PREFIX;
+  if (prefix.length > 200) throw new Error("Тег перед фразой: не длиннее 200 символов");
+  const config: VoiceConfig = { voice_id: voiceId, model_id: modelId, text_prefix: prefix };
   if (input.voice_settings && typeof input.voice_settings === "object") {
     const settings: Record<string, number | boolean> = {};
     for (const [key, value] of Object.entries(input.voice_settings)) {
@@ -131,7 +139,10 @@ export function setCurrentVoice(episodeId: string, character: string, version: n
 
 /** Текст, который уйдёт в ElevenLabs, и число символов (оценка стоимости). */
 export function planCharacterVoice(lines: PostLine[], config: VoiceConfig) {
-  const chunks = chunkLines(lines, config.model_id);
+  const chunks = chunkLines(
+    lines.map((line) => ({ line, text: ttsLineText(config, line.text) })),
+    config.model_id,
+  );
   return { chunks, chars: chunks.reduce((sum, chunk) => sum + chunk.text.length, 0) };
 }
 
@@ -180,8 +191,9 @@ export async function generateCharacterVoice(
       file,
       requestId: result.requestId,
       text: chunk.text,
-      lineIds: chunk.items.map((line) => line.id),
-      located: locateLines(result.alignment, chunk.items.map((line) => line.text)),
+      lineIds: chunk.items.map((item) => item.line.id),
+      // Ищем саму реплику, без тега: тег не звучит, начало речи — первое слово.
+      located: locateLines(result.alignment, chunk.items.map((item) => item.line.text)),
     });
   }
 

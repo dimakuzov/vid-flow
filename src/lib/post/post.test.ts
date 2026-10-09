@@ -170,7 +170,13 @@ test("без галочки разрешения в ElevenLabs ничего не
   await assert.rejects(enqueueVoiceJob(EP, { characters: ["Lena"], allowPaid: true }), /нет voice.json/);
   assert.equal(seen.length, 0);
   const config = JSON.parse(fs.readFileSync(path.join(getCharactersRoot(), "Julia", "voice.json"), "utf8"));
-  assert.deepEqual(config, { voice_id: "voiceJulia01", model_id: "eleven_multilingual_v2", voice_settings: { stability: 0.6 }, seed: 7 });
+  assert.deepEqual(config, {
+    voice_id: "voiceJulia01",
+    model_id: "eleven_multilingual_v2",
+    text_prefix: "[strong Russian accent]",
+    voice_settings: { stability: 0.6 },
+    seed: 7,
+  });
 });
 
 test("озвучка персонажа: два куска склеены через previous_request_ids, один wav, границы реплик по звуку", async () => {
@@ -188,7 +194,9 @@ test("озвучка персонажа: два куска склеены чер
   assert.equal(seen.length, 2);
   assert.equal(seen[0].key, "test-key");
   assert.match(seen[0].url, /\/v1\/text-to-speech\/voiceJulia01\/with-timestamps\?output_format=mp3_44100_128/);
-  assert.equal(seen[0].body.text, "Don't mind him.");
+  assert.equal(seen[0].body.text, "[strong Russian accent] Don't mind him.", "тег персонажа перед фразой");
+  assert.equal(seen[1].body.text, "[strong Russian accent] Everybody wants it. I am Julia, by the way.");
+  assert.equal(seen[0].body.text_prefix, undefined, "поле voice.json в запрос не уходит");
   assert.equal(seen[0].body.model_id, "eleven_multilingual_v2");
   assert.equal(seen[0].body.seed, 7);
   assert.equal(seen[0].body.previous_request_ids, undefined);
@@ -270,6 +278,15 @@ test("перегенерация персонажа: новая версия, р
   assert.equal(line.clip!.version, 2);
   assert.ok(Math.abs(line.clip!.in - (line.clip!.autoIn - 0.05)) < 1e-6);
   assert.ok(Math.abs(line.clip!.out - (line.clip!.autoOut + 0.1)) < 1e-6);
+
+  // Тег не попадает в текст реплик и манифест.
+  assert.ok(lines.every((item) => !item.text.includes("[strong")));
+  // Пустой тег — фраза уходит как есть.
+  writeVoiceConfig("Julia", { voice_id: "voiceJulia01", text_prefix: "" });
+  const before = seen.length;
+  const plain = await runVoiceJob(EP, (await enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true })).id);
+  assert.equal(plain.status, "done", plain.error);
+  assert.equal(seen[before].body.text, "Don't mind him.");
 
   // Текст реплики изменился в speech.md: подрезка сброшена, озвучка устарела, место осталось.
   fs.writeFileSync(path.join(shotDir(EP, "s03"), "speech.md"), "Everybody wants it.\n");
