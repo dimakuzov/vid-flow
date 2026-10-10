@@ -280,6 +280,12 @@ test("таймлайн: видео по порядку, звук финала в
   const firstBlank = Number(juliaTrack.match(/<blank length="(\d+)"\/>/)![1]);
   assert.equal(firstBlank, julia1.timelineStart * 24, "реплика стоит на своём месте");
   assert.match(kd, /voices\/Julia\/v1\.wav<\/property>/);
+  // Каждая реплика — с нарастанием и затуханием по 2 кадра (эффекты Kdenlive fadein/fadeout), чтобы не щёлкало.
+  const firstEntry = juliaTrack.match(/<entry producer="\w+" in="(\d+)" out="(\d+)">[\s\S]*?<\/entry>/)!;
+  const [inPoint, outPoint] = [Number(firstEntry[1]), Number(firstEntry[2])];
+  assert.match(firstEntry[0], new RegExp(`<filter id="[^"]+_fadein" in="${inPoint}" out="${inPoint + 1}">[\\s\\S]*?"kdenlive_id">fadein<[\\s\\S]*?"gain">0<[\\s\\S]*?"end">1<`));
+  assert.match(firstEntry[0], new RegExp(`<filter id="[^"]+_fadeout" in="${outPoint - 1}" out="${outPoint}">[\\s\\S]*?"kdenlive_id">fadeout<[\\s\\S]*?"gain">1<[\\s\\S]*?"end">0<`));
+  assert.ok(!video.includes("fadein"), "у видео затуханий нет");
 
   // Повторная сборка — новая версия, старая остаётся.
   await buildTimeline(EP, { width: 1080, height: 1920 });

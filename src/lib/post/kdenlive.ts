@@ -59,8 +59,38 @@ function timelineSpan(clip: Clip): { in: number; length: number } {
   return { in: Math.round(clip.in / clip.speed), length: Math.max(1, Math.round(clip.length / clip.speed)) };
 }
 
+/** Нарастание и затухание звука реплики, кадров: срез посреди волны иначе щёлкает. */
+export const VOICE_FADE_FRAMES = 2;
+
+/**
+ * Эффекты Kdenlive «Fade in» / «Fade out» на клипе (фильтр `volume`, data/kdenlive/effects/fadein.xml):
+ * `in`/`out` фильтра — кадры клипа, громкость от `gain` до `end`.
+ */
+function fadeFilters(id: string, inPoint: number, out: number, frames: number): string {
+  const length = out - inPoint + 1;
+  const fade = Math.min(frames, Math.floor(length / 2));
+  if (fade < 1) return "";
+  const filter = (kind: "fadein" | "fadeout", from: number, to: number, gain: number, end: number) => `
+   <filter id="${id}_${kind}" in="${from}" out="${to}">
+    ${prop("window", 75)}
+    ${prop("max_gain", "20dB")}
+    ${prop("mlt_service", "volume")}
+    ${prop("kdenlive_id", kind)}
+    ${prop("gain", gain)}
+    ${prop("end", end)}
+    ${prop("kdenlive:collapsed", 0)}
+   </filter>`;
+  return filter("fadein", inPoint, inPoint + fade - 1, 0, 1) + filter("fadeout", out - fade + 1, out, 1, 0);
+}
+
 /** Плейлист дорожки: пустоты `blank` и клипы по порядку. Наезд обрезает конец предыдущего клипа. */
-function playlistXml(id: string, clips: Clip[], producerOf: (clip: Clip) => string, audio: boolean): string {
+function playlistXml(
+  id: string,
+  clips: Clip[],
+  producerOf: (clip: Clip) => string,
+  audio: boolean,
+  fadeFrames = 0,
+): string {
   const sorted = [...clips].sort((a, b) => a.start - b.start);
   const body: string[] = [];
   let cursor = 0;
@@ -72,8 +102,9 @@ function playlistXml(id: string, clips: Clip[], producerOf: (clip: Clip) => stri
     const start = Math.max(clip.start, cursor);
     const inPoint = span.in + (start - clip.start);
     const out = inPoint + Math.max(1, length - (start - clip.start)) - 1;
+    const fades = fadeFrames ? fadeFilters(`${id}_${index}`, inPoint, out, fadeFrames) : "";
     body.push(
-      `  <entry producer="${producerOf(clip)}" in="${inPoint}" out="${out}">\n   ${prop("kdenlive:id", clip.source.kdenliveId)}\n  </entry>`,
+      `  <entry producer="${producerOf(clip)}" in="${inPoint}" out="${out}">\n   ${prop("kdenlive:id", clip.source.kdenliveId)}${fades}\n  </entry>`,
     );
     cursor = start + (out - inPoint + 1);
   });
@@ -212,7 +243,13 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
       name: character.name,
       audio: true,
       muted: false,
-      playlist: playlistXml(`playlist_voice${index}`, characterClips.get(character.name) ?? [], audioProducer, true),
+      playlist: playlistXml(
+        `playlist_voice${index}`,
+        characterClips.get(character.name) ?? [],
+        audioProducer,
+        true,
+        VOICE_FADE_FRAMES,
+      ),
     });
   });
   tracks.push({
