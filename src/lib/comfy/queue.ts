@@ -6,6 +6,7 @@ import {
   downloadComfyImage,
   historyError,
   listHistoryImages,
+  listHistoryTexts,
   queuePositionOf,
   readComfyHistory,
   readComfyQueue,
@@ -320,6 +321,11 @@ async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
   for (const image of listHistoryImages(history)) {
     const bytes = await downloadComfyImage(image);
     saved.push(writeUnique(saveDir, path.basename(image.filename), bytes));
+  }
+  if (job.saveText) {
+    for (const { node, text } of listHistoryTexts(history)) {
+      saved.push(writeUnique(saveDir, `${node.replace(/[^\w-]/g, "_")}.txt`, Buffer.from(text, "utf8")));
+    }
   }
   if (!saved.length) throw new Error("ComfyUI не вернул файлов");
   if (cancelledMeanwhile(job.id)) return;

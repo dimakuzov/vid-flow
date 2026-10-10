@@ -31,6 +31,11 @@ export interface ComfyJob {
   uploads?: { path: string; filename?: string }[];
   /** Куда сохранить результат. От cwd, внутри data/. */
   saveTo: string;
+  /**
+   * Сохранить и текстовые выходы нод (`PreviewAny` и т.п.: `outputs[node].text`) как `{node}.txt` в saveTo.
+   * Для графов без картинок (распознавание речи). Только локальный ComfyUI.
+   */
+  saveText?: boolean;
   /** id в ComfyUI после POST /prompt. */
   promptId?: string;
   /** Время постановки (постановщик). */

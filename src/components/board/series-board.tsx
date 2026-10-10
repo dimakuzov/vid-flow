@@ -8,6 +8,7 @@ import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/
 import { BootstrapPanel } from "./bootstrap-panel";
 import { BulkMenu } from "./bulk-menu";
 import { NewEpisodeDialog } from "./new-episode-dialog";
+import { PostPanel } from "./post-panel";
 import { ShotAgentLine, ShotAgentMenu } from "./shot-agent-menu";
 import { StageCell } from "./stage-cell";
 
@@ -294,6 +295,8 @@ export function SeriesBoard({
           </>
         ) : null}
       </section>
+
+      {episodeId ? <PostPanel key={episodeId} episodeId={episodeId} /> : null}
 
       {episodeId ? (
         <BootstrapPanel
