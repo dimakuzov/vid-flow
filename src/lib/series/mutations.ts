@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { StageId } from "./constants";
 import { listMediaFiles } from "./media";
-import { assertSafeSegment, ensureStageDirs, shotDir, shotsDir, stageDir } from "./paths";
+import { assertSafeSegment, ensureStageDirs, getDataRoot, isInside, shotDir, shotsDir, stageDir } from "./paths";
 import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
@@ -323,6 +323,165 @@ export function updateStageDocs(options: {
 
 export function listApprove(episodeId: string, shotId: string, stageId: StageId) {
   return listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "approve"));
+}
+
+/** Связь нового файла в output/ с исходником. Файл `output/edits.json`. */
+export interface ImageEditRecord {
+  file: string;
+  from: string;
+  kind: "crop" | "edit";
+  prompt?: string;
+  workflow?: string;
+  at: string;
+}
+
+function editsFile(episodeId: string, shotId: string, stageId: StageId): string {
+  return path.join(stageDir(episodeId, shotId, stageId), "output", "edits.json");
+}
+
+function isImageEditRecord(value: unknown): value is ImageEditRecord {
+  if (!value || typeof value !== "object") return false;
+  const item = value as ImageEditRecord;
+  return (
+    typeof item.file === "string" &&
+    typeof item.from === "string" &&
+    (item.kind === "crop" || item.kind === "edit") &&
+    typeof item.at === "string"
+  );
+}
+
+/** Связи «новый файл ← исходник». Пустого файла нет — пустой список. */
+export function readImageEdits(episodeId: string, shotId: string, stageId: StageId): ImageEditRecord[] {
+  const file = editsFile(episodeId, shotId, stageId);
+  if (!fs.existsSync(file)) return [];
+  let data: unknown;
+  try {
+    data = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    throw new Error("output/edits.json не читается");
+  }
+  if (!Array.isArray(data)) throw new Error("output/edits.json повреждён");
+  return data.filter(isImageEditRecord);
+}
+
+/** Записать список целиком. Нужно, когда очередь сохранила файл под другим именем. */
+export function writeImageEdits(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  records: ImageEditRecord[],
+): void {
+  const dir = path.join(stageDir(episodeId, shotId, stageId), "output");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "edits.json"), JSON.stringify(records, null, 2) + "\n");
+}
+
+/** Дописать одну связь. Исходный файл не открывается на запись. */
+export function recordImageEdit(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  record: ImageEditRecord,
+): void {
+  const records = readImageEdits(episodeId, shotId, stageId);
+  records.push(record);
+  writeImageEdits(episodeId, shotId, stageId, records);
+}
+
+/**
+ * Имя нового файла в output/, которого ещё нет на диске.
+ * Совпадение — суффикс, как у загрузки (`photo.png` → `photo_1.png`).
+ */
+export function reserveOutputName(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  filename: string,
+): string {
+  const shot = assertSafeSegment(shotId, "shot");
+  ensureStageDirs(episodeId, shot);
+  const dir = path.join(stageDir(episodeId, shot, stageId), "output");
+  fs.mkdirSync(dir, { recursive: true });
+  return uniqueTarget(dir, path.basename(filename));
+}
+
+function assertImageName(filename: string): string {
+  const safeName = path.basename(filename);
+  if (!safeName || safeName !== filename || safeName === "." || safeName === "..") {
+    throw new Error("Некорректное имя файла");
+  }
+  return safeName;
+}
+
+/**
+ * Обрезка из браузера: байты уже обрезаны, доска только кладёт новый PNG в output/.
+ * Исходник в output/ или approve/ не меняется.
+ */
+export function saveCroppedImage(options: {
+  episodeId: string;
+  shotId: string;
+  stageId: StageId;
+  folder: "output" | "approve";
+  filename: string;
+  bytes: Buffer;
+}): { savedAs: string } {
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  const safeName = assertImageName(options.filename);
+  if (options.folder !== "output" && options.folder !== "approve") {
+    throw new Error("Обрезать можно файл из output/ или approve/");
+  }
+  if (!options.bytes.length) throw new Error("Пустая обрезка");
+  ensureStageDirs(options.episodeId, shotId);
+  const stagePath = stageDir(options.episodeId, shotId, options.stageId);
+  const source = path.join(stagePath, options.folder, safeName);
+  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
+    throw new Error(`Файл не найден: ${safeName}`);
+  }
+  const parsed = path.parse(safeName);
+  const dir = path.join(stagePath, "output");
+  fs.mkdirSync(dir, { recursive: true });
+  const savedAs = uniqueTarget(dir, `${parsed.name}_crop.png`);
+  const target = path.join(dir, savedAs);
+  fs.writeFileSync(target, options.bytes);
+  recordImageEdit(options.episodeId, shotId, options.stageId, {
+    file: savedAs,
+    from: safeName,
+    kind: "crop",
+    at: new Date().toISOString(),
+  });
+  writeStatusFile(options.episodeId, shotId, options.stageId, { status: "review" });
+  clearStageError(options.episodeId, shotId, options.stageId);
+  return { savedAs };
+}
+
+/**
+ * Копии выбранных файлов в refs/ этапа. Имя сохраняется, при совпадении — суффикс.
+ * Исходники не трогаются. Папка помечается правкой пользователя.
+ */
+export function copyFilesToRefs(options: {
+  episodeId: string;
+  shotId: string;
+  stageId: StageId;
+  files: { absolute: string; filename: string }[];
+}): string[] {
+  if (!options.files.length) throw new Error("Не выбраны файлы");
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  ensureStageDirs(options.episodeId, shotId);
+  const dir = path.join(stageDir(options.episodeId, shotId, options.stageId), "refs");
+  fs.mkdirSync(dir, { recursive: true });
+  const dataRoot = getDataRoot();
+  const saved: string[] = [];
+  for (const file of options.files) {
+    if (!isInside(dataRoot, file.absolute)) throw new Error("Файл вне data/");
+    if (!fs.existsSync(file.absolute) || !fs.statSync(file.absolute).isFile()) {
+      throw new Error(`Файл не найден: ${file.filename}`);
+    }
+    const targetName = uniqueTarget(dir, path.basename(file.filename));
+    fs.copyFileSync(file.absolute, path.join(dir, targetName));
+    saved.push(targetName);
+  }
+  markRefsTouched(options.episodeId, shotId, options.stageId);
+  return saved;
 }
 
 export function deleteShot(episodeId: string, shotId: string): void {

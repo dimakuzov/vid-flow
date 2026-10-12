@@ -1,0 +1,96 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "qwen21_image_edit",
+  "graph": "../qwen21_character_compositing.json",
+  "stage": "first_frame",
+  "label": "Правка: Qwen Image 2.1",
+  "description": "Одна картинка, image 1 — исходник. Не пункт меню этапа: только окно «Править».",
+  "playbook": "models/image_edit.en.md",
+  "order": 10,
+  "inputs": {
+    "source": {
+      "kind": "image",
+      "from": "refs",
+      "pick": "first",
+      "min": 0,
+      "whenPrompt": "$a",
+      "label": "Исходная картинка"
+    },
+    "extras": {
+      "kind": "image",
+      "from": "refs",
+      "pick": "all",
+      "min": 0,
+      "whenPrompt": "$a",
+      "label": "Лишние картинки графа"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "470", "field": "image" }],
+      "value": { "input": "source" }
+    },
+    {
+      "targets": [{ "node": "902", "field": "image" }],
+      "value": { "input": "extras", "index": 0 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "902" },
+          { "node": "488", "field": "images.image_2" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "903", "field": "image" }],
+      "value": { "input": "extras", "index": 1 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "903" },
+          { "node": "488", "field": "images.image_3" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "904", "field": "image" }],
+      "value": { "input": "extras", "index": 2 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "904" },
+          { "node": "488", "field": "images.image_4" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "905", "field": "image" }],
+      "value": { "input": "extras", "index": 3 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "905" },
+          { "node": "488", "field": "images.image_5" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "906", "field": "image" }],
+      "value": { "input": "extras", "index": 4 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "906" },
+          { "node": "488", "field": "images.image_6" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "477", "field": "value" }],
+      "value": { "const": "" }
+    },
+    {
+      "targets": [{ "node": "485", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "461", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/edit/{shotId}_edit" }
+    }
+  ]
+}

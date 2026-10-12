@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusPill } from "@/components/board/status-pill";
+import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
 import { Button } from "@/components/ui/button";
+import type { EditWorkflow } from "@/lib/comfy/edit";
+import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { AgentPanel } from "./agent-panel";
 import { useAgentProviders } from "./agent-provider";
 import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
 import { DocFieldLabel, DocTextarea } from "./doc-field";
+import { HotkeyHelp } from "./hotkey-help";
+import { ImageEditDialog } from "./image-edit-dialog";
 import { ImageLightbox } from "./image-lightbox";
 import { LocationLibrary } from "./location-library";
+import { RefSourcePicker } from "./ref-source-picker";
 import { OutputPanel } from "./output-panel";
 import { PromptHistory } from "./prompt-history";
 import { RefFiles, usedRefNames } from "./ref-files";
@@ -25,7 +31,9 @@ const PROMPT_PLACEHOLDER = "Текст для модели, на английс�
 
 const SPEECH_PLACEHOLDER = "Что персонаж говорит вслух, дословно. Одна реплика на строку: «Катя: Мама, я дома.» Молчат — оставьте пустым.";
 
-type Viewer = { files: MediaFile[]; index: number; runContext: boolean };
+type PictureFolder = "output" | "approve" | "refs";
+
+type Viewer = { files: MediaFile[]; index: number; runContext: boolean; folder: PictureFolder };
 
 export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }) {
   const stage = useStageDetail(initialDetail);
@@ -39,6 +47,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const [selectedOutput, setSelectedOutput] = useState<string[]>([]);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   const [viewer, setViewer] = useState<Viewer | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [edits, setEdits] = useState<ImageEditRecord[]>([]);
+  const [editWorkflows, setEditWorkflows] = useState<EditWorkflow[]>([]);
+  const [editing, setEditing] = useState<{ file: MediaFile; folder: "output" | "approve" } | null>(null);
 
   const agentMode = detail.workflows.some((item) => item.available) ? "text" : "agent";
   const agent = useAgentProviders(agentMode, detail.shotAgent, stageId);
@@ -69,11 +81,37 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     }
   }
 
-  function openImage(files: MediaFile[], file: MediaFile, runContext: boolean) {
+  function openImage(files: MediaFile[], file: MediaFile, runContext: boolean, folder: PictureFolder) {
     const images = files.filter((item) => item.kind === "image");
     const index = images.findIndex((item) => item.relativePath === file.relativePath);
-    if (index >= 0) setViewer({ files: images, index, runContext });
+    if (index >= 0) setViewer({ files: images, index, runContext, folder });
   }
+
+  const loadEdits = useCallback(async () => {
+    const data = await requestJson<{ edits: ImageEditRecord[]; workflows: EditWorkflow[] }>(`${stageApi}/edit`, {
+      fallbackError: "Не удалось прочитать правки",
+    });
+    setEdits(data.edits);
+    setEditWorkflows(data.workflows);
+  }, [stageApi]);
+
+  useEffect(() => {
+    let stopped = false;
+    requestJson<{ edits: ImageEditRecord[]; workflows: EditWorkflow[] }>(`${stageApi}/edit`, {
+      fallbackError: "Не удалось прочитать правки",
+    })
+      .then((data) => {
+        if (stopped) return;
+        setEdits(data.edits);
+        setEditWorkflows(data.workflows);
+      })
+      .catch(() => {});
+    return () => {
+      stopped = true;
+    };
+  }, [stageApi, detail.output, detail.approve]);
+
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
 
   const closeViewer = useCallback(() => setViewer(null), []);
   const moveViewer = useCallback(
@@ -262,6 +300,41 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     });
   };
 
+  const keys = useRef({ send: sendToAgent, run: runStage, approve: approveSelected, canRun, stageBusy });
+  useEffect(() => {
+    keys.current = { send: sendToAgent, run: runStage, approve: approveSelected, canRun, stageBusy };
+  });
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.ctrlKey && event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey) {
+        const el = event.target;
+        if (el instanceof HTMLTextAreaElement && el.id === "doc-llmNotes" && !el.readOnly) {
+          event.preventDefault();
+          keys.current.send();
+        }
+        return;
+      }
+      if (isTypingTarget(event.target) || overlayOpen()) return;
+      if (event.ctrlKey && event.shiftKey && event.key === "Enter" && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        if (keys.current.canRun && !keys.current.stageBusy) keys.current.run();
+        return;
+      }
+      if (event.code === "KeyA" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        keys.current.approve();
+        return;
+      }
+      if (event.key === "?") {
+        event.preventDefault();
+        setHelpOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const saveAction = (text: string) =>
     act(async () => {
       await requestJson(`${shotApi}/action`, { method: "PUT", body: { text }, fallbackError: "Не удалось сохранить действие" });
@@ -329,6 +402,9 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             <code className="break-all rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">
               {detail.relativeDir}
             </code>
+            <button type="button" className="text-sm text-teal-800 underline" onClick={() => setHelpOpen(true)}>
+              Клавиши ?
+            </button>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -464,17 +540,27 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             <StageInputs
               inputs={detail.inputs}
               boardRuns={canRun}
-              onOpen={(files, file) => openImage(files, file, false)}
+              onOpen={(files, file) => openImage(files, file, false, "refs")}
               onToggleExclude={excludeToggle}
             />
-            <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
+              <RefSourcePicker
+                stageApi={stageApi}
+                disabled={busy}
+                onPicked={(picked, text) => {
+                  stage.merge(picked);
+                  setMessage(text);
+                }}
+              />
+            </div>
             {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
             <RefFiles
               files={detail.refs}
               selectedName={selectedRef}
               usedNames={usedRefNames(detail.refs, detail.output, selectedOutput, shotId)}
               onSelect={(name) => setSelectedRef((current) => (current === name ? null : name))}
-              onOpen={(file) => openImage(detail.refs, file, false)}
+              onOpen={(file) => openImage(detail.refs, file, false, "refs")}
               excluded={detail.excluded}
               onToggleExclude={excludeToggle}
             />
@@ -535,13 +621,15 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
 
         <OutputPanel
           detail={detail}
+          edits={edits}
           disabled={busy}
           selectedOutput={selectedOutput}
           onToggle={toggleOutput}
-          onOpen={(files, file) => openImage(files, file, true)}
+          onOpen={(files, file, folder) => openImage(files, file, true, folder)}
           onApprove={approveSelected}
           onRemoveApproved={removeApproved}
           onDelete={(name) => deleteFile("output", name)}
+          onEdit={(file, folder) => setEditing({ file, folder })}
         />
       </div>
       {viewer ? (
@@ -551,6 +639,48 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           onClose={closeViewer}
           onIndex={moveViewer}
           showRunContext={viewer.runContext}
+          actions={
+            viewer.folder === "refs"
+              ? undefined
+              : (file) => {
+                  const folder = viewer.folder === "approve" ? "approve" : "output";
+                  return (
+                  <button
+                    type="button"
+                    className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
+                    onClick={() => setEditing({ file, folder })}
+                  >
+                    Править
+                  </button>
+                  );
+                }
+          }
+        />
+      ) : null}
+      <HotkeyHelp open={helpOpen} onClose={closeHelp} />
+      {editing ? (
+        <ImageEditDialog
+          file={editing.file}
+          folder={editing.folder}
+          stageApi={stageApi}
+          workflows={editWorkflows}
+          onClose={() => setEditing(null)}
+          onCropped={(text) => {
+            setEditing(null);
+            void act(async () => {
+              await stage.reload();
+              await loadEdits();
+              return text;
+            });
+          }}
+          onEditQueued={(text) => {
+            setEditing(null);
+            void act(async () => {
+              await stage.reload();
+              await loadEdits();
+              return text;
+            });
+          }}
         />
       ) : null}
     </div>

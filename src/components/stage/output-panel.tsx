@@ -1,10 +1,20 @@
 "use client";
 
+import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { MediaCard } from "./media-card";
 
+/** Подпись «из чего сделан» для файла в output/. */
+function madeFrom(name: string, edits: ImageEditRecord[]): { caption?: string; title?: string } {
+  const found = [...edits].reverse().find((item) => item.file === name);
+  if (!found) return {};
+  const kind = found.kind === "crop" ? "обрезка" : "правка";
+  return { caption: `${kind} из ${found.from}`, title: found.prompt };
+}
+
 export function OutputPanel({
   detail,
+  edits,
   disabled,
   selectedOutput,
   onToggle,
@@ -12,16 +22,19 @@ export function OutputPanel({
   onApprove,
   onRemoveApproved,
   onDelete,
+  onEdit,
 }: {
   detail: StageDetail;
+  edits: ImageEditRecord[];
   disabled: boolean;
   selectedOutput: string[];
   onToggle: (name: string) => void;
-  onOpen: (files: MediaFile[], file: MediaFile) => void;
+  onOpen: (files: MediaFile[], file: MediaFile, folder: "output" | "approve") => void;
   onApprove: (names: string[]) => void;
   onRemoveApproved: (name: string) => void;
   /** Удалить файл из output/ насовсем. Разрешено и у занятого этапа. */
   onDelete: (name: string) => void;
+  onEdit: (file: MediaFile, folder: "output" | "approve") => void;
 }) {
   return (
     <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
@@ -34,8 +47,9 @@ export function OutputPanel({
               <MediaCard
                 key={file.relativePath}
                 file={file}
-                onOpen={() => onOpen(detail.approve, file)}
+                onOpen={() => onOpen(detail.approve, file, "approve")}
                 onRemove={disabled ? undefined : () => onRemoveApproved(file.name)}
+                onEdit={() => onEdit(file, "approve")}
               />
             ))
           ) : (
@@ -51,17 +65,23 @@ export function OutputPanel({
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {detail.output.length ? (
-            detail.output.map((file) => (
+            detail.output.map((file) => {
+              const origin = madeFrom(file.name, edits);
+              return (
               <MediaCard
                 key={file.relativePath}
                 file={file}
                 selected={selectedOutput.includes(file.name)}
                 onSelect={() => onToggle(file.name)}
-                onOpen={() => onOpen(detail.output, file)}
+                onOpen={() => onOpen(detail.output, file, "output")}
                 onApprove={disabled ? undefined : () => onApprove([file.name])}
                 onDelete={disabled ? undefined : () => onDelete(file.name)}
+                onEdit={() => onEdit(file, "output")}
+                caption={origin.caption}
+                captionTitle={origin.title}
               />
-            ))
+              );
+            })
           ) : (
             <p className="text-sm text-stone-500">Вариантов пока нет</p>
           )}
