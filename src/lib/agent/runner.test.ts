@@ -246,32 +246,34 @@ test("pending у провайдера доски без исполнителя �
   assert.equal(fs.readFileSync(file("s01", "location", "prompt.md"), "utf8").trim(), "From the loop.");
 });
 
-test("agent: этап без воркфлоу доски, вывод в run_log.md, done → idle", async () => {
+test("agent: этап без доступного воркфлоу, вывод в run_log.md, done → idle", async () => {
+  makeShot("s03", "# Пусто\n\n- characters: \n- location: \n\n");
   const { calls } = fake("claude", async () => ({ status: "done", log: "→ Write\nСделал katya_s02.png" }));
-  const request = send("s02", "characters", "claude", "Катя в пальто");
+  const request = send("s03", "characters", "claude", "Катя в пальто");
   assert.equal(request.mode, "agent");
   await settle(request.id);
   assert.equal(calls[0].mode, "agent");
   assert.match(calls[0].taskMarkdown, /Катя в пальто/);
-  assert.match(fs.readFileSync(file("s02", "characters", "run_log.md"), "utf8"), /katya_s02\.png/);
-  reconcileStage(EP, "s02", "characters");
-  assert.equal(readStageStateFile(EP, "s02", "characters")?.phase, "idle");
+  assert.match(fs.readFileSync(file("s03", "characters", "run_log.md"), "utf8"), /katya_s02\.png/);
+  reconcileStage(EP, "s03", "characters");
+  assert.equal(readStageStateFile(EP, "s03", "characters")?.phase, "idle");
 });
 
 test("неподходящий провайдер для режима → 400 с понятным текстом, запрос не записан", async () => {
-  const previous = readAgentRequest(EP, "s02", "characters")?.id;
+  makeShot("s03", "# Пусто\n\n- characters: \n- location: \n\n");
+  const previous = readAgentRequest(EP, "s03", "characters")?.id;
   const response = await postAgentRequest(
     new Request("http://x/api", {
       method: "POST",
       body: JSON.stringify({ message: "пальто", provider: "ollama" }),
     }),
-    { params: Promise.resolve({ episodeId: EP, shotId: "s02", stage: "characters" }) },
+    { params: Promise.resolve({ episodeId: EP, shotId: "s03", stage: "characters" }) },
   );
   assert.equal(response.status, 400);
   const body = (await response.json()) as { error: string };
   assert.match(body.error, /не подходит для этапа characters/);
-  assert.equal(readAgentRequest(EP, "s02", "characters")?.id, previous);
-  assert.equal(readStageState(EP, "s02", "characters").phase, "idle");
+  assert.equal(readAgentRequest(EP, "s03", "characters")?.id, previous);
+  assert.equal(readStageState(EP, "s03", "characters").phase, "idle");
 
   const unknown = await postAgentRequest(
     new Request("http://x/api", { method: "POST", body: JSON.stringify({ provider: "gpt" }) }),

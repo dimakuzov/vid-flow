@@ -123,7 +123,7 @@ test("запрос агенту хранит выбранную модель, п
   fs.mkdirSync(shotDir("e09", "s01"), { recursive: true });
   fs.writeFileSync(path.join(shotDir("e09", "s01"), "shot.md"), "# Кафе\n\n- characters: katya\n- location: \n");
   ensureStageDirs("e09", "s01");
-  reply = { status: "done", log: "ok" };
+  reply = { status: "done", prompt: "A coat.", log: "ok" };
   const request = submitAgentRequest({
     episodeId: "e09",
     shotId: "s01",
