@@ -76,6 +76,9 @@ export function ImageEditDialog({
   const [aspect, setAspect] = useState<Aspect>("free");
   const [rect, setRect] = useState<Fraction>({ x: 0, y: 0, w: 1, h: 1 });
   const [workflow, setWorkflow] = useState(workflows[0]?.id ?? "");
+  const [megapixels, setMegapixels] = useState(
+    workflows[0]?.megapixels != null ? String(workflows[0].megapixels) : "",
+  );
   const [text, setText] = useState("");
   const [pending, setPending] = useState<"crop" | "edit" | null>(null);
   const [error, setError] = useState("");
@@ -192,13 +195,26 @@ export function ImageEditDialog({
   }
 
   async function sendEdit() {
+    const chosen = workflows.find((item) => item.id === workflow);
+    const raw = megapixels.trim();
+    const parsed = raw === "" ? undefined : Number(raw);
+    if (parsed !== undefined && (!Number.isFinite(parsed) || parsed < 0.1 || parsed > 16)) {
+      setError("Мегапиксели: число от 0.1 до 16");
+      return;
+    }
     setPending("edit");
     setError("");
     try {
       const res = await fetch(`${stageApi}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, folder, workflow, text }),
+        body: JSON.stringify({
+          filename: file.name,
+          folder,
+          workflow,
+          text,
+          megapixels: parsed ?? chosen?.megapixels,
+        }),
       });
       const data = (await res.json()) as { error?: string; message?: string };
       if (!res.ok) throw new Error(data.error || "Не удалось поставить правку");
@@ -283,21 +299,46 @@ export function ImageEditDialog({
         </Button>
 
         <div className="mt-6 space-y-2 border-t border-stone-200 pt-4">
-          <h3 className="text-sm font-medium text-stone-900">Правка моделью</h3>
+          <h3 className="text-sm font-medium text-stone-900">Улучшение</h3>
+          <p className="text-xs text-stone-500">
+            Пустое поле — только текстуры и мелкие детали, объекты, свет и камера как есть.
+            Если написать просьбу, Haiku соберёт промпт: сначала она, потом всё остальное.
+            Камеру не двигаем. Картинку Haiku не смотрит.
+          </p>
           <label className="block text-xs text-stone-600">
             Что изменить
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Убрать предмет, сделать ночь, дождь, другой свет"
+              placeholder="Пусто — улучшить как есть. Или: убрать чашку, сделать ночь, добавить дождь"
               className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-900"
             />
           </label>
           <label className="block text-xs text-stone-600">
+            Мегапиксели нового файла
+            <input
+              type="number"
+              min={0.1}
+              max={16}
+              step={0.1}
+              value={megapixels}
+              onChange={(event) => setMegapixels(event.target.value)}
+              className="mt-1 h-9 w-32 rounded-lg border border-stone-300 px-2 text-sm text-stone-900"
+            />
+          </label>
+          <p className="text-xs text-stone-500">
+            В графе {workflows.find((item) => item.id === workflow)?.megapixels ?? "—"}. Пустое поле оставляет это число.
+          </p>
+          <label className="block text-xs text-stone-600">
             Воркфлоу
             <select
               value={workflow}
-              onChange={(event) => setWorkflow(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value;
+                setWorkflow(next);
+                const item = workflows.find((entry) => entry.id === next);
+                if (item) setMegapixels(String(item.megapixels));
+              }}
               className="mt-1 h-9 w-full rounded-lg border border-stone-300 bg-white px-2 text-sm"
             >
               {workflows.length ? null : <option value="">Нет воркфлоу правки</option>}
@@ -313,10 +354,10 @@ export function ImageEditDialog({
           ) : null}
           <Button
             type="button"
-            disabled={pending !== null || !text.trim() || !workflow}
+            disabled={pending !== null || !workflow}
             onClick={() => void sendEdit()}
           >
-            {pending === "edit" ? "Ставлю в очередь…" : "Отправить правку"}
+            {pending === "edit" ? "Ставлю в очередь…" : "Применить улучшение"}
           </Button>
         </div>
 

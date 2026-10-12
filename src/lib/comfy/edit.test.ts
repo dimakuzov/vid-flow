@@ -16,7 +16,7 @@ delete process.env.SERIES_ROOT;
 import { overrideClaudeOneShot } from "../agent/claude-oneshot";
 import { loadBindings } from "./binding";
 import { readComfyJob } from "./queue";
-import { listEditWorkflows, queueImageEdit } from "./edit";
+import { listEditWorkflows, QUALITY_PROMPT, queueImageEdit } from "./edit";
 import { createEpisode, ensureStageDirs, getComfyQueueRoot, stageDir } from "../series/paths";
 import { readImageEdits } from "../series/mutations";
 import { readStageStateFile } from "../series/stage-state";
@@ -58,7 +58,10 @@ test("задание правки: исходный файл, английски
   let seenModel = "";
   overrideClaudeOneShot(async (request) => {
     seenModel = request.model || "";
+    assert.equal(request.image, undefined);
     assert.match(request.prompt, /сделай ночь/);
+    assert.match(request.prompt, /camera position/);
+    assert.match(request.prompt, /do not say the light stays/);
     return { text: ENGLISH, usage: {}, model: request.model || "" };
   });
 
@@ -73,7 +76,7 @@ test("задание правки: исходный файл, английски
     signal: AbortSignal.timeout(1000),
   });
 
-  assert.equal(seenModel, "claude-sonnet-5-5");
+  assert.equal(seenModel, "claude-haiku-5-5");
   assert.equal(result.savedAs, "frame_edit_v1.png");
   assert.equal(result.prompt, ENGLISH);
   assert.equal(fs.readFileSync(source).equals(before), true);
@@ -92,6 +95,7 @@ test("задание правки: исходный файл, английски
   assert.deepEqual(job.prompt["488"].inputs["images.image_1"], ["470", 0]);
   assert.equal(job.prompt["486"].inputs.switch, true);
   assert.equal(job.prompt["461"].inputs.filename_prefix, "frameboard/edit/frame_edit_v1");
+  assert.equal(job.prompt["13"].inputs.megapixels, 2.3);
   assert.equal(typeof job.prompt["485"].inputs.seed, "number");
   assert.equal(readStageStateFile("e01", "s01", "first_frame")?.phase, "comfy");
 
@@ -122,9 +126,52 @@ test("без Claude задание всё равно собирается, мо�
     signal: AbortSignal.timeout(1000),
   });
   assert.match(result.prompt, /^Edit image 1: сделай дождь\./);
-  assert.match(result.prompt, /Keep EVERYTHING else exactly the same/);
+  assert.match(result.prompt, /camera position, angle and framing must not change/);
   const job = readComfyJob(result.id);
   assert.equal(job?.uploads?.[0].filename, "still.png");
   assert.equal(job?.prompt["470"].inputs.image, "still.png");
   assert.equal(fs.readFileSync(source).equals(PNG), true);
+});
+
+test("пустое поле — улучшение текстур, Claude не вызывается; другое число мегапикселей пишется в ноду 13", async () => {
+  overrideClaudeOneShot(async () => {
+    throw new Error("пустое поле не должно звать модель");
+  });
+  shot("s03");
+  const source = path.join(stageDir("e01", "s03", "first_frame"), "output", "frame.png");
+  fs.writeFileSync(source, PNG);
+  const quiet = await queueImageEdit({
+    episodeId: "e01",
+    shotId: "s03",
+    stageId: "first_frame",
+    folder: "output",
+    filename: "frame.png",
+    workflowId: "qwen21_image_edit",
+    text: "  ",
+    signal: AbortSignal.timeout(1000),
+  });
+  assert.equal(quiet.prompt, QUALITY_PROMPT);
+  assert.match(quiet.prompt, /textures and the fine detail/);
+  assert.match(quiet.prompt, /same light and colours/);
+  const quietJob = readComfyJob(quiet.id);
+  assert.equal(quietJob?.prompt["13"].inputs.megapixels, 2.3);
+  assert.equal(listEditWorkflows().find((item) => item.id === "qwen21_image_edit")?.megapixels, 2.3);
+  assert.equal(fs.readFileSync(source).equals(PNG), true);
+
+  shot("s04");
+  const sizedSource = path.join(stageDir("e01", "s04", "first_frame"), "output", "frame.png");
+  fs.writeFileSync(sizedSource, PNG);
+  const sized = await queueImageEdit({
+    episodeId: "e01",
+    shotId: "s04",
+    stageId: "first_frame",
+    folder: "output",
+    filename: "frame.png",
+    workflowId: "qwen21_image_edit",
+    text: "",
+    megapixels: 4,
+    signal: AbortSignal.timeout(1000),
+  });
+  assert.equal(readComfyJob(sized.id)?.prompt["13"].inputs.megapixels, 4);
+  assert.equal(fs.readFileSync(sizedSource).equals(PNG), true);
 });

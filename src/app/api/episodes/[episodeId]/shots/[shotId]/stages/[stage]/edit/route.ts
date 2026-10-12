@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listEditWorkflows, queueImageEdit, syncEditFiles } from "@/lib/comfy/edit";
+import { listEditWorkflows, parseEditMegapixels, queueImageEdit, syncEditFiles } from "@/lib/comfy/edit";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(_request: Request, context: StageRouteContext) {
   }
 }
 
-/** Правка моделью. Тело: `{ filename, folder, workflow, text }`. Исходник не меняется. */
+/** Правка и улучшение. Тело: `{ filename, folder, workflow, text, megapixels? }`. Пустой text — улучшение текстур. Исходник не меняется. */
 export async function POST(request: Request, context: StageRouteContext) {
   try {
     const { episodeId, shotId, stageId } = parseStageParams(await context.params);
@@ -27,12 +27,13 @@ export async function POST(request: Request, context: StageRouteContext) {
       folder?: unknown;
       workflow?: unknown;
       text?: unknown;
+      megapixels?: unknown;
     };
     if (body.folder !== "output" && body.folder !== "approve") {
       return NextResponse.json({ error: "Править можно файл из output/ или approve/" }, { status: 400 });
     }
     if (typeof body.filename !== "string" || typeof body.workflow !== "string" || typeof body.text !== "string") {
-      return NextResponse.json({ error: "Нужны файл, воркфлоу и текст правки" }, { status: 400 });
+      return NextResponse.json({ error: "Нужны файл и воркфлоу" }, { status: 400 });
     }
     const result = await queueImageEdit({
       episodeId,
@@ -42,6 +43,7 @@ export async function POST(request: Request, context: StageRouteContext) {
       filename: body.filename,
       workflowId: body.workflow,
       text: body.text,
+      megapixels: parseEditMegapixels(body.megapixels),
       signal: request.signal,
     });
     return NextResponse.json({

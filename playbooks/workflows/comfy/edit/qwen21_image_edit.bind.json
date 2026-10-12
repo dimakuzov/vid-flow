@@ -4,7 +4,7 @@
   "graph": "../qwen21_character_compositing.json",
   "stage": "first_frame",
   "label": "Правка: Qwen Image 2.1",
-  "description": "Одна картинка, image 1 — исходник. Не пункт меню этапа: только окно «Править».",
+  "description": "Улучшение и правка одной картинки, image 1 — исходник. Пустой текст — только текстуры. Не пункт меню этапа: только окно «Править».",
   "playbook": "models/image_edit.en.md",
   "order": 10,
   "inputs": {
