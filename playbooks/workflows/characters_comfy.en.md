@@ -11,7 +11,7 @@ Do not edit the graph JSON: the queue gets the image names, the text, the seed a
 | Node | What | Value |
 | --- | --- | --- |
 | 10 LoadImage | image 1 — the character | the base from `data/characters/{name}/` or the result of a previous pass |
-| 22 LoadImage | image 2 — the garment reference | this stage's `refs/`. Can be dropped when the garment is described in text |
+| 22 LoadImage | image 2 — the garment reference | `refs/{name}_clothes.*`. No file — the node is bypassed |
 | 11 UNETLoader | model | `qwen_image_2.1_int8_convrot.safetensors`, weight_dtype `default` |
 | 12 CLIPLoader | encoder | `qwen3vl_8b_int8_convrot.safetensors`, type `qwen_image` |
 | 13 VAELoader | VAE | `qwen_image_2.1_vae_bf16.safetensors` |
@@ -24,7 +24,7 @@ Do not edit the graph JSON: the queue gets the image names, the text, the seed a
 
 Do not change steps, cfg, sampler or LoRA.
 
-Without a garment reference: delete node 22 and the `images.image_2` key of node 17, and do not mention image 2 in the text.
+No garment reference — node 22 («image 2: образец одежды») is bypassed: node 22 and the `images.image_2` key on node 17 leave the prompt. Do not mention image 2 in the text. Other files in `refs/` do not enter the graph.
 
 ## Command
 

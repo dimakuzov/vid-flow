@@ -1,0 +1,67 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "character_outfit",
+  "graph": "character_outfit_qwen21.json",
+  "stage": "characters",
+  "label": "Персонаж: одежда кадра",
+  "description": "Правка одежды базы персонажа. Один прогон на персонажа, раздел ## имя в prompt.md.",
+  "playbook": "models/qwen_outfit.en.md",
+  "order": 10,
+  "aliases": [],
+  "forEach": "character",
+  "inputs": {
+    "base": {
+      "kind": "image",
+      "from": ["refs", "library:character"],
+      "match": "{character}_base*",
+      "pick": "first",
+      "uploadAs": "{shotId}_{character}_base{ext}",
+      "label": "База персонажа (refs/{имя}_base или data/characters/{имя}/)"
+    },
+    "clothes": {
+      "kind": "image",
+      "from": "refs",
+      "match": "{character}_clothes*",
+      "pick": "newest",
+      "min": 0,
+      "uploadAs": "{shotId}_{character}_clothes{ext}",
+      "label": "Образец одежды в refs/ ({имя}_clothes.png). Нет файла — нода image 2 в bypass"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "sectionsFrom": "characters",
+      "label": "prompt.md (раздел ## имя персонажа)"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "10", "field": "image" }],
+      "value": { "input": "base" }
+    },
+    {
+      "targets": [{ "node": "22", "field": "image" }],
+      "value": { "input": "clothes" },
+      "whenEmpty": {
+        "remove": [{ "node": "22" }, { "node": "17", "field": "images.image_2" }]
+      }
+    },
+    {
+      "targets": [{ "node": "16", "field": "value" }],
+      "value": {
+        "input": "text",
+        "section": "{character}",
+        "steps": [{ "namesTo": "the person" }]
+      }
+    },
+    {
+      "targets": [{ "node": "19", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "21", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/characters/{character}_{shotId}_v1" }
+    }
+  ]
+}

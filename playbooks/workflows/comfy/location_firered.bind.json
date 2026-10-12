@@ -1,0 +1,72 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "location_firered",
+  "graph": "location_firered_edit.json",
+  "stage": "location",
+  "label": "Локация из референсов: FireRed",
+  "description": "Новая локация 9:16 по 1–3 картинкам из refs/. Четвёртый референс запуск не берёт.",
+  "playbook": "models/firered_location.en.md",
+  "order": 30,
+  "aliases": [],
+  "inputs": {
+    "refs": {
+      "kind": "image",
+      "from": "refs",
+      "pick": "all",
+      "min": 1,
+      "max": 3,
+      "uploadAs": "{shotId}_firered_{index}{ext}",
+      "label": "Референсы из refs/ (от 1 до 3, по имени файла)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "label": "prompt.md"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "143", "field": "image" }],
+      "value": { "input": "refs", "index": 0 }
+    },
+    {
+      "targets": [{ "node": "144", "field": "image" }],
+      "value": { "input": "refs", "index": 1 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "144" },
+          { "node": "192:187", "field": "image2" },
+          { "node": "192:188", "field": "image2" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "145", "field": "image" }],
+      "value": { "input": "refs", "index": 2 },
+      "whenEmpty": {
+        "remove": [
+          { "node": "145" },
+          { "node": "192:187", "field": "image3" },
+          { "node": "192:188", "field": "image3" }
+        ]
+      }
+    },
+    {
+      "targets": [{ "node": "192:187", "field": "prompt" }],
+      "value": { "input": "text" }
+    },
+    {
+      "targets": [{ "node": "192:195", "field": "aspect_ratio" }],
+      "value": { "const": "9:16 (Portrait Widescreen)" }
+    },
+    {
+      "targets": [{ "node": "192:189", "field": "seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "9", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/location/{shotId}_firered" }
+    }
+  ]
+}

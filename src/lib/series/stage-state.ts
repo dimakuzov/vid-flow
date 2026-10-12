@@ -23,7 +23,9 @@ export interface StageStateFile {
   since: string;
   requestId?: string;
   jobId?: string;
-  /** Агент сам гоняет Comfy (этап characters): доска не ставит задание после done. */
+  /** Все задания одного запуска (по персонажу). jobId — первое из них, для старого чтения. */
+  jobIds?: string[];
+  /** Агент сам гоняет Comfy: доска не ставит задание после done. */
   agentRunsComfy?: boolean;
   error?: string;
   updatedAt: string;
@@ -92,6 +94,7 @@ export function setIdle(episodeId: string, shotId: string, stageId: StageId): St
   return writeStageState(episodeId, shotId, stageId, {
     phase: "idle",
     jobId: prev?.jobId,
+    jobIds: prev?.jobIds,
     requestId: prev?.requestId,
   });
 }
@@ -108,6 +111,7 @@ export function setError(
     error,
     requestId: prev?.requestId,
     jobId: prev?.jobId,
+    jobIds: prev?.jobIds,
   });
 }
 
@@ -149,6 +153,36 @@ export function readJobSummary(jobId: string | null | undefined): JobSummary | n
 }
 
 /**
+ * Несколько заданий одного запуска (по персонажу). Этап занят, пока хоть одно не закончилось.
+ * Ошибка одного не останавливает остальные: фаза error — когда все уже завершились и кто-то упал.
+ */
+function aggregateJobs(
+  base: { since: string | null; requestId: string | null; jobId: string | null },
+  ids: string[],
+): StageState {
+  const jobs = ids.map((id) => ({ id, job: readJobSnapshot(id) }));
+  const missing = jobs.find((item) => item.job === "missing");
+  if (missing) {
+    return { ...base, phase: "error", error: `Задание ${missing.id} пропало из очереди`, busy: false };
+  }
+  if (jobs.some((item) => item.job === null)) {
+    return { ...base, phase: "queued", error: null, busy: true };
+  }
+  const ready = jobs.map((item) => item.job as JobSnapshot);
+  const live = ready.some((job) => job.status === "pending" || job.status === "running");
+  if (live) {
+    const generating = ready.some((job) => job.status === "running" && job.promptId);
+    return { ...base, phase: generating ? "running" : "queued", error: null, busy: true };
+  }
+  const failed = ready.filter((job) => job.status === "error");
+  if (failed.length) {
+    const text = failed.map((job) => job.error || "Ошибка ComfyUI").join(" ");
+    return { ...base, phase: "error", error: text, busy: false };
+  }
+  return { ...base, phase: "idle", error: null, busy: false };
+}
+
+/**
  * Фаза, которую видит интерфейс. Чистое чтение: ничего не пишет.
  * Переводы comfy → idle/error и таймаут агента записывает фоновый цикл (reconcileStageState).
  */
@@ -169,8 +203,10 @@ export function readStageState(episodeId: string, shotId: string, stageId: Stage
     return { ...base, phase: "agent", error: null, busy: true };
   }
   // comfy
-  if (!file.jobId) return { ...base, phase: "error", error: "Нет id задания", busy: false };
-  const job = readJobSnapshot(file.jobId);
+  const ids = file.jobIds?.length ? file.jobIds : file.jobId ? [file.jobId] : [];
+  if (!ids.length) return { ...base, phase: "error", error: "Нет id задания", busy: false };
+  if (ids.length > 1) return aggregateJobs(base, ids);
+  const job = readJobSnapshot(ids[0]);
   if (job === "missing") {
     return { ...base, phase: "error", error: `Задание ${file.jobId} пропало из очереди`, busy: false };
   }

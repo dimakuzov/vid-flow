@@ -13,7 +13,12 @@ export type ImageSource =
    * Лица персонажей: по одному на файл в approve/ этапа characters, в том же порядке.
    * `refs/{name}_face.*` этого этапа, иначе портрет из data/characters/{name}/.
    */
-  | "library:faces";
+  | "library:faces"
+  /**
+   * База одного персонажа прогона (`forEach: character`): full_body.png, иначе body.png,
+   * иначе первая картинка без «copy» в data/characters/{имя}/.
+   */
+  | "library:character";
 
 export type ImagePick = "first" | "newest" | "all";
 
@@ -35,6 +40,12 @@ export interface ImageInput {
    * Так агент сам решает, нужен ли вход: например, лицо — фразой `face from image N`.
    */
   whenPrompt?: string;
+  /**
+   * Для источника `refs`: оставить файлы, чьё имя совпадает с шаблоном.
+   * `{character}` — имя персонажа прогона, `*` — любая концовка (`{character}_base*`).
+   * К библиотеке не применяется: там свои имена файлов.
+   */
+  match?: string;
   /** Подпись для меню и сообщений об ошибке: «Утверждённая локация». */
   label: string;
 }
@@ -57,6 +68,11 @@ export interface TextInput {
    * имя раздела — только в него. По умолчанию `all`.
    */
   untitled?: string;
+  /**
+   * Разделы — имена персонажей кадра, строчными буквами (`## lena`).
+   * Вместо фиксированного `sections`. Нужен прогону `forEach: character`.
+   */
+  sectionsFrom?: "characters";
   /**
    * true — каждая реплика из speech.md кадра должна стоять в этом тексте дословно, иначе запуск —
    * ошибка с недостающими репликами. Для моделей, которые сами озвучивают и двигают губы (MiniMax H3).
@@ -198,6 +214,11 @@ export interface GraphBinding {
   cost?: CloudCost;
   /** Старое имя для совместимости (`i2v`, `flf`). */
   aliases?: string[];
+  /**
+   * `character` — отдельный прогон на каждого персонажа кадра (shot.md).
+   * Плейсхолдер `{character}` в match, uploadAs, template и section слота.
+   */
+  forEach?: "character";
   inputs: Record<string, BindingInput>;
   slots: BindingSlot[];
 }

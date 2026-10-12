@@ -89,7 +89,7 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   if (stageId === "characters") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nБаза: data/characters/{name}/ — portrait.png, side.png, full_body.png.\nПерсонажи кадра: ${names}.\nВ refs/ этого кадра: {name}_outfit.png, {name}_pose.png, {name}_face.png.\nСм. playbooks/stages/characters.md.\n`;
+    return `# Refs\n\nImage 1: refs/{name}_base.* (если положили сами), иначе data/characters/{name}/full_body.png.\nImage 2: refs/{name}_clothes.* — образец одежды. Нет файла — нода «image 2: образец одежды» в bypass.\nПерсонажи кадра: ${names}.\nДругие файлы refs/ в этот граф не входят.\nСм. playbooks/stages/characters.md.\n`;
   }
   if (stageId === "location") {
     const location = shot.location || "{locationId}";
@@ -108,7 +108,7 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
 function defaultWorkflow(stageId: StageId): string {
   const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет edit Qwen Image 2.1: image 1 — персонаж, image 2 — образец одежды из refs/. Команда: playbooks/workflows/characters_comfy.md, раздел «Команда». Граф: playbooks/workflows/comfy/character_outfit_qwen21.json. Сам JSON графа не редактируется.\n`;
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет доска: манифест character_outfit, граф character_outfit_qwen21.json. Image 1 — база, image 2 — refs/{name}_clothes.*, если есть. Промпт — разделы ## имя в prompt.md. Плейбук: playbooks/models/qwen_outfit.md.\n`;
   }
   if (stageId === "location") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;

@@ -206,6 +206,7 @@ function playbooksForStage(stageId: StageId): string[] {
     candidates.push(path.join("workflows", "comfy", "wan22_flf_sketch_turbo_api.json"));
   }
   if (stageId === "characters") {
+    candidates.push(path.join("models", "qwen_outfit.md"));
     candidates.push(path.join("models", "qwen_image.md"));
   }
   if (stageId === "first_frame") {
@@ -217,6 +218,7 @@ function playbooksForStage(stageId: StageId): string[] {
   if (stageId === "location") {
     candidates.push(path.join("models", "qwen_location.md"));
     candidates.push(path.join("models", "krea2_location.md"));
+    candidates.push(path.join("models", "firered_location.md"));
     candidates.push(
       path.join("workflows", "comfy", "location_views_multiple_angles.json"),
     );

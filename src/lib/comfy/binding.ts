@@ -15,6 +15,7 @@ import type {
   TextStep,
   TextTemplate,
 } from "../contracts/graph-binding";
+import { characterBaseImage, characterFolder } from "../series/character-base";
 import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
@@ -80,6 +81,9 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
   if (binding.defaultWhen !== undefined && !["speech", "dialogue", "silent"].includes(binding.defaultWhen)) {
     fail(`defaultWhen: speech, dialogue или silent (сейчас ${binding.defaultWhen})`);
   }
+  if (binding.forEach !== undefined && binding.forEach !== "character") {
+    fail(`forEach: только character (сейчас ${binding.forEach})`);
+  }
   if (binding.target !== undefined && binding.target !== "cloud") fail(`target: только cloud (сейчас ${binding.target})`);
   if (binding.target === "cloud") {
     const cost = binding.cost;
@@ -102,6 +106,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
           source === "refs" ||
           source === "library:location" ||
           source === "library:faces" ||
+          source === "library:character" ||
           (stage && STAGES.includes(stage as StageId));
         if (!known) fail(`вход ${name}: неизвестный источник ${source}`);
       }
@@ -117,6 +122,10 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
     } else if (input.kind === "text") {
       if (input.from !== "prompt") fail(`вход ${name}: текст берётся только из prompt`);
       if (input.stage !== undefined && !STAGES.includes(input.stage)) fail(`вход ${name}: неизвестный этап ${input.stage}`);
+      if (input.sectionsFrom !== undefined && input.sectionsFrom !== "characters") {
+        fail(`вход ${name}: sectionsFrom может быть только characters`);
+      }
+      if (input.sectionsFrom && input.sections) fail(`вход ${name}: sectionsFrom и sections вместе`);
       if (input.sections !== undefined) {
         if (!input.sections.length) fail(`вход ${name}: пустой sections`);
         for (const section of input.sections) {
@@ -183,8 +192,12 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       if ((value.steps || value.templates || value.section) && input.kind !== "text") {
         fail(`${what}: section, steps и templates только для текста`);
       }
-      if (value.section !== undefined && input.kind === "text" && !input.sections?.includes(String(value.section))) {
-        fail(`${what}: у входа ${value.input} нет раздела ${value.section}`);
+      if (value.section !== undefined && input.kind === "text") {
+        const section = String(value.section);
+        const perCharacter = section === "{character}" && (binding.forEach === "character" || input.sectionsFrom === "characters");
+        if (!perCharacter && !input.sections?.includes(section)) {
+          fail(`${what}: у входа ${value.input} нет раздела ${value.section}`);
+        }
       }
       if (value.index !== undefined && input.kind !== "image" && input.kind !== "video") fail(`${what}: index только для файлов`);
       for (const step of (value.steps as TextStep[] | undefined) ?? []) {
@@ -273,6 +286,8 @@ export interface ShotContext {
   episodeId: string;
   shotId: string;
   stageId: StageId;
+  /** Персонаж этого прогона (`forEach: character`). Без него library:character пуст. */
+  character?: string;
 }
 
 function listFiles(dir: string, exts: Set<string> = IMAGE_EXT): string[] {
@@ -356,6 +371,22 @@ function approvedCharacters(ctx: ShotContext): string[] {
   });
 }
 
+/** База персонажа этого прогона: full_body.png, иначе body.png, иначе первая картинка без copy. */
+function libraryCharacter(ctx: ShotContext): string[] {
+  if (!ctx.character) return [];
+  const folder = characterFolder(ctx.character);
+  if (!folder) return [];
+  const image = characterBaseImage(folder);
+  return image ? [image] : [];
+}
+
+/** Шаблон имени в refs/: `{character}` и `*`. К библиотеке не применяется. */
+function matchName(filename: string, pattern: string, character: string | undefined): boolean {
+  const filled = pattern.replaceAll("{character}", (character ?? "").toLowerCase());
+  const body = filled.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
+  return new RegExp(`^${body}$`, "i").test(filename);
+}
+
 /** Лица по одному на персонажа из approve: `refs/{name}_face.*` этого этапа, иначе библиотека. */
 function faceFiles(ctx: ShotContext): string[] {
   const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
@@ -371,6 +402,7 @@ function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["ki
     return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
   }
   if (source === "library:faces") return kind === "image" ? faceFiles(ctx) : [];
+  if (source === "library:character") return kind === "image" ? libraryCharacter(ctx) : [];
   const stage = source.slice("approve:".length) as StageId;
   return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "approve"), exts);
 }
@@ -410,7 +442,10 @@ export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[]
   const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
-    const files = sourceFiles(ctx, source, input.kind).filter((file) => !isExcluded(excluded, file));
+    let files = sourceFiles(ctx, source, input.kind).filter((file) => !isExcluded(excluded, file));
+    if (source === "refs" && input.match) {
+      files = files.filter((file) => matchName(path.basename(file), input.match!, ctx.character));
+    }
     if (files.length) return pickImages(files, input);
   }
   return [];
@@ -457,6 +492,10 @@ export function slotFile(binding: GraphBinding, slot: BindingSlot, images: Recor
 
 /** Подписи обязательных входов-картинок, которых не хватает. Текст и число на доступность не влияют. */
 export function missingInputs(ctx: ShotContext, binding: GraphBinding): string[] {
+  // Прогон на персонажа: база проверяется при запуске, по одному. Меню доступно, пока в кадре есть люди.
+  if (binding.forEach === "character") {
+    return readShotMeta(ctx.episodeId, ctx.shotId).characters.length ? [] : ["в кадре нет персонажей"];
+  }
   const missing: string[] = [];
   for (const input of Object.values(binding.inputs)) {
     if ((input.kind !== "image" && input.kind !== "video") || imageMin(input) < 1) continue;
@@ -845,7 +884,14 @@ function uploadName(input: ImageInput, file: string, index: number, ctx: ShotCon
     episodeId: ctx.episodeId,
     index: String(index),
     ext: path.extname(file).toLowerCase() || ".png",
+    character: (ctx.character ?? "").toLowerCase(),
   });
+}
+
+/** Разделы по именам персонажей кадра, если манифест просит sectionsFrom. */
+function textInputFor(input: TextInput, characters: string[]): TextInput {
+  if (input.sectionsFrom !== "characters") return input;
+  return { ...input, sections: characters.map((name) => name.toLowerCase()) };
 }
 
 /**
@@ -871,15 +917,16 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       images[name] = resolveImageInput(ctx, input);
       if (images[name].length < imageMin(input)) missing.push(input.label);
     } else if (input.kind === "text") {
-      const own = !input.stage || input.stage === ctx.stageId;
-      const where = own ? "prompt.md" : `prompt.md этапа ${input.stage}`;
-      texts[name] = own ? promptMd : readPrompt(input.stage!);
-      if (input.required && !texts[name]) {
+      const textInput = textInputFor(input, meta.characters);
+      const own = !textInput.stage || textInput.stage === ctx.stageId;
+      const where = own ? "prompt.md" : `prompt.md этапа ${textInput.stage}`;
+      texts[name] = own ? promptMd : readPrompt(textInput.stage!);
+      if (textInput.required && !texts[name]) {
         throw new Error(`В ${where} нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.`);
       }
       assertModelText(texts[name], where, allowed);
-      if (input.sections) splitSections(texts[name], input.sections, where);
-      if (input.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), where);
+      if (textInput.sections) splitSections(texts[name], textInput.sections, where);
+      if (textInput.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), where);
     }
   }
   if (missing.length) throw new Error(`Для «${binding.label}» не хватает: ${missing.join(", ")}.`);
@@ -919,6 +966,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
           episodeId: ctx.episodeId,
           stageId: ctx.stageId,
           workflow: binding.id,
+          character: (ctx.character ?? "").toLowerCase(),
         }),
       );
       continue;
@@ -941,10 +989,12 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
     } else if ("inputs" in value) {
       continue;
     } else if (input.kind === "text") {
+      const textInput = textInputFor(input, meta.characters);
       const steps = "steps" in value ? value.steps : undefined;
       const templates = "templates" in value ? value.templates : undefined;
-      const section = "section" in value ? value.section : undefined;
-      const source = sectionText(texts[value.input], input, section);
+      const rawSection = "section" in value ? value.section : undefined;
+      const section = rawSection === "{character}" ? ctx.character?.toLowerCase() : rawSection;
+      const source = sectionText(texts[value.input], textInput, section);
       let text = steps?.length ? applySteps(source, steps, meta.characters) : source;
       const template = templates?.length ? pickTemplate(templates, counts) : null;
       if (template) {
