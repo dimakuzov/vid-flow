@@ -165,8 +165,9 @@ test("эскиз LTX по метаданным — по умолчанию фи�
     assert.equal(defaultFinal(), "final_ltx");
     const { prompt } = buildFinal("final_ltx");
     assert.match(String(prompt["398:376"].inputs.value), /^use image as the first frame\. The young woman turns/);
-    assert.equal(prompt["398:372"].inputs.value, 768);
-    assert.equal(prompt["398:360"].inputs.value, 1344);
+    assert.equal(prompt["403"].inputs.megapixels, 1.2);
+    assert.deepEqual(prompt["398:372"].inputs.value, ["403", 0]);
+    assert.deepEqual(prompt["398:360"].inputs.value, ["403", 1]);
     assert.equal(prompt["398:361"].inputs.value, 24);
     assert.equal(prompt["398:362"].inputs.value, 5);
     assert.equal(prompt["398:339"].inputs.noise_seed, 7);

@@ -10,7 +10,7 @@
 | `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
 | `video_ltx` | `video_preview` | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком) | доска; промпт — `models/ltx_video.md` |
 | `final_wan_720` | `final_render` | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с) | доска; промпт — из метаданных утверждённого эскиза |
-| `final_ltx` | `final_render` | тот же `ltx25_i2v_api.json` (768×1344, 24 к/с) | доска, по умолчанию если эскиз LTX |
+| `final_ltx` | `final_render` | тот же `ltx25_i2v_api.json` (1.2 Мп, 832×1504, 24 к/с) | доска, по умолчанию если эскиз LTX |
 | `final_h3`, `final_h3_768`, `final_h3_768_face` | `final_render` | `minimax_h3_creator_api.json` (MiniMax H3, ComfyUI-Continuity) | доска; разделы `## body/...` в `prompt.md`; исходный промпт — из метаданных эскиза |
 | `final_heygen` | `final_render` | `heygen_video_i2v_api.json` (Comfy Cloud) | доска, только с галочкой на этот запуск |
 | `final_i2v`, `final_flf` | `final_render` | графы Wan превью | доска, запасной вариант |

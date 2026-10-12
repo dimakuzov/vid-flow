@@ -3,8 +3,8 @@
   "id": "final_ltx",
   "graph": "ltx25_i2v_api.json",
   "stage": "final_render",
-  "label": "Финал LTX 2.5, 768×1344",
-  "description": "Тот же граф, что у эскиза LTX, 768×1344 и 24 к/с. По умолчанию, если утверждённый эскиз сделан LTX.",
+  "label": "Финал LTX 2.5, 1.2 Мп",
+  "description": "Тот же граф, что у эскиза LTX. Resolution Selector — 1.2 Мп, 9:16 (832×1504), 24 к/с. По умолчанию, если утверждённый эскиз сделан LTX.",
   "playbook": "models/ltx_video.en.md",
   "order": 7,
   "whenSketch": {
@@ -73,12 +73,8 @@
       "value": { "template": "frameboard/final/{shotId}_ltx" }
     },
     {
-      "targets": [{ "node": "398:372", "field": "value" }],
-      "value": { "const": 768 }
-    },
-    {
-      "targets": [{ "node": "398:360", "field": "value" }],
-      "value": { "const": 1344 }
+      "targets": [{ "node": "403", "field": "megapixels" }],
+      "value": { "const": 1.2 }
     },
     {
       "targets": [{ "node": "398:361", "field": "value" }],

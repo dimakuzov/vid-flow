@@ -244,7 +244,7 @@ playbooks/workflows/comfy/
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
 | `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |
 | `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с; промпт — `approve-meta` эскиза, запасной `prompt.md`) |
-| `final_ltx` | final_render | `ltx25_i2v_api.json` (768×1344, 24 к/с; `whenSketch` — эскиз LTX) |
+| `final_ltx` | final_render | `ltx25_i2v_api.json` (нода `403`: 1.2 Мп, 9:16 → 832×1504, 24 к/с; `whenSketch` — эскиз LTX) |
 | `final_h3`, `final_h3_768`, `final_h3_768_face` | final_render | `minimax_h3_creator_api.json` (MiniMax H3; исходный промпт — `approve-meta` эскиза) |
 | `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; запуск только с галочкой на этот раз) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
