@@ -196,3 +196,19 @@ First frame: a boy at the door. Last frame in `refs/`: the same boy close to the
 ```
 Static shot, fixed camera. The boy in the grey coat stands by the door at the back of the room. He walks toward the camera at an even pace, straight along the middle of the floor, arms relaxed. The shot ends as he stops close in front of the camera and stands still, looking slightly to the left. Realistic, natural movement. 4 sec
 ```
+
+## Which variant to suggest
+
+The board does not switch by itself. If the selected variant does not fit, write its id in `suggestedWorkflow`. The full table is in `playbooks/stages/video_preview.en.md` and `playbooks/stages/final_render.en.md`.
+
+| Situation | id |
+| --- | --- |
+| Sketch: a simple move, nobody speaks | `video_i2v` (the board already defaults to it) |
+| Sketch: a specific end pose is needed | `video_flf` |
+| Sketch: someone speaks, or the shot needs sound | `video_ltx` |
+| Final: the sketch was made with LTX | `final_ltx` |
+| Final: nobody speaks, the sketch is Wan | `final_wan_720` |
+| Final: one speaker | `final_h3_768_face` |
+| Final: two or more speakers | `final_heygen` (the cloud runs only after the user ticks the box for this one run) |
+
+A prompt that starts with `use image as the first frame.` is LTX, not Wan.

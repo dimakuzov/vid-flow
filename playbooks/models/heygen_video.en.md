@@ -33,3 +33,5 @@ Start exactly from the first frame and keep both girls, their outfits and the li
 4. The lips line.
 5. The Audio block with `No music.` at the end.
 6. No file names, no `@img` labels, no section headings.
+
+HeyGen is the default when `speech.md` has two or more speakers and the sketch is not LTX. An LTX sketch makes the board select `final_ltx` even for a dialogue: if the lips need HeyGen, write the id in `suggestedWorkflow`. The board does not switch by itself. The cloud still goes out only after the box «Разрешить платную отправку в Comfy Cloud» is ticked for that one run. The table is in `playbooks/stages/final_render.en.md`.

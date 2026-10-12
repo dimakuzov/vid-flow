@@ -51,3 +51,13 @@ use image as the first frame. The young woman with the braid stands by the windo
 6. Every line from the task, word for word, in quotes, with who says it and in what order; no lines invented.
 7. 50–90 words besides the lines; no `N sec` if the duration is chosen in the menu.
 8. 2–3 seeds at once.
+
+## Final (`final_ltx`)
+
+The same graph, `ltx25_i2v_api.json`. The board defaults to it when the approved sketch was made with this graph (the video metadata has non-empty text in node `398:376` / `value`; with no metadata, the file name contains `_ltx`). Lines do not override that.
+
+Resolution comes from the Resolution Selector node (`403`): the manifest sets `megapixels` to 1.2, the aspect stays `9:16 (Portrait Widescreen)`, and the multiple stays 32. That is 832×1504. 24 fps is the constant on `398:361`. The manifest does not replace width and height: that node calculates them. The duration is the approved sketch's length, 2–10 s.
+
+The final does not rewrite the prompt: it takes the text from the approved video's metadata. No metadata — the sketch's `prompt.md`, with a note in `run_log.md`. A prompt that starts with `use image as the first frame.` does not belong in a Wan final: for an LTX sketch the board selects `final_ltx`.
+
+If another final is selected and the sketch is LTX, write `final_ltx` in `suggestedWorkflow`. The board does not switch by itself. The full table is in `playbooks/stages/final_render.en.md`.

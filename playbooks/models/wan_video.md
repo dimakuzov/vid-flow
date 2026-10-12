@@ -196,3 +196,19 @@ Static shot, fixed camera. The girl with dark braided hair lies on her back in b
 ```
 Static shot, fixed camera. The boy in the grey coat stands by the door at the back of the room. He walks toward the camera at an even pace, straight along the middle of the floor, arms relaxed. The shot ends as he stops close in front of the camera and stands still, looking slightly to the left. Realistic, natural movement. 4 sec
 ```
+
+## Какой вариант предложить
+
+Доска сама не переключает. Если выбранный вариант не подходит, id пишется в `suggestedWorkflow`. Таблица целиком — `playbooks/stages/video_preview.md` и `playbooks/stages/final_render.md`.
+
+| Ситуация | id |
+| --- | --- |
+| Эскиз: простое движение без речи | `video_i2v` (доска и так берёт его) |
+| Эскиз: нужна конечная поза | `video_flf` |
+| Эскиз: есть речь или нужен звук | `video_ltx` |
+| Финал: эскиз сделан LTX | `final_ltx` |
+| Финал: никто не говорит, эскиз Wan | `final_wan_720` |
+| Финал: говорит один | `final_h3_768_face` |
+| Финал: говорят двое и больше | `final_heygen` (облако только по галочке пользователя на этот запуск) |
+
+Промпт, который начинается с `use image as the first frame.`, — это LTX, не Wan.

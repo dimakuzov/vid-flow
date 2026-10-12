@@ -24,10 +24,16 @@
     },
     "text": {
       "kind": "text",
-      "from": "prompt",
+      "from": "approve-meta",
+      "of": "preview",
+      "nodes": [
+        { "node": "129:93", "field": "text" },
+        { "node": "398:376", "field": "value" }
+      ],
+      "fallback": "prompt",
       "stage": "video_preview",
       "required": true,
-      "label": "prompt.md эскиза (video_preview)"
+      "label": "Промпт утверждённого эскиза"
     },
     "seconds": {
       "kind": "number",

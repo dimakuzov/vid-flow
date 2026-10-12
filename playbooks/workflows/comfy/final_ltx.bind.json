@@ -1,0 +1,84 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "final_ltx",
+  "graph": "ltx25_i2v_api.json",
+  "stage": "final_render",
+  "label": "Финал LTX 2.5, 1.2 Мп",
+  "description": "Тот же граф, что у эскиза LTX. Resolution Selector — 1.2 Мп, 9:16 (832×1504), 24 к/с. По умолчанию, если утверждённый эскиз сделан LTX.",
+  "playbook": "models/ltx_video.en.md",
+  "order": 7,
+  "whenSketch": {
+    "of": "preview",
+    "nodes": [
+      { "node": "398:376", "field": "value" }
+    ],
+    "filename": "_ltx"
+  },
+  "inputs": {
+    "start": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "uploadAs": "{shotId}_start{ext}",
+      "label": "Утверждённый первый кадр"
+    },
+    "preview": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "min": 0,
+      "label": "Утверждённый эскиз (длительность и промпт)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "approve-meta",
+      "of": "preview",
+      "nodes": [
+        { "node": "398:376", "field": "value" },
+        { "node": "129:93", "field": "text" }
+      ],
+      "fallback": "prompt",
+      "stage": "video_preview",
+      "required": true,
+      "label": "Промпт утверждённого эскиза"
+    },
+    "seconds": {
+      "kind": "number",
+      "from": "media:duration",
+      "of": "preview",
+      "min": 2,
+      "max": 10,
+      "label": "Длительность эскиза"
+    }
+  },
+  "slots": [
+    {
+      "targets": [{ "node": "395", "field": "image" }],
+      "value": { "input": "start" }
+    },
+    {
+      "targets": [{ "node": "398:376", "field": "value" }],
+      "value": { "input": "text" }
+    },
+    {
+      "targets": [{ "node": "398:339", "field": "noise_seed" }],
+      "value": { "seed": "random" }
+    },
+    {
+      "targets": [{ "node": "398:362", "field": "value" }],
+      "value": { "input": "seconds" }
+    },
+    {
+      "targets": [{ "node": "75", "field": "filename_prefix" }],
+      "value": { "template": "frameboard/final/{shotId}_ltx" }
+    },
+    {
+      "targets": [{ "node": "403", "field": "megapixels" }],
+      "value": { "const": 1.2 }
+    },
+    {
+      "targets": [{ "node": "398:361", "field": "value" }],
+      "value": { "const": 24 }
+    }
+  ]
+}

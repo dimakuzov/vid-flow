@@ -37,7 +37,7 @@ The board guarantees both: if the body lacks `use @vid-1 as a reference`, it put
 
 To see what H3 really got, read the metadata of the output video file itself, or `data/comfy_queue/<id>.json`. Do not open the video in the ComfyUI interface to check it: the Continuity node's frontend overwrites `creator_data` with its own empty state (empty prompt, no assets, 16:9), and the saved workflow shows that instead.
 
-**The source to refine** is the original Wan prompt, unchanged (`video_preview/prompt.md`). Not the prompt of an older H3 render: its action may differ (S6: in the old text the water turned red, in the approved Wan video it washes away).
+**The source to refine** is the prompt of the approved sketch, as saved in the video metadata (`video_preview/approve/`, the `prompt` key). No metadata — the sketch's `prompt.md`, and the board notes that in `run_log.md`. Not the prompt of an older H3 render: its action may differ (S6: in the old text the water turned red, in the approved video it washes away). An edit of `prompt.md` after the video was approved does not reach the final until the video is generated again.
 
 ---
 
@@ -159,7 +159,7 @@ Stage `final_render`, graph `playbooks/workflows/comfy/minimax_h3_creator_api.js
 | `@img-1` | the first frame | `first_frame/approve/` (newest) |
 | `@img-2`, `@img-3` | character references | `final_render/refs/` (by name), otherwise `characters/approve/`, at most two. No files — no label |
 | duration | = the length of the low-res video | read from the mp4 |
-| the Wan source | segment `prompt` and `refined.source` | `video_preview/prompt.md` |
+| the sketch prompt | segment `prompt` and `refined.source` | metadata of the video in `video_preview/approve/`; if there is none, the sketch's `prompt.md` |
 
 **`prompt.md` is the refine, split into sections. The board adds nothing.** Return exactly this, in English, no other headings:
 
@@ -185,7 +185,7 @@ Rules:
 1. `## body` is required. Text without headings counts as the body.
 2. Write `subject_definitions`, `summary`, `retention_analysis` (section 4). An empty or missing one is derived by the node, which is where the refiner errors come from.
 3. `@img-N` numbers follow the table above. Two characters: `@img-2` is the first by file name, `@img-3` the second. A character whose face is not visible gets no reference: say so in the message to the user instead of inventing a label.
-4. Start from `video_preview/prompt.md` (the approved Wan prompt), not from an older final.
+4. Start from the approved sketch prompt (the video metadata; if it has none, `video_preview/prompt.md`), not from an older final.
 5. No Russian text: the board refuses such a `prompt.md`. The only exception is the lines below.
 6. Lines: see «Dialogue» below. No lines — `## soundscape` is the environment only.
 
@@ -200,6 +200,6 @@ Rules:
 
 `## soundscape`: `Ambient sound of a quiet lecture hall, soft whispers and intimate conversation.`
 
-Do not translate, shorten or add lines. A speaker keeps the same ID for the whole shot. The board refuses to run H3 when a line of `speech.md` is missing from `prompt.md`. A shot with lines is H3 by default (`final_h3_768_face`); a shot without lines is Wan by default (`final_wan_720`).
+Do not translate, shorten or add lines. A speaker keeps the same ID for the whole shot. The board refuses to run H3 when a line of `speech.md` is missing from `prompt.md`. One speaker defaults to H3 (`final_h3_768_face`); two or more default to HeyGen (`final_heygen`, and the cloud runs only after the user ticks the box for this one run); nobody speaking defaults to Wan (`final_wan_720`). An LTX sketch wins: the default is then `final_ltx`. If the selected variant is not that one, write `suggestedWorkflow`. The table is in `playbooks/stages/final_render.en.md`.
 
 **`## summary`** for this pass starts with the task type `[video editing]`: `The target video is an edited version of @vid-1: the same motion and composition, re-rendered at much higher quality, with the lips re-animated to the dialogue.`

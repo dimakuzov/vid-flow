@@ -33,3 +33,5 @@ Start exactly from the first frame and keep both girls, their outfits and the li
 4. Фраза про губы.
 5. Блок Audio с `No music.` в конце.
 6. Никаких имён файлов, меток `@img` и заголовков разделов.
+
+HeyGen — вариант по умолчанию, когда в `speech.md` двое говорящих и больше и эскиз не LTX. Эскиз LTX доска ставит в `final_ltx` даже при диалоге: если губам нужен HeyGen, id пишется в `suggestedWorkflow`, доска сама не переключает. Облако по-прежнему уходит только после галочки «Разрешить платную отправку в Comfy Cloud» на этот один запуск. Таблица — `playbooks/stages/final_render.md`.
