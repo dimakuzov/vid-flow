@@ -33,23 +33,17 @@ export function ShotContext({
   const context = detail.shotContext ?? null;
   const notes = detail.notes ?? [];
   const [editing, setEditing] = useState<string | null>(null);
+  const scenario = detail.shotSummary.trim();
+  const action = context?.action.trim() ?? "";
+  const showAction = editing !== null || Boolean(context && (action || !scenario));
 
   return (
     <div className="space-y-2">
-      {detail.shotSummary.trim() ? (
-        <div className="rounded-lg bg-stone-50 px-3 py-2">
-          <div className="text-xs font-medium text-stone-600">
-            Действие кадра{context ? " · сценарий" : ""}
-          </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{detail.shotSummary}</p>
-        </div>
-      ) : null}
-
-      {context ? (
+      {showAction && context ? (
         <div className="rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs font-medium text-teal-900">
-              Действие по картинкам
+              Действие кадра
               {context.actionEditedByUser ? " · ваша правка" : ""}
               {context.action && context.actionStale ? " · обновится при следующей отправке агенту" : ""}
             </div>
@@ -98,28 +92,23 @@ export function ShotContext({
             </p>
           )}
         </div>
-      ) : null}
-
-      {context?.images.length ? (
-        <details className="text-xs text-stone-500">
-          <summary className="cursor-pointer">
-            Что на утверждённых картинках ({context.images.filter((item) => item.text).length} из{" "}
-            {context.images.length} описано)
-          </summary>
-          <ul className="mt-2 space-y-2">
-            {context.images.map((item) => (
-              <li key={`${item.kind}-${item.name}`} className="rounded-lg bg-stone-50 px-3 py-2">
-                <div className="font-medium text-stone-600">
-                  {KIND_LABELS[item.kind]}
-                  {item.subject ? ` ${item.subject}` : ""} · <code>{item.name}</code>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-stone-700">
-                  {item.text ?? (item.describing ? "Модель смотрит картинку…" : "Ещё не описано: опишется само в течение минуты или при отправке агенту.")}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </details>
+      ) : scenario ? (
+        <div className="rounded-lg bg-stone-50 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-medium text-stone-600">Описание из сценария</div>
+            {context ? (
+              <button
+                type="button"
+                className="text-xs text-teal-800 hover:underline disabled:opacity-50"
+                disabled={disabled}
+                onClick={() => setEditing("")}
+              >
+                Написать своё
+              </button>
+            ) : null}
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{scenario}</p>
+        </div>
       ) : null}
 
       {notes.length ? (
@@ -147,6 +136,28 @@ export function ShotContext({
             ))}
           </ol>
           <p className="mt-1">Более позднее замечание важнее раннего. Замечания важнее сценария.</p>
+        </details>
+      ) : null}
+
+      {context?.images.length ? (
+        <details className="text-xs text-stone-500">
+          <summary className="cursor-pointer">
+            Что на утверждённых картинках ({context.images.filter((item) => item.text).length} из{" "}
+            {context.images.length} описано)
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {context.images.map((item) => (
+              <li key={`${item.kind}-${item.name}`} className="rounded-lg bg-stone-50 px-3 py-2">
+                <div className="font-medium text-stone-600">
+                  {KIND_LABELS[item.kind]}
+                  {item.subject ? ` ${item.subject}` : ""} · <code>{item.name}</code>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-stone-700">
+                  {item.text ?? (item.describing ? "Модель смотрит картинку…" : "Ещё не описано: опишется само в течение минуты или при отправке агенту.")}
+                </p>
+              </li>
+            ))}
+          </ul>
         </details>
       ) : null}
     </div>

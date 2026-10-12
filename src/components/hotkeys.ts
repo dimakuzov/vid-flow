@@ -13,6 +13,7 @@ export const HOTKEYS: HotkeyItem[] = [
   { keys: "← →", action: "Листать картинки в просмотре", scope: "Этап" },
   { keys: "Esc", action: "Закрыть просмотр или меню", scope: "Этап" },
   { keys: "?", action: "Показать этот список", scope: "Этап" },
+  { keys: "` / ё", action: "Назад к таблице, к этому кадру", scope: "Этап" },
   { keys: "← → ↑ ↓", action: "Выбрать клетку", scope: "Таблица" },
   { keys: "Enter", action: "Открыть этап выбранной клетки", scope: "Таблица" },
 ];

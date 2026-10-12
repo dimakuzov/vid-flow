@@ -458,6 +458,57 @@ export function saveCroppedImage(options: {
  * Копии выбранных файлов в refs/ этапа. Имя сохраняется, при совпадении — суффикс.
  * Исходники не трогаются. Папка помечается правкой пользователя.
  */
+/**
+ * Копия чужих утверждённых картинок в approve/ персонажей этого кадра.
+ * Имя становится `{персонаж}_{shotId}`. Исходные файлы не меняются.
+ */
+export function copyIntoCharacterApprove(options: {
+  episodeId: string;
+  shotId: string;
+  files: { absolute: string; filename: string }[];
+  /** Брать только файл, в имени которого есть персонаж этого кадра. */
+  requireNameMatch?: boolean;
+}): string[] {
+  const shotId = assertSafeSegment(options.shotId, "shot");
+  const stageId: StageId = "characters";
+  if (readStageState(options.episodeId, shotId, stageId).busy) {
+    throw new Error("Этап занят. Добавить можно после прогона или «Отменить».");
+  }
+  if (!options.files.length) throw new Error("Не выбраны файлы");
+  ensureStageDirs(options.episodeId, shotId);
+  const approveDir = path.join(stageDir(options.episodeId, shotId, stageId), "approve");
+  fs.mkdirSync(approveDir, { recursive: true });
+  const characters = readShotMeta(options.episodeId, shotId).characters;
+  const dataRoot = getDataRoot();
+  const taken = new Set(fs.readdirSync(approveDir).map((existing) => approvedSlot(existing, shotId)));
+  const saved: string[] = [];
+  for (const file of options.files) {
+    if (!isInside(dataRoot, file.absolute)) throw new Error("Файл вне data/");
+    if (!fs.existsSync(file.absolute) || !fs.statSync(file.absolute).isFile()) {
+      throw new Error(`Файл не найден: ${file.filename}`);
+    }
+    if (options.requireNameMatch && !matchCharacter(file.filename, characters, taken)) continue;
+    const targetName = characterApproveName(file.filename, shotId, characters, taken);
+    if (!targetName) continue;
+    const slot = approvedSlot(targetName, shotId);
+    for (const existing of fs.readdirSync(approveDir)) {
+      if (approvedSlot(existing, shotId) === slot && existing !== targetName) {
+        fs.unlinkSync(path.join(approveDir, existing));
+      }
+    }
+    fs.copyFileSync(file.absolute, path.join(approveDir, targetName));
+    taken.add(slot);
+    saved.push(targetName);
+  }
+  if (!saved.length) {
+    const expected = characters.length ? characters.join(", ") : shotId;
+    throw new Error(`Нет картинки персонажа этого кадра (${expected}).`);
+  }
+  writeStatusFile(options.episodeId, shotId, stageId, { status: "approved" });
+  clearStageError(options.episodeId, shotId, stageId);
+  return [...new Set(saved)];
+}
+
 export function copyFilesToRefs(options: {
   episodeId: string;
   shotId: string;

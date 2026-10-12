@@ -19,6 +19,7 @@ import { ImageLightbox } from "./image-lightbox";
 import { LocationLibrary } from "./location-library";
 import { RefSourcePicker } from "./ref-source-picker";
 import { OutputPanel } from "./output-panel";
+import { PrevShotRefButton } from "./prev-shot-buttons";
 import { PromptHistory } from "./prompt-history";
 import { RefFiles, usedRefNames } from "./ref-files";
 import { ShotContext } from "./shot-context";
@@ -154,7 +155,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       setAllowCloud(false);
       stage.reset(data.stage);
       // Запрос ушёл — обратно к таблице, как «← Таблица».
-      router.push(episodePagePath(episodeId));
+      router.push(episodePagePath(episodeId, shotId));
       return data.message;
     });
 
@@ -300,9 +301,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     });
   };
 
-  const keys = useRef({ send: sendToAgent, run: runStage, approve: approveSelected, canRun, stageBusy });
+  const backToTable = () => router.push(episodePagePath(episodeId, shotId));
+  const keys = useRef({ send: sendToAgent, run: runStage, approve: approveSelected, back: backToTable, canRun, stageBusy });
   useEffect(() => {
-    keys.current = { send: sendToAgent, run: runStage, approve: approveSelected, canRun, stageBusy };
+    keys.current = { send: sendToAgent, run: runStage, approve: approveSelected, back: backToTable, canRun, stageBusy };
   });
 
   useEffect(() => {
@@ -324,6 +326,11 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       if (event.code === "KeyA" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
         keys.current.approve();
+        return;
+      }
+      if (event.code === "Backquote" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+        event.preventDefault();
+        keys.current.back();
         return;
       }
       if (event.key === "?") {
@@ -390,7 +397,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href={episodePagePath(episodeId)} className="text-sm text-teal-800 hover:underline">
+          <Link href={episodePagePath(episodeId, shotId)} className="text-sm text-teal-800 hover:underline">
             ← Таблица {episodeId}
           </Link>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-stone-950">
@@ -496,30 +503,36 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onSaveAction={saveAction}
               onDeleteNote={deleteNote}
             />
-            <DocFieldLabel htmlFor="doc-prompt" note="этот текст уходит в модель">
-              Prompt
-            </DocFieldLabel>
-            {docField("prompt", {
-              readOnly: stageBusy,
-              placeholder: PROMPT_PLACEHOLDER,
-              className: "min-h-28",
-            })}
+            <details className="text-xs text-stone-500">
+              <summary className="cursor-pointer text-sm font-medium text-stone-800">
+                Промпт <span className="font-normal text-stone-500">этот текст уходит в модель</span>
+              </summary>
+              <div className="mt-2">
+                {docField("prompt", {
+                  readOnly: stageBusy,
+                  placeholder: PROMPT_PLACEHOLDER,
+                  className: "min-h-28",
+                })}
+              </div>
+            </details>
             <PromptHistory
               versions={detail.promptHistory}
               disabled={busy}
               onRestore={restorePrompt}
             />
             {detail.hasSpeech ? (
-              <>
-                <DocFieldLabel htmlFor="doc-speech" note="дословно · для агента · пусто — молчат">
-                  Реплики
-                </DocFieldLabel>
-                {docField("speech", {
-                  readOnly: stageBusy,
-                  placeholder: SPEECH_PLACEHOLDER,
-                  className: "min-h-16",
-                })}
-              </>
+              <details className="text-xs text-stone-500">
+                <summary className="cursor-pointer text-sm font-medium text-stone-800">
+                  Реплики <span className="font-normal text-stone-500">дословно · пусто — молчат</span>
+                </summary>
+                <div className="mt-2">
+                  {docField("speech", {
+                    readOnly: stageBusy,
+                    placeholder: SPEECH_PLACEHOLDER,
+                    className: "min-h-16",
+                  })}
+                </div>
+              </details>
             ) : null}
             <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · поле очищается после отправки, агент помнит все замечания кадра">
               Рекомендация
@@ -529,6 +542,28 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               placeholder: "Что изменить в текущем промпте.",
               className: "min-h-24",
             })}
+            {stage.dirty ? (
+              <Button variant="outline" disabled={busy} onClick={() => act(async () => {
+                await saveDocs();
+                return "Сохранено.";
+              })}>
+                Сохранить поля
+              </Button>
+            ) : null}
+            <AgentPanel
+              detail={detail}
+              disabled={busy}
+              mode={agentMode}
+              providers={agent.providers}
+              provider={agent.selected}
+              onChooseProvider={agent.choose}
+              model={agent.model}
+              onChooseModel={agent.chooseModel}
+              isShotAgent={agent.isInitial}
+              rememberForShot={rememberForShot}
+              onRememberForShot={setRememberChoice}
+              onSend={sendToAgent}
+            />
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
                 <summary className="cursor-pointer">Журнал прогона</summary>
@@ -545,14 +580,27 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
-              <RefSourcePicker
-                stageApi={stageApi}
-                disabled={busy}
-                onPicked={(picked, text) => {
-                  stage.merge(picked);
-                  setMessage(text);
-                }}
-              />
+              <div className="flex flex-wrap gap-2">
+                {stageId === "location" || stageId === "characters" ? (
+                  <PrevShotRefButton
+                    stageApi={stageApi}
+                    disabled={busy || stageBusy}
+                    onDone={(picked, text) => {
+                      stage.merge(picked);
+                      setMessage(text);
+                    }}
+                    onError={setMessage}
+                  />
+                ) : null}
+                <RefSourcePicker
+                  stageApi={stageApi}
+                  disabled={busy}
+                  onPicked={(picked, text) => {
+                    stage.merge(picked);
+                    setMessage(text);
+                  }}
+                />
+              </div>
             </div>
             {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
             <RefFiles
@@ -576,28 +624,6 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
               </div>
             </details>
-            {stage.dirty ? (
-              <Button variant="outline" disabled={busy} onClick={() => act(async () => {
-                await saveDocs();
-                return "Сохранено.";
-              })}>
-                Сохранить поля
-              </Button>
-            ) : null}
-            <AgentPanel
-              detail={detail}
-              disabled={busy}
-              mode={agentMode}
-              providers={agent.providers}
-              provider={agent.selected}
-              onChooseProvider={agent.choose}
-              model={agent.model}
-              onChooseModel={agent.chooseModel}
-              isShotAgent={agent.isInitial}
-              rememberForShot={rememberForShot}
-              onRememberForShot={setRememberChoice}
-              onSend={sendToAgent}
-            />
           </div>
 
           {detail.playbooks.length ? (
@@ -630,6 +656,11 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           onRemoveApproved={removeApproved}
           onDelete={(name) => deleteFile("output", name)}
           onEdit={(file, folder) => setEditing({ file, folder })}
+          stageApi={stageApi}
+          onStage={(next, text) => {
+            if (next) stage.merge(next);
+            setMessage(text);
+          }}
         />
       </div>
       {viewer ? (

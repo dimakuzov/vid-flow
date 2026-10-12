@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
 import { episodePagePath, errorText, requestJson, stagePagePath } from "@/components/stage/api";
@@ -51,6 +51,7 @@ export function SeriesBoard({
   initialPreview: BootstrapPreview;
 }) {
   const router = useRouter();
+  const focusShot = useSearchParams().get("shot");
   const [pending, setPending] = useState(false);
   const [series, setSeries] = useState(initialSeries);
   const [seenSeries, setSeenSeries] = useState(initialSeries);
@@ -152,6 +153,14 @@ export function SeriesBoard({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [cell, episodeId, router, series.shots]);
+
+  useEffect(() => {
+    if (!focusShot) return;
+    const row = [...document.querySelectorAll<HTMLElement>(`[data-shot="${CSS.escape(focusShot)}"]`)].find(
+      (item) => item.getClientRects().length > 0,
+    );
+    row?.scrollIntoView({ block: "start" });
+  }, [focusShot, series.shots]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -269,7 +278,7 @@ export function SeriesBoard({
             </div>
             <div className="space-y-6 md:hidden">
               {series.shots.map((shot, shotIndex) => (
-                <div key={shot.id} className="space-y-2">
+                <div key={shot.id} data-shot={shot.id} className="scroll-mt-4 space-y-2">
                   <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                   <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                     {STAGES.map((stageId, stageIndex) => (
@@ -317,7 +326,7 @@ export function SeriesBoard({
                 </thead>
                 <tbody>
                   {series.shots.map((shot, shotIndex) => (
-                    <tr key={shot.id}>
+                    <tr key={shot.id} data-shot={shot.id} className="scroll-mt-4">
                       <td className="align-top">
                         <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                       </td>

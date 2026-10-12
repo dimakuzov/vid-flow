@@ -3,6 +3,7 @@
 import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { MediaCard } from "./media-card";
+import { CharacterApproveTools } from "./prev-shot-buttons";
 
 /** Подпись «из чего сделан» для файла в output/. */
 function madeFrom(name: string, edits: ImageEditRecord[]): { caption?: string; title?: string } {
@@ -23,6 +24,8 @@ export function OutputPanel({
   onRemoveApproved,
   onDelete,
   onEdit,
+  stageApi,
+  onStage,
 }: {
   detail: StageDetail;
   edits: ImageEditRecord[];
@@ -35,12 +38,17 @@ export function OutputPanel({
   /** Удалить файл из output/ насовсем. Разрешено и у занятого этапа. */
   onDelete: (name: string) => void;
   onEdit: (file: MediaFile, folder: "output" | "approve") => void;
+  stageApi: string;
+  onStage: (stage: StageDetail | null, message: string) => void;
 }) {
   return (
     <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">Output</h2>
       <div className="mt-4">
         <h3 className="text-sm font-medium text-stone-800">approve/</h3>
+        {detail.stageId === "characters" ? (
+          <CharacterApproveTools stageApi={stageApi} disabled={disabled} onDone={onStage} />
+        ) : null}
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {detail.approve.length ? (
             detail.approve.map((file) => (
