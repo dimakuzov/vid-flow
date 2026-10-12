@@ -13,29 +13,42 @@ function clearStageError(episodeId: string, shotId: string, stageId: StageId): v
   if (readStageState(episodeId, shotId, stageId).phase === "error") setIdle(episodeId, shotId, stageId);
 }
 
-function nameInStem(stem: string, token: string): boolean {
-  if (stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`)) return true;
+/** Номер части имени файла, с которой начинается имя персонажа. -1 — имени нет. */
+function namePosition(stem: string, token: string): number {
+  if (stem === token || stem.startsWith(`${token}_`) || stem.startsWith(`${token}-`)) return 0;
   const segments = stem.split(/[_-]+/).filter(Boolean);
   const parts = token.split(/[_-]+/).filter(Boolean);
-  if (!parts.length) return false;
-  return segments.some((_, index) =>
+  if (!parts.length) return -1;
+  return segments.findIndex((_, index) =>
     parts.every((part, offset) => segments[index + offset] === part),
   );
 }
 
-function matchCharacter(filename: string, characters: string[]): string | null {
+/**
+ * Персонаж кадра по имени файла. В имени может быть несколько персонажей: `Lena_mom_body.png` —
+ * это мама Лены. Тогда сначала тот, кого ещё нет в approve (`taken`), затем тот, чьё имя
+ * стоит в имени файла позже (`lena_mom` — мама), затем более длинное имя.
+ */
+function matchCharacter(filename: string, characters: string[], taken: Set<string> = new Set()): string | null {
   const stem = path.parse(path.basename(filename)).name.toLowerCase();
-  const ranked = [...characters].sort((a, b) => b.length - a.length);
-  return ranked.find((name) => nameInStem(stem, name.toLowerCase())) ?? null;
+  const found = characters
+    .map((name) => ({ name, at: namePosition(stem, name.toLowerCase()) }))
+    .filter((item) => item.at >= 0);
+  if (!found.length) return null;
+  const free = found.filter((item) => !taken.has(item.name.toLowerCase()));
+  const pool = free.length ? free : found;
+  pool.sort((a, b) => b.at - a.at || b.name.length - a.name.length);
+  return pool[0].name;
 }
 
 function characterApproveName(
   filename: string,
   shotId: string,
   characters: string[],
+  taken?: Set<string>,
 ): string | null {
   const parsed = path.parse(path.basename(filename));
-  const matched = matchCharacter(filename, characters);
+  const matched = matchCharacter(filename, characters, taken);
   const character = matched ?? (characters.length === 1 ? characters[0] : null);
   if (!character) {
     if (characters.length) return null;
@@ -160,9 +173,14 @@ export function approveFiles(options: {
     if (!fs.existsSync(source)) {
       throw new Error(`Файл не найден в output: ${safeName}`);
     }
+    // Кто уже в approve: файл с двумя именами достаётся тому, кого там ещё нет.
+    const taken =
+      options.stageId === "characters"
+        ? new Set(fs.readdirSync(approveDir).map((existing) => approvedSlot(existing, shotId)))
+        : undefined;
     const targetName =
       options.stageId === "characters"
-        ? characterApproveName(safeName, shotId, characters)
+        ? characterApproveName(safeName, shotId, characters, taken)
         : safeName;
     if (!targetName) continue;
     if (options.stageId === "characters") {

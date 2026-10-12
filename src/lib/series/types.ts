@@ -148,6 +148,28 @@ export interface StageDetail {
   };
   /** Агент кадра: «Отправить агенту» берёт его по умолчанию. null — не назначен. */
   shotAgent: ShotAgentChoice | null;
+  /**
+   * Первый кадр и видео: действие кадра под утверждённые картинки (`shots/{shotId}/action.md`)
+   * и что на этих картинках на самом деле. null — этапу это не нужно.
+   */
+  shotContext: {
+    action: string;
+    /** Текст правил пользователь: модель учитывает его как замечание. */
+    actionEditedByUser: boolean;
+    /** Основа изменилась (картинки, shot.md, замечания): агент перепишет действие при следующей отправке. */
+    actionStale: boolean;
+    images: {
+      kind: "location" | "character" | "first_frame";
+      subject: string | null;
+      name: string;
+      /** Описание. null — ещё нет. */
+      text: string | null;
+      /** Модель смотрит картинку прямо сейчас. */
+      describing: boolean;
+    }[];
+  } | null;
+  /** Замечания пользователя к кадру со всех этапов (`shots/{shotId}/notes.json`), старые первыми. */
+  notes: { id: string; at: string; stageId: StageId; stageLabel: string; message: string }[];
 }
 
 export interface BootstrapShotDraft {

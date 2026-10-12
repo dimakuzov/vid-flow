@@ -37,7 +37,7 @@
   },
   "477": {
     "inputs": {
-      "value": "Place the girl from image 2 and the young man from image 3 into the street from image 1. <where, described by what is visible on image 1> <scale tied to a specific object> <one action, body direction, where they look> Amateur snapshot, no special lighting on the people: <named colour cast>, faces in shadow. Keep the location from image 1 exactly as it is. Do not add any other people."
+      "value": "Place the girl from image 2 and the young man from image 3 into the street from image 1. <where, described by what is visible on image 1> <scale tied to a specific object> <one action, body direction, where they look> Their clothes, shoes, bags and everything they wear or carry exactly as in image 2 and image 3, unchanged. No special lighting on them: they are lit by the same light as everything in image 1. Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people."
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -203,6 +203,10 @@
       "images.image_5": [
         "905",
         0
+      ],
+      "images.image_6": [
+        "906",
+        0
       ]
     },
     "class_type": "TextEncodeQwenImage21",
@@ -226,38 +230,47 @@
   },
   "902": {
     "inputs": {
-      "image": "character_1.png"
+      "image": "reference_1.png"
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Image 2 (character 1)"
+      "title": "Image 2 (reference 1)"
     }
   },
   "903": {
     "inputs": {
-      "image": "character_2.png"
+      "image": "reference_2.png"
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Image 3 (character 2, optional)"
+      "title": "Image 3 (reference 2, optional)"
     }
   },
   "904": {
     "inputs": {
-      "image": "face_1.png"
+      "image": "reference_3.png"
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Face of character 1 (optional)"
+      "title": "Image 4 (reference 3, optional)"
     }
   },
   "905": {
     "inputs": {
-      "image": "face_2.png"
+      "image": "reference_4.png"
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Face of character 2 (optional)"
+      "title": "Image 5 (reference 4, optional)"
+    }
+  },
+  "906": {
+    "inputs": {
+      "image": "reference_5.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Image 6 (reference 5, optional)"
     }
   }
 }

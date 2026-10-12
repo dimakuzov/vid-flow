@@ -12,6 +12,7 @@
 | --- | --- | --- | --- |
 | `video_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | самый новый файл в `first_frame/approve/`, `prompt.md` |
 | `video_flf` | 20 | `wan22_flf_sketch_turbo_api.json` | то же + самая новая картинка в `refs/` этого этапа как последний кадр |
+| `video_ltx` | 30 | `ltx25_i2v_api.json` (LTX 2.5, 24 к/с, со звуком, длительность 2–10 с) | самый новый файл в `first_frame/approve/`, `prompt.md` по `playbooks/models/ltx_video.md` |
 
 По умолчанию доска берёт `video_i2v`. FLF доступен, только когда в `refs/` есть картинка.
 

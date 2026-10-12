@@ -11,7 +11,7 @@ The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Con
 | manifest id | order | Graph | When |
 | --- | --- | --- | --- |
 | `final_heygen` | 2 | `heygen_video_i2v_api.json`, HeyGen Video 1.0 in **Comfy Cloud** (paid, ~45.3 credits per 10 s, 5–15 s), from the approved first frame, the preview's length | default for a **dialogue** (two or more speakers in `speech.md`); runs only after the box «Разрешить платную отправку в Comfy Cloud» is ticked for this run. Prompt: `playbooks/models/heygen_video.en.md` |
-| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, the sketch's prompt and first frame, the preview's length | default for a shot **without lines** |
+| `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, 24 fps, the sketch's prompt and first frame, the preview's length | default for a shot **without lines** |
 | `final_h3_768_face` | 4 | `minimax_h3_creator_api.json`, 768, face pass | default for a shot **with lines** (`speech.md`): MiniMax voices it and moves the lips |
 | `final_h3` | 5 | same graph, 1152, face pass | faces and the shot needs the higher resolution |
 | `final_h3_768` | 6 | same graph, 768, no face pass | no people, small faces, faster and less memory |

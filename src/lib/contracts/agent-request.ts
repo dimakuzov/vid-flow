@@ -144,4 +144,6 @@ export interface AgentProviderInfo {
   /** Модели на выбор. Пусто — у провайдера нет выбора модели (ручной режим). */
   models: ModelChoice[];
   defaultModel: string | null;
+  /** Модель этапа, важнее агента кадра (`first_frame` → Sonnet). Нет — у этапа своей модели нет. */
+  stageModels?: Record<string, string>;
 }

@@ -58,7 +58,7 @@ test("по умолчанию — финал Wan 720×1280; H3 768 с face pass 
   assert.equal(data.face.on, true);
 });
 
-test("Wan: эскиз 576×1024, финал Wan 720×1280 с промптом эскиза", () => {
+test("Wan: эскиз 576×1024 и 16 к/с, финал Wan 720×1280 и 24 к/с с промптом эскиза", () => {
   fs.writeFileSync(path.join(stageDir(EP, "s01", "video_preview"), "prompt.md"), "Static shot. Lena turns her head. 5 sec");
   fs.writeFileSync(path.join(stageDir(EP, "s01", "final_render"), "prompt.md"), "[Shot 1] H3 text, not for Wan.");
   const build = (stageId: "video_preview" | "final_render", workflow: string) => {
@@ -70,9 +70,11 @@ test("Wan: эскиз 576×1024, финал Wan 720×1280 с промптом э
     if (workflow === "video_flf") put(path.join(stageDir(EP, "s01", "video_preview"), "refs", "end.png"));
     const wan = build("video_preview", workflow)["129:98"].inputs;
     assert.deepEqual([wan.width, wan.height], [576, 1024], workflow);
+    assert.equal(build("video_preview", workflow)["129:162"].inputs.value, 16, workflow);
   }
   const final = build("final_render", "final_wan_720");
   assert.deepEqual([final["129:98"].inputs.width, final["129:98"].inputs.height], [720, 1280]);
+  assert.equal(final["129:162"].inputs.value, 24, "FPS финала");
   assert.equal(
     final["129:93"].inputs.text,
     "Static shot. Lena turns her head. 5 sec The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.",

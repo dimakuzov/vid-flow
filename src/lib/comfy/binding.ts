@@ -206,8 +206,14 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
           fail(`${what}: when.input ${template.when.input} — не файл`);
         }
       }
+    } else if (Array.isArray(value.inputs)) {
+      if (!value.inputs.length) fail(`${what}: пустой inputs`);
+      for (const name of value.inputs as unknown[]) {
+        const kind = inputs[String(name)]?.kind;
+        if (kind !== "image" && kind !== "video") fail(`${what}: inputs — ${String(name)} не вход-файл`);
+      }
     } else if (value.seed !== "random" && typeof value.template !== "string" && !("const" in value)) {
-      fail(`${what}: значение должно быть input, seed, template или const`);
+      fail(`${what}: значение должно быть input, inputs, seed, template или const`);
     }
   });
 }
@@ -421,6 +427,32 @@ export function excludedInputFiles(ctx: ShotContext, input: ImageInput): string[
 
 function imageMin(input: ImageInput): number {
   return input.min ?? 1;
+}
+
+/** Файл, который слот-картинка получит. index — номер файла внутри его входа (для uploadAs). */
+export interface SlotFile {
+  name: string;
+  input: ImageInput;
+  file: string;
+  index: number;
+}
+
+/**
+ * Файл слота `{ input, index }` или `{ inputs, index }` (входы подряд). null — файла нет
+ * или слот не про файлы. `images` — уже разобранные входы (resolveImageInput).
+ */
+export function slotFile(binding: GraphBinding, slot: BindingSlot, images: Record<string, string[]>): SlotFile | null {
+  const value = slot.value;
+  const names = "inputs" in value ? value.inputs : "input" in value ? [value.input] : [];
+  let index = "index" in value && value.index != null ? value.index : 0;
+  for (const name of names) {
+    const input = binding.inputs[name];
+    if (input?.kind !== "image" && input?.kind !== "video") return null;
+    const files = images[name] ?? [];
+    if (index < files.length) return { name, input, file: files[index], index };
+    index -= files.length;
+  }
+  return null;
 }
 
 /** Подписи обязательных входов-картинок, которых не хватает. Текст и число на доступность не влияют. */
@@ -891,17 +923,23 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       );
       continue;
     }
-    const input = binding.inputs[value.input];
+    const names = "inputs" in value ? value.inputs : [value.input];
+    const input = binding.inputs[names[0]];
     if (input.kind === "image" || input.kind === "video") {
-      const index = "index" in value && value.index != null ? value.index : 0;
-      const file = images[value.input][index];
-      if (!file) {
-        empty(slot, input, imageMin(input) >= 1);
+      const found = slotFile(binding, slot, images);
+      if (!found) {
+        // Ряд входов: слот обязателен, только если это один из обязательных файлов первого входа.
+        const index = "index" in value && value.index != null ? value.index : 0;
+        empty(slot, input, "inputs" in value ? imageMin(input) > index : imageMin(input) >= 1);
         continue;
       }
-      const filename = uploadName(input, file, index, ctx);
-      if (!uploads.some((item) => item.path === file && item.filename === filename)) uploads.push({ path: file, filename });
+      const filename = uploadName(found.input, found.file, found.index, ctx);
+      if (!uploads.some((item) => item.path === found.file && item.filename === filename)) {
+        uploads.push({ path: found.file, filename });
+      }
       write(slot, filename);
+    } else if ("inputs" in value) {
+      continue;
     } else if (input.kind === "text") {
       const steps = "steps" in value ? value.steps : undefined;
       const templates = "templates" in value ? value.templates : undefined;

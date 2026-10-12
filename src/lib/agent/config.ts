@@ -38,12 +38,37 @@ export function providerParallel(id: AgentProviderId): number {
 /** Модели Claude Code на выбор. Первая — по умолчанию, если не задана FRAMEBOARD_CLAUDE_MODEL. */
 export const CLAUDE_MODELS = [
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+  { id: "claude-haiku-5-5", label: "Haiku 5.5" },
 ];
+
+/** Старые id моделей → нынешние: agent.json кадров и запросы, записанные до замены (Haiku 4.5 → 5.5). */
+const CLAUDE_MODEL_ALIASES: Record<string, string> = {
+  "claude-haiku-4-5-20251001": "claude-haiku-5-5",
+  "claude-haiku-4-5": "claude-haiku-5-5",
+};
+
+export function currentClaudeModel<T extends string | null | undefined>(model: T): T {
+  return (model ? (CLAUDE_MODEL_ALIASES[model] ?? model) : model) as T;
+}
 
 export function defaultClaudeModel(): string {
   const configured = process.env.FRAMEBOARD_CLAUDE_MODEL?.trim();
   return configured || CLAUDE_MODELS[0].id;
+}
+
+/**
+ * Модель Claude этапа: важнее агента кадра. Первый кадр сводит сценарий, локацию и персонажей —
+ * там нужен Sonnet, даже если кадру назначен Haiku. Другую модель можно выбрать на странице
+ * этапа на один запуск.
+ */
+export const STAGE_CLAUDE_MODELS: Partial<Record<string, string>> = {
+  first_frame: "claude-sonnet-5-5",
+};
+
+/** Модель запроса: этап Claude со своей моделью — она, иначе `model` (агент кадра или выбор меню). */
+export function stageModel(provider: string | undefined, stageId: string, model: string | undefined): string | undefined {
+  if (provider !== "claude") return model;
+  return STAGE_CLAUDE_MODELS[stageId] ?? model;
 }
 
 export function claudeBin(): string {

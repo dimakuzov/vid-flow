@@ -1,6 +1,7 @@
 import path from "path";
 import { listWorkflowChoices } from "../comfy/workflows";
 import type { AgentProviderId } from "../contracts/agent-request";
+import { stageModel } from "../agent/config";
 import { submitAgentRequest } from "./agent-request";
 import { STAGE_LABELS, STAGES, type StageId } from "./constants";
 import { readTextIfExists } from "./media";
@@ -105,6 +106,7 @@ function sendToAgent(episodeId: string, shotId: string, stageId: StageId, option
   const dir = stageDir(episodeId, shotId, stageId);
   // Агент кадра; у кадра без агента — выбор меню или агент доски по умолчанию.
   const own = readShotAgent(episodeId, shotId);
+  const provider = own ? own.provider : options.provider;
   // Документы этапа уходят как есть: массовый запуск ничего в них не меняет.
   submitAgentRequest({
     episodeId,
@@ -114,8 +116,10 @@ function sendToAgent(episodeId: string, shotId: string, stageId: StageId, option
     prompt: readTextIfExists(path.join(dir, "prompt.md")),
     refsNote: readTextIfExists(path.join(dir, "refs.md")),
     workflowNote: readTextIfExists(path.join(dir, "workflow.md")),
-    provider: own ? own.provider : options.provider,
-    model: own ? (own.model ?? undefined) : options.model,
+    provider,
+    // Этап со своей моделью (первый кадр — Sonnet) важнее модели агента кадра.
+    model: stageModel(provider, stageId, own ? (own.model ?? undefined) : options.model),
+    auto: true,
   });
 }
 

@@ -137,7 +137,7 @@ S10: коса всё время «доплеталась» к финалу. Ре
 ## 7. Настройки Wan 2.2
 
 - **Turbo:** LoRA lightx2v 4 шага, CFG 1, split 2. Эскизы делаем только так.
-- **Разрешение эскиза:** 576×1024 (задают манифесты `video_i2v` / `video_flf`; в файле графа по-прежнему 384×672). Финальный Wan-вариант `final_wan_720` — 720×1280. Замер на s03 с тем же промптом и seed: 432×768 — 35 с, 576×1024 — 70 с, 720×1280 — 128 с. В 720×1280 Wan додумывает детали фона, поэтому доска заканчивает финальный промпт строкой: `The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.`
+- **Разрешение эскиза:** 576×1024 (задают манифесты `video_i2v` / `video_flf`; в файле графа по-прежнему 384×672). Финальный Wan-вариант `final_wan_720` — 720×1280 и 24 к/с (эскиз — 16 к/с): кадров на ту же длительность в 1,5 раза больше. Замер на s03 с тем же промптом и seed: 432×768 — 35 с, 576×1024 — 70 с, 720×1280 — 128 с. В 720×1280 Wan додумывает детали фона, поэтому доска заканчивает финальный промпт строкой: `The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.`
 - **FPS 16, длина = длительность × 16 + 1:**
   - 3 с = 49 кадров;
   - 5 с = 81 кадр;

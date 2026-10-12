@@ -26,14 +26,9 @@ Put the pictures in `ComfyUI/input` and type their names into Load Image.
 | Node | What to feed |
 | --- | --- |
 | Image 1 (location), id 470 | The shot's approved location, `shots/{shotId}/location/approve/`. For an edit, the chosen first frame itself |
-| Image 2 (character 1), id 902 | `shots/{shotId}/characters/approve/{name}_{shotId}.png` |
-| Image 3 (character 2), id 903 | The second character. If there is only one character, delete this node and remove `images.image_3` from node 488 |
-| Face of character 1, id 904 | Close-up only: the portrait of the first character. Otherwise delete the node and remove `images.image_4` from node 488 |
-| Face of character 2, id 905 | Close-up of the second character only. Otherwise delete the node and remove `images.image_5` from node 488 |
+| Image 2…6 (reference 1…5), id 902…906 | The references in a row: first `shots/{shotId}/characters/approve/{name}_{shotId}.png` of every character, then their portraits. Empty nodes are deleted together with `images.image_N` on node 488 |
 
-The prompt calls the connected pictures `image 1`, `image 2`, … in the order of the inputs. Text Encode Qwen Image 2.1 skips a removed input and numbers the rest in a row: with one character and a face, the face is image 3.
-
-The board does the removal itself (manifest `first_frame_compositing.bind.json`): faces go only when `prompt.md` contains `face from image N`.
+The prompt calls the connected pictures `image 1`, `image 2`, … in the order of the inputs. The board fills `image_2`…`image_6` in a row, with no gaps (manifest `first_frame_compositing.bind.json`): with one character and a portrait, the portrait is image 3; with two, image 4 and image 5.
 
 The pose and the direction on the reference should be close to the shot. The model takes the running direction from the picture. If the reference contradicts the shot, change the file or write `unlike image 2`.
 
@@ -66,13 +61,14 @@ Through the API, the same JSON goes to `POST http://127.0.0.1:8188/prompt` as `{
 
 | Problem | What to do |
 | --- | --- |
-| The character is brighter than the room | `amateur snapshot, no special lighting` and a named colour. Or an edit matched to a sample |
+| The character is brighter than the room | `No special lighting on her: she is lit by the same light as everything in image 1`, and if needed `slightly underexposed like everything around`. Do not name a colour of your own |
 | The wrong surface | Describe the spot by colour, neighbouring objects, and part of the frame |
 | Too large | Tie height to an object in the location |
 | A medium shot comes out full height | Describe where the frame cuts the body (`the bottom edge of the frame cuts her at the waist`), not a fraction of the frame and not `stands on the floor` |
-| A close-up comes out as a wide shot | Start with `Close-up portrait: her face fills most of the frame`, use the close-up lock without `the same framing` |
-| The room is redrawn (a window moves) | Medium-shot lock naming the objects that must stay; or ask the location stage for a view at the shot's distance |
-| The face drifts in a close-up | Add `Her face exactly as the face from image N` |
+| A close-up comes out as a wide shot | Put the person right at the camera: `She stands right in front of the camera, very close: her face and shoulders fill most of the frame`. Do not «move the room closer»; if it still fails, ask the location stage for a closer view |
+| The location changed: objects moved, added or gone, other buildings, other light | The lock from the model playbook («Lock»), naming what changed. Remove from the prompt any description of the place, your own light, weather and camera angle |
+| Clothes or the bag differ from the reference | Remove the clothes and items description from the prompt, keep `Her clothes, shoes, bag … exactly as in image 2, unchanged` |
+| The face drifts | Add a portrait (`refs/{name}_face.png` or in the library) and write `Her face exactly as in image N` |
 | Two people swap places or roles | Name and number both in the first sentence, numbers from «Images the graph receives» |
 | Location objects disappear | Name them, with `same places, sharp` |
 | The background is soft | Assemble again from the clean location |

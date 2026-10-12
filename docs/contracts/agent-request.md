@@ -116,6 +116,24 @@
 
 Скрипты без зависимостей: `scripts/frameboard-status.mjs` — строка состояния Claude Code (таймаут 500 мс, код выхода всегда 0), `scripts/frameboard-agents.mjs` — `npm run agents -- list | stop <ep>/<shot>/<stage> | stop --all`. Порт — `FRAMEBOARD_PORT` (3456). Настройка — README, «Агенты доски в Claude Code».
 
+## Что агент знает о кадре: замечания, картинки, действие
+
+Код: `src/lib/series/shot-notes.ts`, `descriptions.ts`, `shot-action.ts`, текст для агента — `src/lib/agent/shot-context.ts`. Все файлы пишет только доска.
+
+| Файл | Что | Когда |
+|---|---|---|
+| `shots/{shotId}/notes.json` | замечания пользователя ко всем этапам кадра: `{ entries: [{ id, at, stageId, message }] }` | `submitAgentRequest`, если сообщение написал пользователь (у массового запуска `auto: true` — не пишется). Убрать — `DELETE /api/episodes/{ep}/shots/{shot}/notes` `{ id }` |
+| `data/descriptions/{sha256}.json` | что на утверждённой картинке на самом деле: `{ sha256, kind: location \| character \| first_frame, text, model, createdAt, source }` | фоновый цикл `image-descriptions` (20 с, текущий эпизод, не больше 2 сразу) и перед задачей агенту. Ключ — содержимое файла: один файл в нескольких кадрах описывается один раз, замена файла в approve — новое описание |
+| `shots/{shotId}/action.md`, `action.json` | действие кадра под утверждённые картинки, по-русски; `action.json` — `{ basis, textSha, source: agent \| user, at, model? }` | перед задачей агенту на `first_frame`, `video_preview`, `final_render`, если изменилась основа (shot.md, картинки и их описания, замечания). Правка на странице — `PUT /api/episodes/{ep}/shots/{shot}/action` `{ text }`: версия пользователя, она важнее модели и уходит в следующую пересборку как замечание; пустой текст — убрать |
+
+Описания и действие делает `claude -p` (`src/lib/agent/claude-oneshot.ts`): описания — `FRAMEBOARD_VISION_MODEL` (по умолчанию `claude-haiku-5-5`: только «что на картинке»), действие — `FRAMEBOARD_CONTEXT_MODEL` (по умолчанию `claude-sonnet-5-5`); пустая временная папка, картинка копируется туда и открывается инструментом Read. `FRAMEBOARD_DESCRIBE=off` выключает и то и другое; при `FRAMEBOARD_LOOPS=off` (тесты, скрипты) настоящий claude здесь не вызывается. Не вышло — агент работает с тем, что есть.
+
+В задаче агента (text и `llm_task.md`) после shot.md: действие по картинкам, описания картинок (на первом кадре — без его прошлого утверждённого варианта), прошлые замечания кадра (текущее сообщение — только как запрос) и порядок приоритета: запрос → прошлые замечания (позднее важнее) → что на картинках → действие по картинкам → shot.md → остальное.
+
+## Модель этапа
+
+`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude на `first_frame` — Sonnet, даже если агенту кадра назначен Haiku. Массовый запуск и «Запустить следующий этап» берут её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск.
+
 ## Ручной режим и `agent-mail/`
 
 Ручной режим остаётся: `AGENTS.md` коротко говорит, где взять задачу (`agent_inbox.md` → `llm_task.md`) и что единственный сигнал — `done`. `agent-mail/` (связь облако ↔ локальная машина через git) к доске не относится; модуль 5 решает, оставить ли его ручным инструментом, и записывает решение в `AGENTS.md`.

@@ -81,6 +81,10 @@ for (const name of manifests) {
         for (const template of (value.templates as { when?: { input: string } }[] | undefined) ?? []) {
           if (template.when) assert.ok(inputs[template.when.input], `${binding.id}: when.input ${template.when.input}`);
         }
+      } else if (Array.isArray(value.inputs)) {
+        for (const name of value.inputs as string[]) {
+          assert.ok(["image", "video"].includes(inputs[name]?.kind), `${binding.id}: inputs — ${name} не вход-файл`);
+        }
       } else {
         assert.ok(
           value.seed === "random" || typeof value.template === "string" || "const" in value,

@@ -17,7 +17,16 @@ import {
   getPlaybooksRoot,
   shotDir,
 } from "../series/paths";
-import { CLAUDE_MODELS, claudeBin, defaultClaudeModel, defaultProviderId, ollamaModel, ollamaUrl } from "./config";
+import {
+  CLAUDE_MODELS,
+  STAGE_CLAUDE_MODELS,
+  currentClaudeModel,
+  claudeBin,
+  defaultClaudeModel,
+  defaultProviderId,
+  ollamaModel,
+  ollamaUrl,
+} from "./config";
 import { resolveExecutable, runProcess } from "./process";
 
 /*
@@ -90,7 +99,7 @@ export function claudeInvocation(
   task: AgentTask,
   viaShell = false,
 ): { args: string[]; cwd: string; stdin?: string; env?: Record<string, string> } {
-  const model = task.request?.model || defaultClaudeModel();
+  const model = currentClaudeModel(task.request?.model) || defaultClaudeModel();
   const isolation = ["--strict-mcp-config", "--no-session-persistence"];
   if (task.mode === "text") {
     // Чистый вызов модели: без инструментов, MCP и системного промпта Claude Code — один запрос, один ответ.
@@ -311,7 +320,8 @@ const claudeProvider: BoardAgentProvider = {
   label: "Claude Code",
   modes: ["text", "agent"],
   configError(model) {
-    return !model || CLAUDE_MODELS.some((item) => item.id === model) ? null : `Неизвестная модель Claude: ${model}`;
+    const id = currentClaudeModel(model);
+    return !id || CLAUDE_MODELS.some((item) => item.id === id) ? null : `Неизвестная модель Claude: ${model}`;
   },
   async check() {
     const bin = claudeBin();
@@ -409,6 +419,7 @@ export async function listAgentProviders(): Promise<AgentProviderInfo[]> {
         isDefault: id === fallback,
         models: checked.models ?? [],
         defaultModel: checked.defaultModel ?? null,
+        ...(id === "claude" ? { stageModels: { ...STAGE_CLAUDE_MODELS } as Record<string, string> } : {}),
       };
     }),
   );

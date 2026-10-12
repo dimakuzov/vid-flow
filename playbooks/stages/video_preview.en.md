@@ -12,6 +12,7 @@ Prompt: `playbooks/models/wan_video.en.md`, template in section 8. How the graph
 | --- | --- | --- | --- |
 | `video_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | the newest file in `first_frame/approve/`, `prompt.md` |
 | `video_flf` | 20 | `wan22_flf_sketch_turbo_api.json` | the same + the newest picture in this stage's `refs/` as the last frame |
+| `video_ltx` | 30 | `ltx25_i2v_api.json` (LTX 2.5, 24 fps, with sound, 2–10 s) | the newest file in `first_frame/approve/`, `prompt.md` by `playbooks/models/ltx_video.en.md` |
 
 The board defaults to `video_i2v`. FLF is available only when `refs/` has a picture.
 

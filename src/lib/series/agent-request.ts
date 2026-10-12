@@ -9,7 +9,7 @@ import type {
 } from "../contracts/agent-request";
 import type { WorkflowChoice } from "../contracts/graph-binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
-import { defaultProviderId, isProviderId } from "../agent/config";
+import { currentClaudeModel, defaultProviderId, isProviderId } from "../agent/config";
 import {
   BASELINE_FILE,
   LLM_TASK,
@@ -34,6 +34,8 @@ import { readTextIfExists, writeText } from "./media";
 import { updateStageDocs } from "./mutations";
 import { excludedFiles } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
+import { appendShotNote } from "./shot-notes";
+import { renderShotContext } from "../agent/shot-context";
 import { readShotSpeech, SPEECH_FILE, stageHasSpeech } from "./speech";
 import { assertStageFree, writeStageState } from "./stage-state";
 import {
@@ -236,6 +238,14 @@ ${excluded.map((item) => `- \`data/${item}\``).join("\n")}
 `;
 }
 
+/** Замечания, действие кадра и описания картинок: блок с пустой строкой после него, иначе пусто. */
+function renderContext(request: AgentRequestFile): string {
+  const text = renderShotContext(request.episodeId, request.shotId, request.stageId, request.createdAt);
+  return text ? `${text}
+
+` : "";
+}
+
 /** Номера картинок графа первого кадра (`image N`): блок с пустой строкой перед ним, иначе пусто. */
 function renderImages(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
   const text = renderGraphImages(episodeId, shotId, stageId, workflow);
@@ -321,7 +331,9 @@ ${meta.summary || "(действие кадра не описано)"}
 - персонажи: ${bulletList(meta.characters)}
 - локация: ${meta.location || "нет"}
 
-${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
+Это исходный текст сценария, написанный до картинок. Если он расходится с картинками или замечаниями ниже, верны они.
+
+${renderContext(request)}${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
 ${renderDuration(episodeId, shotId, stageId, selected)}${renderImages(episodeId, shotId, stageId, boardQueues ? selected : null)}
@@ -411,6 +423,8 @@ export function submitAgentRequest(options: {
   model?: string;
   /** Разрешение на платный запуск в Comfy Cloud после ответа агента (один запуск). */
   allowCloud?: boolean;
+  /** Сообщение написала доска (массовый запуск), а не пользователь: в замечания кадра не идёт. */
+  auto?: boolean;
 }): AgentRequestFile {
   const episodeId = options.episodeId;
   const shotId = assertSafeSegment(options.shotId, "shot");
@@ -430,7 +444,8 @@ export function submitAgentRequest(options: {
         .join(", ")}. Выбери Claude или ручной режим.`,
     );
   }
-  const model = options.model?.trim() || undefined;
+  const typedModel = options.model?.trim() || undefined;
+  const model = providerId === "claude" ? currentClaudeModel(typedModel) : typedModel;
   const configError = provider.configError?.(model);
   if (configError) throw new Error(configError);
   const workflow = options.workflow?.trim() || undefined;
@@ -468,12 +483,16 @@ export function submitAgentRequest(options: {
     : false;
   const refsChangedByUser = touched || refsDifferFromBaseline;
 
+  const createdAt = new Date().toISOString();
+  // Замечание пользователя остаётся в истории кадра: поле «Рекомендация» уже очищено.
+  if (typed && !options.auto) appendShotNote(episodeId, shotId, stageId, typed, createdAt);
+
   const request: AgentRequestFile = {
     id: `${shotId}-${stageId}-${Date.now()}`,
     episodeId,
     shotId,
     stageId,
-    createdAt: new Date().toISOString(),
+    createdAt,
     status: "pending",
     message,
     refsChangedByUser,

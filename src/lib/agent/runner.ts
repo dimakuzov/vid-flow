@@ -6,6 +6,8 @@ import { formatMinutes, modeTimeoutMs, providerParallel } from "./config";
 import { appendRunLog, captureBaseline, readAgentRequest, writeAgentRequest } from "./files";
 import { cleanPromptText, getAgentProvider } from "./providers";
 import { buildAgentTask } from "./task";
+import { stageUsesContext } from "../series/descriptions";
+import { ensureShotAction } from "../series/shot-action";
 
 /*
  * Исполнитель запросов агенту: pending → running → done | error (docs/contracts/agent-request.md).
@@ -208,6 +210,11 @@ async function execute(request: AgentRequestFile, run: LiveRun): Promise<void> {
 
   let result: AgentResult;
   try {
+    // Первый кадр и видео: модель смотрит утверждённые картинки и приводит действие кадра к ним.
+    // Не вышло — агент работает с тем, что уже есть.
+    if (stageUsesContext(request.stageId)) {
+      await Promise.race([ensureShotAction(request.episodeId, request.shotId, signal), abortPromise(signal)]);
+    }
     const task = buildAgentTask(request, mode, timeoutMs);
     // race: провайдер, который не слушает signal, всё равно не держит запрос дольше таймаута.
     result = await Promise.race([provider.run(task, signal), abortPromise(signal)]);
