@@ -103,6 +103,13 @@ function queueDir(): string {
   return dir;
 }
 
+/** id одного персонажа в запуске этапа. Латиница, не длиннее 81 символа (контракт очереди). */
+export function characterJobId(shotId: string, workflow: string, character: string, stamp: number): string {
+  const safe = character.toLowerCase().replace(/[^a-z0-9_-]/g, "") || "x";
+  const id = `${shotId}-${workflow}-${safe}-${stamp}`;
+  return id.length <= 81 ? id : id.slice(0, 81);
+}
+
 function jobPath(id: string): string {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$/.test(id)) {
     throw new Error("id задания: латиница, цифры, точка, _ и -");

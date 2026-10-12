@@ -42,12 +42,13 @@ There is no `env/` folder. Older notes called this file `S<number>/env/env.png`.
 
 ## Which graph
 
-The stage "Воркфлоу" menu has two options:
+The stage "Воркфлоу" menu has three options:
 
 | Option | When |
 | --- | --- |
 | `location_views` — «Локация: 4 ракурса по общему виду» (Qwen, order 10) | The location exists in `data/locations/` or its general view is in `refs/`. You need the same room from another point. It keeps the room |
 | `location_krea2` — «Локация с нуля: Krea 2 по тексту» (order 20) | The location is not in the library. Or a fresh take on the space is needed, for example a future `view.png` for a new library folder. A picture in `refs/` is only a meaning reference: Krea 2 draws the room anew |
+| `location_firered` — «Локация из референсов: FireRed» (order 30) | A new location is built from 1–3 pictures the user placed in `refs/`. Prompt: `playbooks/models/firered_location.en.md`. A run will not take more than three references |
 
 By default the board takes the first available one: with a general view, `location_views`; without one, `location_krea2` (it does not need a picture). To use Krea 2 when a general view exists, the user picks it in the menu. If you think Krea 2 fits better, say so with `suggestedWorkflow: "location_krea2"`.
 

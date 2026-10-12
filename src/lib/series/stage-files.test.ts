@@ -120,21 +120,25 @@ test("входы видео: утверждённый первый кадр", ()
   assert.deepEqual(start?.files.map((file) => file.name), ["ff.png"]);
 });
 
-test("входы персонажей: база из библиотеки и образцы одежды из refs/", () => {
+test("входы персонажей: одна база и один образец одежды, остальные refs не входят", () => {
   const katya = path.join(getCharactersRoot(), "Katya");
   fs.mkdirSync(katya, { recursive: true });
   fs.writeFileSync(path.join(katya, "full_body.png"), PNG);
   fs.writeFileSync(path.join(katya, "portrait.png"), PNG);
   fs.writeFileSync(path.join(katya, "notes.png"), PNG);
   put("characters", "refs", "katya_outfit.png");
+  put("characters", "refs", "katya_clothes.png");
 
   const inputs = stageInputs("e01", "s01", "characters");
   const base = inputs.find((input) => input.label === "Персонаж katya");
-  assert.deepEqual(base?.files.map((file) => file.name), ["full_body.png", "portrait.png"]);
-  assert.equal(base?.source, "библиотека data/characters/Katya/");
+  assert.deepEqual(base?.files.map((file) => file.name), ["full_body.png"]);
+  assert.equal(base?.source, "библиотека data/characters/Katya/ (full_body.png).");
   assert.match(base!.files[0].url, /^\/api\/media\/characters\/Katya\/full_body\.png/);
+  const clothes = inputs.find((input) => input.label === "Одежда katya");
+  assert.deepEqual(clothes?.files.map((file) => file.name), ["katya_clothes.png"]);
+  assert.equal(inputs.some((input) => input.files.some((file) => file.name === "katya_outfit.png")), false);
 
-  // Старые имена из исходных заметок, как у Лены: body.png, portret.png, portret_side.png; копии не берутся.
+  // Старое имя базы, как у Лены: body.png. Копии не берутся. Лист не режется.
   const lena = path.join(getCharactersRoot(), "Lena");
   fs.mkdirSync(lena, { recursive: true });
   for (const name of ["body.png", "portret.png", "portret_side.png", "portret - Copy.png"]) {
@@ -142,13 +146,13 @@ test("входы персонажей: база из библиотеки и о�
   }
   fs.writeFileSync(path.join(shotDir("e01", "s01"), "shot.md"), "# Кафе\n\n- characters: katya, lena, mark\n- location: cafe\n");
   const withLena = stageInputs("e01", "s01", "characters").find((input) => input.label === "Персонаж lena");
-  assert.deepEqual(withLena?.files.map((file) => file.name), ["body.png", "portret.png", "portret_side.png"]);
+  assert.deepEqual(withLena?.files.map((file) => file.name), ["body.png"]);
+  assert.match(withLena!.source, /Положите full_body\.png во весь рост/);
 
   const mark = inputs.find((input) => input.label === "Персонаж mark");
   assert.equal(mark?.files.length, 0);
-  assert.match(mark!.source, /^пусто: нет папки data\/characters\/mark\//);
-
-  const outfit = inputs.find((input) => input.label === "Образцы одежды");
-  assert.deepEqual(outfit?.excluded, []);
-  assert.deepEqual(outfit?.files.map((file) => file.name), ["katya_outfit.png"]);
+  assert.equal(mark!.source, "нет базы для mark: положите картинку в data/characters/mark/");
+  const markClothes = inputs.find((input) => input.label === "Одежда mark");
+  assert.equal(markClothes?.files.length, 0);
+  assert.match(markClothes!.source, /image 2: образец одежды/);
 });

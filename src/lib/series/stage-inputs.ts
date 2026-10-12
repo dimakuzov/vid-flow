@@ -9,8 +9,9 @@ import {
   type ShotContext,
 } from "../comfy/binding";
 import { resolveWorkflowId } from "../comfy/workflows";
+import { characterBaseImage, characterFolder, missingCharacterBase, missingCharacterClothes } from "./character-base";
 import { STAGE_LABELS, type StageId } from "./constants";
-import { listMediaFiles, mediaKind, mediaUrlPath } from "./media";
+import { mediaKind, mediaUrlPath } from "./media";
 import { getCharactersRoot, getDataRoot, getLocationsRoot, stageDir, toPosix } from "./paths";
 import { excludedFiles, readRunSettings } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
@@ -20,34 +21,6 @@ import type { MediaFile, StageInput } from "./types";
  * Входы этапа для страницы: что граф возьмёт по умолчанию, даже если это утверждено
  * на другом этапе или лежит в общей библиотеке. Только чтение.
  */
-
-/**
- * База персонажа в data/characters/{name}/, по порядку показа: каноническое имя и старые имена
- * из исходных заметок (`body.png`, `portret.png`, `portret_side.png`).
- */
-const CHARACTER_BASE = [
-  ["full_body.png", "body.png"],
-  ["portrait.png", "portret.png"],
-  ["side.png", "portret_side.png"],
-];
-const IMAGE = /\.(png|jpe?g|webp)$/i;
-
-/** Картинки базы: канонические или старые имена; нет ни одного — любые картинки папки, кроме копий. */
-function characterBaseFiles(folder: string): string[] {
-  const named = CHARACTER_BASE.map((names) => names.map((name) => path.join(folder, name)).find((file) => fs.existsSync(file)))
-    .filter((file): file is string => Boolean(file));
-  if (named.length) return named;
-  try {
-    return fs
-      .readdirSync(folder)
-      .filter((name) => IMAGE.test(name) && !/copy/i.test(name))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-      .map((name) => path.join(folder, name))
-      .filter((file) => fs.statSync(file).isFile());
-  } catch {
-    return [];
-  }
-}
 
 function mediaFileAt(absolute: string): MediaFile | null {
   const relativePath = mediaUrlPath(absolute);
@@ -64,16 +37,6 @@ function mediaFileAt(absolute: string): MediaFile | null {
     kind: mediaKind(absolute),
     url: `/api/media/${relativePath.split("/").map(encodeURIComponent).join("/")}?v=${version}`,
   };
-}
-
-function libraryFolder(root: string, name: string): string | null {
-  if (!name) return null;
-  try {
-    const found = fs.readdirSync(root).find((item) => item.toLowerCase() === name.toLowerCase());
-    return found ? path.join(root, found) : null;
-  } catch {
-    return null;
-  }
 }
 
 function dataLabel(absoluteDir: string): string {
@@ -148,31 +111,66 @@ function workflowInputs(ctx: ShotContext): StageInput[] {
     .map((input) => bindingInput(ctx, input));
 }
 
-/** Этап персонажей (воркфлоу доски нет): база каждого персонажа и образцы одежды из refs/. */
+/** Файл пользователя в refs/: `{имя}_base*` или `{имя}_clothes*`. Другие файлы refs/ в граф не идут. */
+function refByStem(ctx: ShotContext, name: string, kind: "base" | "clothes"): string | null {
+  const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
+  let names: string[];
+  try {
+    names = fs.readdirSync(refs);
+  } catch {
+    return null;
+  }
+  const stem = `${name.toLowerCase()}_${kind}`;
+  const found = names
+    .filter((file) => file.toLowerCase().startsWith(stem) && /\.(png|jpe?g|webp)$/i.test(file))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return found[0] ? path.join(refs, found[0]) : null;
+}
+
+/**
+ * В граф идут база и, если пользователь положил, образец одежды.
+ * База: refs/{имя}_base.*, иначе библиотека. Нет образца — нода image 2 в bypass.
+ * Не full_body.png — подсказка положить картинку во весь рост. Лист доска не режет.
+ */
 function characterInputs(ctx: ShotContext): StageInput[] {
   const { episodeId, shotId, stageId } = ctx;
   const excluded = excludedFiles(episodeId, shotId, stageId);
-  const inputs: StageInput[] = readShotMeta(episodeId, shotId).characters.map((name) => {
-    const folder = libraryFolder(getCharactersRoot(), name);
-    return {
+  const inputs: StageInput[] = [];
+  for (const name of readShotMeta(episodeId, shotId).characters) {
+    const fromRefs = refByStem(ctx, name, "base");
+    const folder = characterFolder(name);
+    const fromLibrary = folder ? characterBaseImage(folder) : null;
+    const chosen = fromRefs ?? fromLibrary;
+    const hint =
+      chosen && path.basename(chosen).toLowerCase() !== "full_body.png"
+        ? " Положите full_body.png во весь рост."
+        : "";
+    let source: string;
+    if (!chosen) {
+      source = missingCharacterBase(name);
+    } else if (fromRefs) {
+      source = `refs/ этого этапа (${path.basename(fromRefs)}).${hint}`;
+    } else {
+      source = `библиотека ${dataLabel(folder!)} (${path.basename(fromLibrary!)}).${hint}`;
+    }
+    inputs.push({
       label: `Персонаж ${name}`,
-      source: folder
-        ? `библиотека ${dataLabel(folder)}`
-        : `пусто: нет папки ${dataLabel(path.join(getCharactersRoot(), name))}`,
-      ...splitExcluded(folder ? mediaFiles(characterBaseFiles(folder)) : [], excluded),
-    };
-  });
-  inputs.push({
-    label: "Образцы одежды",
-    source: "refs/ этого этапа",
-    ...splitExcluded(listMediaFiles(path.join(stageDir(episodeId, shotId, stageId), "refs")), excluded),
-  });
+      source,
+      ...splitExcluded(chosen ? mediaFiles([chosen]) : [], excluded),
+    });
+    const clothes = refByStem(ctx, name, "clothes");
+    inputs.push({
+      label: `Одежда ${name}`,
+      source: clothes ? `refs/ этого этапа (${path.basename(clothes)}).` : missingCharacterClothes(name),
+      ...splitExcluded(clothes ? mediaFiles([clothes]) : [], excluded),
+    });
+  }
   return inputs;
 }
 
 export function stageInputs(episodeId: string, shotId: string, stageId: StageId): StageInput[] {
   const ctx: ShotContext = { episodeId, shotId, stageId };
-  if (stageBindings(stageId).length) return workflowInputs(ctx);
   if (stageId === "characters") return characterInputs(ctx);
+  if (stageBindings(stageId).length) return workflowInputs(ctx);
   return [];
 }

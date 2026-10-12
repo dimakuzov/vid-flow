@@ -240,6 +240,8 @@ playbooks/workflows/comfy/
 | id | Этап | Граф |
 |---|---|---|
 | `location_views` | location | `location_views_multiple_angles.json` |
+| `location_krea2` | location | `location_krea2_api.json` |
+| `location_firered` | location | `location_firered_edit.json` (FireRed-Image-Edit-1.1, 1–3 картинки из `refs/`) |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
 | `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |

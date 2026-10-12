@@ -11,7 +11,7 @@ JSON графа не редактировать: в очередь подста�
 | Нода | Что | Значение |
 | --- | --- | --- |
 | 10 LoadImage | image 1 — персонаж | база из `data/characters/{name}/` или результат прошлого прохода |
-| 22 LoadImage | image 2 — образец одежды | `refs/` этого этапа. Можно убрать, если одежда описана текстом |
+| 22 LoadImage | image 2 — образец одежды | `refs/{имя}_clothes.*`. Нет файла — нода в bypass |
 | 11 UNETLoader | модель | `qwen_image_2.1_int8_convrot.safetensors`, weight_dtype `default` |
 | 12 CLIPLoader | энкодер | `qwen3vl_8b_int8_convrot.safetensors`, type `qwen_image` |
 | 13 VAELoader | VAE | `qwen_image_2.1_vae_bf16.safetensors` |
@@ -24,7 +24,7 @@ JSON графа не редактировать: в очередь подста�
 
 Шаги, cfg, sampler и LoRA не менять.
 
-Без образца одежды: удалить ноду 22 и ключ `images.image_2` у ноды 17, в тексте не упоминать image 2.
+Нет образца одежды — нода 22 («image 2: образец одежды») в bypass: из промпта уходят нода 22 и ключ `images.image_2` у ноды 17. В тексте image 2 не упоминать. Другие файлы `refs/` в граф не входят.
 
 ## Команда
 

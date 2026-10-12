@@ -178,8 +178,9 @@ export async function cancelStage(episodeId: string, shotId: string, stageId: St
     const cancelled = cancelAgentRequest(episodeId, shotId, stageId);
     if (cancelled) abortAgentRun(episodeId, cancelled.id);
   }
-  if (file?.jobId && (file.phase === "comfy" || file.phase === "error")) {
-    await cancelComfyJob(file.jobId);
+  if (file?.phase === "comfy" || file?.phase === "error") {
+    const ids = file.jobIds?.length ? file.jobIds : file.jobId ? [file.jobId] : [];
+    for (const id of ids) await cancelComfyJob(id);
   }
   setIdle(episodeId, shotId, stageId);
 }

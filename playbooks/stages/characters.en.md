@@ -4,7 +4,7 @@ English copy for the agent. Russian original: `playbooks/stages/characters.md`.
 
 A shot variant of a character: the clothes of this shot. Face and body come from the base asset, the clothes from a reference in `refs/` or from text. The character stands straight, full length, on a light background: the pose and the place in the frame are set by the `first_frame` stage, not this one.
 
-The run is a Qwen Image 2.1 outfit edit per the “Command” section of `playbooks/workflows/characters_comfy.en.md`, graph `playbooks/workflows/comfy/character_outfit_qwen21.json`. The teaser s07 characters were made this way.
+The board runs the pass: manifest `character_outfit`, graph `playbooks/workflows/comfy/character_outfit_qwen21.json`. The agent writes only `prompt.md` (sections `## name`). The user approves. The teaser s07 characters were made this way.
 
 ## Dependency on the base
 
@@ -17,7 +17,7 @@ data/characters/{name}/
   full_body.png    # full length, light background
 ```
 
-The variant in `data/episodes/{episodeId}/shots/{shotId}/characters/` is built from this base. If there is no canonical name, take an existing png in the character's folder: a sheet (the right panel, one figure) or `body.png`. Do not take the `_old/` folder or files with `Copy` in the name. Do not invent a character without their own picture. Do not mix in old pictures from subfolders.
+The variant in `data/episodes/{episodeId}/shots/{shotId}/characters/` is built from this base. Image 1 is one picture: this shot's `refs/{name}_base.*` when it exists, otherwise `full_body.png`, otherwise `body.png`, otherwise the first picture in the folder whose name has no `copy`. The board does not crop a multi-panel sheet: the stage page shows which picture will be the base, and a hint to put a full-length `full_body.png`. No picture of their own — that character is not run, the others still are. Do not mix in old pictures from subfolders.
 
 ## Shot contract
 
@@ -37,8 +37,9 @@ The approved file: `approve/{name}_{shotId}.png` (example: `lena_s01.png`). It i
 
 | File | Role | From |
 | --- | --- | --- |
-| garment reference (`{name}_outfit.png`, `green_dress.jpg` …) | image 2 — the shot's clothes | a photo or picture of the needed clothes: fully visible, with shoes if they change |
-| `{name}_face.png` | the face for later stages | `portrait.png` or a tight crop when the figure in the shot is small |
+| `{name}_base.*` | image 1, when the user placed the file | a base for this shot. Without it the library picture is used |
+| `{name}_clothes.*` | image 2, when the user placed the file | without it, node «image 2: образец одежды» is bypassed. `{name}_outfit.png` does not enter the graph |
+| `{name}_face.png` | the face for later stages | this graph does not use it |
 
 One item — one reference. A layer that is not visible on the reference (a dress under a jacket) is made in a separate pass.
 
@@ -48,9 +49,9 @@ One item — one reference. A layer that is not visible on the reference (a dres
 2. Outfit edit: image 2 is the garment reference; the text names the layer that changes and keeps the face, hair, pose, framing and background.
 3. If the base's lower garment shows under the new clothes, replace it with the requested layer in a second pass. Write what is worn, not “without trousers”.
 4. If the feet are missing because the frame is cropped, extend the same figure downward.
-5. The best results go to `output/`, the chosen one to `approve/{name}_{shotId}.png`. Set `"status": "done"` in `agent_request.json` only when every character in the shot has such a file. Do not touch `status.json`: the board sets the stage status.
+5. Each run lands in `output/`, and the file name starts with `{name}_{shotId}_v1`. Only the user puts a file in `approve/`. The agent sets `"status": "done"` when `prompt.md` is written. Do not touch `status.json`: the board sets the stage status.
 
-Prompt and parameters: `playbooks/models/qwen_image.en.md`. Running the graph: `playbooks/workflows/characters_comfy.en.md`.
+Prompt: `playbooks/models/qwen_outfit.en.md`. Graph: `playbooks/workflows/characters_comfy.en.md`. Model parameters: `playbooks/models/qwen_image.en.md`.
 
 ## Checked (teaser s07)
 

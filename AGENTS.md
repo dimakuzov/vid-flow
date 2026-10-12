@@ -46,9 +46,9 @@ A shot with no specific characters and no specific location is made directly in 
 
 ## Characters stage
 
-If the inbox item is `characters`, the paperwork above is not the result. Run ComfyUI with the command in `playbooks/workflows/characters_comfy.md` (English: `playbooks/workflows/characters_comfy.en.md`). Claude follows the same section.
+If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md` (Russian: `qwen_outfit.md`).
 
-ComfyUI is at `http://127.0.0.1:8188/`. Do not edit the graph JSON. Do not run `update_comfyui.bat`. The pass is an outfit edit with `character_outfit_qwen21.json`: image 1 is the character, image 2 is the garment reference. Set `"status": "done"` in `agent_request.json` only when every character in the shot has `approve/{name}_{shotId}.png` and the clothes on it match the user message. Do not write `status.json`.
+The board runs ComfyUI, one job per character, into `output/`. Do not queue Comfy, do not edit the graph JSON, do not copy files into `approve/`. The user approves. Graph: `character_outfit_qwen21.json`, manifest `character_outfit`. Image 1 is the character base (`refs/{name}_base.*` if the user put it there, otherwise `data/characters/{name}/`). Image 2 is `refs/{name}_clothes.*` when the user placed that file. With only the base, node «image 2: образец одежды» is bypassed. Other files in `refs/` do not enter this graph. Set `"status": "done"` in `agent_request.json` when `prompt.md` is written. Do not write `status.json`.
 
 ## Do not
 - Delete `output/` or `approve/` without explicit user confirmation. The trash button on a board file card in `output/` is that confirmation and the board deletes the file itself; an agent still never deletes from these folders on its own. In `refs/` the board has no trash: «Убрать» only keeps a file out of this stage's graph (`run_settings.json` → `excluded`). Do not use excluded files, and do not delete or restore them
