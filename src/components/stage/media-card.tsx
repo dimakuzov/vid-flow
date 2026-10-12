@@ -39,6 +39,8 @@ export function MediaCard({
   onOpen,
   onRemove,
   caption,
+  captionTitle,
+  onEdit,
   onApprove,
   onDelete,
   compact,
@@ -51,6 +53,10 @@ export function MediaCard({
   onOpen?: () => void;
   onRemove?: () => void;
   caption?: string;
+  /** Подсказка подписи: промпт правки, из которой сделан файл. */
+  captionTitle?: string;
+  /** «Править» — только у картинки. */
+  onEdit?: () => void;
   onApprove?: () => void;
   /** Корзина: удалить файл с диска. Подтверждение спрашивает вызывающий. */
   onDelete?: () => void;
@@ -62,6 +68,12 @@ export function MediaCard({
   onToggleExclude?: () => void;
 }) {
   const shownCaption = [excluded ? "убран из графа" : "", caption ?? ""].filter(Boolean).join(" · ");
+  const editButton =
+    onEdit && file.kind === "image" ? (
+      <button type="button" onClick={onEdit} className="shrink-0 text-stone-500 underline hover:text-stone-800">
+        Править
+      </button>
+    ) : null;
   return (
     <div
       className={`w-full min-w-0 rounded-xl border p-2 text-left ${
@@ -101,21 +113,24 @@ export function MediaCard({
           <button
             type="button"
             onClick={onSelect}
+            title={captionTitle}
             className="min-w-0 flex-1 truncate text-left text-xs text-stone-600"
           >
             {selected ? "Выбрано · " : ""}
             {shownCaption ? `${shownCaption} · ` : ""}
             {file.name}
           </button>
+          {editButton}
           {onToggleExclude ? <ExcludeButton excluded={Boolean(excluded)} onToggle={onToggleExclude} /> : null}
           {onDelete ? <DeleteButton name={file.name} onDelete={onDelete} /> : null}
         </div>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2 text-xs text-stone-600">
-          <span className="truncate">
+          <span className="truncate" title={captionTitle}>
             {shownCaption ? `${shownCaption} · ` : ""}
             {file.name}
           </span>
+          {editButton}
           {onToggleExclude ? <ExcludeButton excluded={Boolean(excluded)} onToggle={onToggleExclude} /> : null}
           {onRemove ? (
             <button type="button" onClick={onRemove} className="shrink-0 text-stone-500 underline">

@@ -14,10 +14,13 @@ export function PromptHistory({
 }) {
   if (!versions.length) {
     return (
-      <p className="text-xs text-stone-500">
-        Это текущий промпт. Следующая сохранённая правка оставит его в списке, и его можно будет
-        вернуть.
-      </p>
+      <details className="text-xs text-stone-500">
+        <summary className="cursor-pointer">Прошлые версии промпта</summary>
+        <p className="mt-2">
+          Это текущий промпт. Следующая сохранённая правка оставит его в списке, и его можно будет
+          вернуть.
+        </p>
+      </details>
     );
   }
   return (

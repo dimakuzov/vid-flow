@@ -12,8 +12,9 @@ export function stagePagePath(episodeId: string, shotId: string, stageId: string
   return `/e/${encodeURIComponent(episodeId)}/shots/${encodeURIComponent(shotId)}/${encodeURIComponent(stageId)}`;
 }
 
-export function episodePagePath(episodeId: string): string {
-  return `/e/${encodeURIComponent(episodeId)}`;
+export function episodePagePath(episodeId: string, shotId?: string): string {
+  const base = `/e/${encodeURIComponent(episodeId)}`;
+  return shotId ? `${base}?shot=${encodeURIComponent(shotId)}` : base;
 }
 
 /** JSON-запрос. Ошибка сервера (`{ error }`) превращается в исключение с её текстом. */

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { episodePagePath, errorText, requestJson } from "@/components/stage/api";
+import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
+import { episodePagePath, errorText, requestJson, stagePagePath } from "@/components/stage/api";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
@@ -50,11 +51,13 @@ export function SeriesBoard({
   initialPreview: BootstrapPreview;
 }) {
   const router = useRouter();
+  const focusShot = useSearchParams().get("shot");
   const [pending, setPending] = useState(false);
   const [series, setSeries] = useState(initialSeries);
   const [seenSeries, setSeenSeries] = useState(initialSeries);
   const [newEpisodeOpen, setNewEpisodeOpen] = useState(false);
   const [headerMessage, setHeaderMessage] = useState("");
+  const [cell, setCell] = useState<{ shot: number; stage: number } | null>(null);
   const reloadInFlight = useRef(false);
   // Эпизод страницы задаётся URL (/e/{episodeId}); на смену эпизода страница монтируется заново.
   const episodeId = initialSeries.episodeId;
@@ -113,6 +116,51 @@ export function SeriesBoard({
 
   const onChanged = useCallback(() => reload(), [reload]);
   const withoutAgent = series.shots.filter((shot) => !shot.agent).length;
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!episodeId || !series.shots.length) return;
+      if (isTypingTarget(event.target) || overlayOpen()) return;
+      if (event.target instanceof HTMLElement && event.target.closest("button, a, select")) {
+        if (event.key === "Enter") return;
+      }
+      const shots = series.shots.length;
+      const stages = STAGES.length;
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowUp" ||
+        event.key === "ArrowDown"
+      ) {
+        event.preventDefault();
+        setCell((prev) => {
+          if (!prev) return { shot: 0, stage: 0 };
+          if (event.key === "ArrowRight") return { shot: prev.shot, stage: (prev.stage + 1) % stages };
+          if (event.key === "ArrowLeft") return { shot: prev.shot, stage: (prev.stage + stages - 1) % stages };
+          if (event.key === "ArrowDown") return { shot: (prev.shot + 1) % shots, stage: prev.stage };
+          return { shot: (prev.shot + shots - 1) % shots, stage: prev.stage };
+        });
+        return;
+      }
+      if (event.key === "Enter" && !event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && cell) {
+        const shot = series.shots[cell.shot];
+        const stageId = STAGES[cell.stage];
+        if (!shot || !stageId) return;
+        event.preventDefault();
+        router.push(stagePagePath(episodeId, shot.id, stageId));
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cell, episodeId, router, series.shots]);
+
+  useEffect(() => {
+    if (!focusShot) return;
+    const row = [...document.querySelectorAll<HTMLElement>(`[data-shot="${CSS.escape(focusShot)}"]`)].find(
+      (item) => item.getClientRects().length > 0,
+    );
+    row?.scrollIntoView({ block: "start" });
+  }, [focusShot, series.shots]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -229,12 +277,18 @@ export function SeriesBoard({
               ))}
             </div>
             <div className="space-y-6 md:hidden">
-              {series.shots.map((shot) => (
-                <div key={shot.id} className="space-y-2">
+              {series.shots.map((shot, shotIndex) => (
+                <div key={shot.id} data-shot={shot.id} className="scroll-mt-4 space-y-2">
                   <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                   <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-                    {STAGES.map((stageId) => (
-                      <div key={stageId} className="min-w-0">
+                    {STAGES.map((stageId, stageIndex) => (
+                      <div
+                        key={stageId}
+                        data-selected={cell?.shot === shotIndex && cell?.stage === stageIndex ? "true" : undefined}
+                        className={`min-w-0 rounded-xl ${
+                          cell?.shot === shotIndex && cell?.stage === stageIndex ? "ring-2 ring-teal-700" : ""
+                        }`}
+                      >
                         <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
                           {STAGE_LABELS[stageId]}
                         </div>
@@ -271,13 +325,19 @@ export function SeriesBoard({
                   </tr>
                 </thead>
                 <tbody>
-                  {series.shots.map((shot) => (
-                    <tr key={shot.id}>
+                  {series.shots.map((shot, shotIndex) => (
+                    <tr key={shot.id} data-shot={shot.id} className="scroll-mt-4">
                       <td className="align-top">
                         <ShotHeader shot={shot} episodeId={episodeId} onChanged={onChanged} />
                       </td>
-                      {STAGES.map((stageId) => (
-                        <td key={stageId} className="align-top">
+                      {STAGES.map((stageId, stageIndex) => (
+                        <td
+                          key={stageId}
+                          data-selected={cell?.shot === shotIndex && cell?.stage === stageIndex ? "true" : undefined}
+                          className={`align-top rounded-xl ${
+                            cell?.shot === shotIndex && cell?.stage === stageIndex ? "ring-2 ring-teal-700" : ""
+                          }`}
+                        >
                           <StageCell
                             episodeId={episodeId}
                             shotId={shot.id}
