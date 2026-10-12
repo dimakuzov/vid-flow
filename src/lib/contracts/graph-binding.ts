@@ -39,11 +39,46 @@ export interface ImageInput {
   label: string;
 }
 
+/** Нода промпта в графе, который ComfyUI записал в ролик (ключ `prompt`). */
+export interface PromptNodeRef {
+  node: string;
+  field: string;
+}
+
+/**
+ * Как узнать, каким графом сделан ролик: нода в метаданных, иначе подстрока имени файла.
+ * Метаданные важнее имени: файл могли переименовать при утверждении.
+ */
+export interface SketchMatch {
+  /** Имя входа kind: video этого манифеста. Берётся самый новый файл. */
+  of: string;
+  /** Ролик сделан этим графом, если в метаданных есть такая нода с непустым текстом. Первая подходящая. */
+  nodes: PromptNodeRef[];
+  /** Запасной признак, только если метаданных нет: подстрока имени файла, например `_ltx`. */
+  filename?: string;
+}
+
 export interface TextInput {
   kind: "text";
-  /** Текст для модели — только prompt.md, без фильтров. */
-  from: "prompt";
-  /** Чей prompt.md: по умолчанию этого этапа. Например, финал берёт исходный Wan-промпт у video_preview. */
+  /**
+   * `prompt` — prompt.md.
+   * `approve-meta` — текст ноды из метаданных самого нового ролика входа `of`
+   * (SaveVideo пишет граф в ключ `prompt` контейнера mp4/mov).
+   */
+  from: "prompt" | "approve-meta";
+  /** Для approve-meta: имя входа kind: video, чей самый новый файл читать. */
+  of?: string;
+  /** Для approve-meta: ноды промпта в сохранённом графе. Первая, у которой в поле непустой текст. */
+  nodes?: PromptNodeRef[];
+  /**
+   * Для approve-meta: нет метаданных или нет ни одной ноды — взять prompt.md.
+   * Чей файл — поле `stage` (нет — этап запуска).
+   */
+  fallback?: "prompt";
+  /**
+   * Чей prompt.md: по умолчанию этого этапа.
+   * Для `from: prompt` — откуда читать. Для `approve-meta` — чей prompt.md запасной.
+   */
   stage?: StageId;
   /** Пустой prompt.md — ошибка, если true. */
   required: boolean;
@@ -189,6 +224,12 @@ export interface GraphBinding {
    * Подходящего нет — первый доступный.
    */
   defaultWhen?: "speech" | "dialogue" | "silent";
+  /**
+   * Вариант по умолчанию, если утверждённый ролик сделан этим графом.
+   * Важнее `defaultWhen`: эскиз LTX → финал LTX, даже если в кадре есть реплики.
+   * Нет совпадения — обычные правила `defaultWhen`.
+   */
+  whenSketch?: SketchMatch;
   /**
    * `cloud` — прогон идёт в Comfy Cloud (платно, ключ COMFY_CLOUD_API_KEY), только с разрешением
    * пользователя на этот запуск. Нет поля — локальный ComfyUI.

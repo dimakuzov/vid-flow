@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { ApiPrompt } from "../contracts/comfy-job";
+import { appendRunLog } from "../agent/files";
 import type {
   BindingInput,
   BindingSlot,
@@ -10,6 +11,7 @@ import type {
   ImageSource,
   NodeTarget,
   NumberInput,
+  PromptNodeRef,
   Removal,
   TextInput,
   TextStep,
@@ -115,8 +117,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       }
       if (!["first", "newest", "all"].includes(input.pick)) fail(`вход ${name}: pick ${input.pick}`);
     } else if (input.kind === "text") {
-      if (input.from !== "prompt") fail(`вход ${name}: текст берётся только из prompt`);
-      if (input.stage !== undefined && !STAGES.includes(input.stage)) fail(`вход ${name}: неизвестный этап ${input.stage}`);
+      validateTextInput(name, input, inputs, fail);
       if (input.sections !== undefined) {
         if (!input.sections.length) fail(`вход ${name}: пустой sections`);
         for (const section of input.sections) {
@@ -146,6 +147,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       fail(`вход ${name}: неизвестный kind ${(input as { kind: string }).kind}`);
     }
   }
+  validateWhenSketch(binding, inputs, fail);
 
   const nodeRef = (node: string, field: string | undefined, what: string, json?: string) => {
     const target = graph[node];
@@ -216,6 +218,54 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       fail(`${what}: значение должно быть input, inputs, seed, template или const`);
     }
   });
+}
+
+/** Текст из prompt.md или из метаданных ролика. of/nodes/fallback — только у approve-meta. */
+function validateTextInput(
+  name: string,
+  input: TextInput,
+  inputs: Record<string, BindingInput>,
+  fail: (message: string) => never,
+): void {
+  if (input.stage !== undefined && !STAGES.includes(input.stage)) fail(`вход ${name}: неизвестный этап ${input.stage}`);
+  if (input.from === "prompt") {
+    if (input.of !== undefined || input.nodes !== undefined || input.fallback !== undefined) {
+      fail(`вход ${name}: of, nodes и fallback только у from: approve-meta`);
+    }
+    return;
+  }
+  if (input.from !== "approve-meta") fail(`вход ${name}: текст берётся из prompt или approve-meta`);
+  const source = input.of ? inputs[input.of] : undefined;
+  if (!source || source.kind !== "video") fail(`вход ${name}: of должен указывать на вход kind: video`);
+  if (source.pick !== "newest") fail(`вход ${name}: у входа ${input.of} pick должен быть newest (самый новый ролик)`);
+  if (!input.nodes?.length) fail(`вход ${name}: нужен список nodes — ноды промпта в сохранённом графе`);
+  for (const ref of input.nodes) {
+    if (!ref?.node || !ref.field) fail(`вход ${name}: nodes — пары { node, field }`);
+  }
+  if (input.fallback !== undefined && input.fallback !== "prompt") fail(`вход ${name}: fallback может быть только prompt`);
+}
+
+/**
+ * whenSketch смотрит на ролик другого графа: ноды из манифеста не проверяются против графа этого варианта.
+ * Иначе финал LTX не смог бы узнать Wan-ролик и наоборот.
+ */
+function validateWhenSketch(
+  binding: GraphBinding,
+  inputs: Record<string, BindingInput>,
+  fail: (message: string) => never,
+): void {
+  const match = binding.whenSketch;
+  if (match === undefined) return;
+  const source = match.of ? inputs[match.of] : undefined;
+  if (!source || source.kind !== "video") fail("whenSketch.of должен указывать на вход kind: video");
+  if (source.pick !== "newest") fail(`whenSketch: у входа ${match.of} pick должен быть newest`);
+  if (!match.nodes?.length) fail("whenSketch: нужен список nodes");
+  for (const ref of match.nodes) {
+    if (!ref?.node || !ref.field) fail("whenSketch.nodes — пары { node, field }");
+  }
+  if (match.filename !== undefined && (typeof match.filename !== "string" || !match.filename.trim() || /[\\/]/.test(match.filename))) {
+    fail("whenSketch.filename — непустая подстрока имени файла, без пути");
+  }
 }
 
 function loadOne(file: string): LoadedBinding {
@@ -586,6 +636,220 @@ export function sectionText(text: string, input: TextInput, section: string | un
   return parts.get(section) ?? "";
 }
 
+// ---------- промпт из метаданных ролика ----------
+
+/**
+ * SaveVideo (ComfyUI) кладёт граф API в метаданные контейнера mp4/mov: ключ `prompt`,
+ * значение — JSON графа. Флаг ffmpeg `use_metadata_tags` пишет его в `moov/udta/meta`:
+ * атом `keys` (имена `mdta`) и `ilst` (значение в атоме `data`, тип 1 — UTF-8).
+ * CreateVideo файл не пишет. Нет ключа или это не объект — метаданных промпта нет.
+ */
+export function readVideoPromptText(
+  file: string,
+  nodes: PromptNodeRef[],
+): { metadata: boolean; text: string | null } {
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch {
+    return { metadata: false, text: null };
+  }
+  const raw = readPromptTag(bytes);
+  if (raw == null) return { metadata: false, text: null };
+  const graph = parsePromptGraph(raw);
+  if (!graph) return { metadata: false, text: null };
+  return { metadata: true, text: textAtNodes(graph, nodes) };
+}
+
+function textAtNodes(graph: Record<string, unknown>, nodes: PromptNodeRef[]): string | null {
+  for (const ref of nodes) {
+    const node = graph[ref.node];
+    if (!node || typeof node !== "object") continue;
+    const inputs = (node as { inputs?: unknown }).inputs;
+    if (!inputs || typeof inputs !== "object") continue;
+    const value = (inputs as Record<string, unknown>)[ref.field];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function parsePromptGraph(raw: string): Record<string, unknown> | null {
+  try {
+    let value: unknown = JSON.parse(raw);
+    if (typeof value === "string") value = JSON.parse(value);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function readPromptTag(bytes: Buffer): string | null {
+  const metas: { start: number; end: number }[] = [];
+  const collect = (start: number, end: number) => {
+    walkBoxes(bytes, start, end, (type, contentStart, contentEnd) => {
+      if (type === "meta") metas.push({ start: contentStart + 4, end: contentEnd });
+      else if (type === "moov" || type === "udta") collect(contentStart, contentEnd);
+    });
+  };
+  collect(0, bytes.length);
+  for (const meta of metas) {
+    if (meta.start >= meta.end) continue;
+    const tags = readMetaTags(bytes, meta.start, meta.end);
+    const prompt = tags.get("prompt");
+    if (prompt != null) return prompt;
+  }
+  return null;
+}
+
+function readMetaTags(bytes: Buffer, start: number, end: number): Map<string, string> {
+  let names: string[] = [];
+  const values = new Map<number, string>();
+  walkBoxes(bytes, start, end, (type, contentStart, contentEnd) => {
+    if (type === "keys") names = readMdtaKeys(bytes, contentStart, contentEnd);
+    else if (type === "ilst") readIlst(bytes, contentStart, contentEnd, values);
+  });
+  const tags = new Map<string, string>();
+  names.forEach((name, index) => {
+    const value = values.get(index + 1);
+    if (name && value != null) tags.set(name, value);
+  });
+  return tags;
+}
+
+/** `keys` — full box: версия, число имён, затем атомы `mdta` с именем. */
+function readMdtaKeys(bytes: Buffer, start: number, end: number): string[] {
+  if (start + 8 > end) return [];
+  const count = bytes.readUInt32BE(start + 4);
+  const names: string[] = [];
+  let offset = start + 8;
+  for (let index = 0; index < count && offset + 8 <= end; index += 1) {
+    const size = bytes.readUInt32BE(offset);
+    if (size < 8 || offset + size > end) break;
+    const kind = bytes.toString("latin1", offset + 4, offset + 8);
+    names.push(kind === "mdta" ? bytes.toString("utf8", offset + 8, offset + size) : "");
+    offset += size;
+  }
+  return names;
+}
+
+/** `ilst`: размер, индекс ключа (с 1), атом `data`. */
+function readIlst(bytes: Buffer, start: number, end: number, values: Map<number, string>): void {
+  let offset = start;
+  while (offset + 8 <= end) {
+    const size = bytes.readUInt32BE(offset);
+    const index = bytes.readUInt32BE(offset + 4);
+    if (size < 8 || offset + size > end) break;
+    const text = readDataString(bytes, offset + 8, offset + size);
+    if (text != null) values.set(index, text);
+    offset += size;
+  }
+}
+
+function readDataString(bytes: Buffer, start: number, end: number): string | null {
+  let offset = start;
+  while (offset + 16 <= end) {
+    const size = bytes.readUInt32BE(offset);
+    if (size < 16 || offset + size > end) break;
+    const kind = bytes.toString("latin1", offset + 4, offset + 8);
+    if (kind === "data" && bytes.readUInt32BE(offset + 8) === 1) {
+      return bytes.toString("utf8", offset + 16, offset + size);
+    }
+    offset += size;
+  }
+  return null;
+}
+
+function walkBoxes(
+  bytes: Buffer,
+  start: number,
+  end: number,
+  visit: (type: string, contentStart: number, contentEnd: number) => void,
+): void {
+  let offset = start;
+  while (offset + 8 <= end) {
+    let size = bytes.readUInt32BE(offset);
+    const type = bytes.toString("latin1", offset + 4, offset + 8);
+    let header = 8;
+    if (size === 1) {
+      if (offset + 16 > end) return;
+      const large = bytes.readBigUInt64BE(offset + 8);
+      if (large > BigInt(Number.MAX_SAFE_INTEGER)) return;
+      size = Number(large);
+      header = 16;
+    } else if (size === 0) {
+      size = end - offset;
+    }
+    if (size < header || offset + size > end) return;
+    visit(type, offset + header, offset + size);
+    offset += size;
+  }
+}
+
+interface ResolvedText {
+  text: string;
+  /** Куда смотреть в тексте ошибки. */
+  where: string;
+  /** Почему взяли prompt.md: нет метаданных или в них нет текста нод. null — взяли ролик. */
+  note: string | null;
+}
+
+/** Текст входа. approve-meta читает самый новый ролик `of`; нет текста — fallback prompt.md. */
+function resolveTextInput(
+  ctx: ShotContext,
+  binding: GraphBinding,
+  input: TextInput,
+  readPrompt: (stage: StageId) => string,
+  promptMd: string,
+): ResolvedText {
+  if (input.from !== "approve-meta") {
+    const own = !input.stage || input.stage === ctx.stageId;
+    return {
+      text: own ? promptMd : readPrompt(input.stage!),
+      where: own ? "prompt.md" : `prompt.md этапа ${input.stage}`,
+      note: null,
+    };
+  }
+  const source = binding.inputs[input.of ?? ""];
+  const file = source && (source.kind === "video" || source.kind === "image") ? resolveImageInput(ctx, source)[0] : undefined;
+  const read = file && input.nodes ? readVideoPromptText(file, input.nodes) : { metadata: false, text: null };
+  if (read.text) {
+    return { text: read.text, where: `метаданные ${path.basename(file!)}`, note: null };
+  }
+  const stage = input.stage ?? ctx.stageId;
+  const own = stage === ctx.stageId;
+  const where = own ? "prompt.md" : `prompt.md этапа ${stage}`;
+  if (input.fallback !== "prompt") return { text: "", where, note: null };
+  const reason = !file
+    ? "Утверждённого ролика нет."
+    : !read.metadata
+      ? `В файле ${path.basename(file)} нет метаданных промпта (SaveVideo, ключ prompt).`
+      : `В метаданных ${path.basename(file)} нет текста промпта в нодах манифеста.`;
+  return {
+    text: own ? promptMd : readPrompt(stage),
+    where,
+    note: `${reason} В запуск ушёл ${where}.`,
+  };
+}
+
+/** Та же пометка, что buildPrompt пишет в run_log.md. null — у выбранного воркфлоу метаданные ролика на месте. */
+export function sketchPromptTaskNote(ctx: ShotContext, binding: GraphBinding): string | null {
+  const readPrompt = (stage: StageId) =>
+    readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "prompt.md")).trim();
+  const promptMd = readPrompt(ctx.stageId);
+  const notes: string[] = [];
+  for (const input of Object.values(binding.inputs)) {
+    if (input.kind !== "text") continue;
+    const resolved = resolveTextInput(ctx, binding, input, readPrompt, promptMd);
+    if (resolved.note && (resolved.text.trim() || input.required)) notes.push(resolved.note);
+  }
+  return notes.length ? notes.join("\n") : null;
+}
+
+function noteSketchFallback(ctx: ShotContext, note: string): void {
+  appendRunLog(ctx.episodeId, ctx.shotId, ctx.stageId, `\n## ${new Date().toISOString()} · доска · промпт эскиза\n\n- ${note}\n`);
+}
+
 // ---------- длительность ролика ----------
 
 /** Длительность mp4/mov в секундах по атому mvhd. null — не нашли. */
@@ -871,15 +1135,15 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       images[name] = resolveImageInput(ctx, input);
       if (images[name].length < imageMin(input)) missing.push(input.label);
     } else if (input.kind === "text") {
-      const own = !input.stage || input.stage === ctx.stageId;
-      const where = own ? "prompt.md" : `prompt.md этапа ${input.stage}`;
-      texts[name] = own ? promptMd : readPrompt(input.stage!);
+      const resolved = resolveTextInput(ctx, binding, input, readPrompt, promptMd);
+      texts[name] = resolved.text;
+      if (resolved.note && (resolved.text.trim() || input.required)) noteSketchFallback(ctx, resolved.note);
       if (input.required && !texts[name]) {
-        throw new Error(`В ${where} нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.`);
+        throw new Error(`В ${resolved.where} нет текста для модели. Отправь рекомендацию агенту или впиши промпт сам.`);
       }
-      assertModelText(texts[name], where, allowed);
-      if (input.sections) splitSections(texts[name], input.sections, where);
-      if (input.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), where);
+      assertModelText(texts[name], resolved.where, allowed);
+      if (input.sections) splitSections(texts[name], input.sections, resolved.where);
+      if (input.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), resolved.where);
     }
   }
   if (missing.length) throw new Error(`Для «${binding.label}» не хватает: ${missing.join(", ")}.`);

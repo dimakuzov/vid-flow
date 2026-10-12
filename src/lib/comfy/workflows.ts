@@ -1,8 +1,9 @@
+import path from "path";
 import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, WorkflowChoice } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
 import { readShotSpeech, speechSpeakers } from "../series/speech";
-import { missingInputs, stageBindings, type LoadedBinding } from "./binding";
+import { missingInputs, readVideoPromptText, resolveImageInput, stageBindings, type LoadedBinding } from "./binding";
 
 /*
  * Воркфлоу этапа для меню и для запуска (docs/contracts/graph-binding.md):
@@ -31,8 +32,10 @@ export function listWorkflowChoices(
       cloud: binding.target === "cloud" && binding.cost ? binding.cost : null,
     };
   });
-  // По умолчанию — первый доступный, чей defaultWhen подходит кадру: реплики есть — `speech`,
-  // говорящих двое и больше — ещё и `dialogue`, реплик нет — `silent`.
+  // Сначала эскиз: whenSketch важнее реплик (эскиз LTX → финал LTX, даже если в кадре говорят).
+  // Нет совпадения — defaultWhen: реплики есть — `speech`, говорящих двое и больше — ещё и
+  // `dialogue`, реплик нет — `silent`. Подходящего доступного нет — первый доступный.
+  const sketch = choices.find((choice, index) => choice.available && sketchMatches(episodeId, shotId, stageId, loaded[index].binding));
   const speech = readShotSpeech(episodeId, shotId);
   const speaks = speech.trim().length > 0;
   const dialogue = speechSpeakers(speech).length >= 2;
@@ -44,11 +47,28 @@ export function listWorkflowChoices(
     return speaks;
   };
   const fallback =
+    sketch ??
     choices.find((choice, index) => choice.available && fits(index)) ??
     choices.find((choice) => choice.available) ??
     choices[0];
   if (fallback) fallback.isDefault = true;
   return choices;
+}
+
+/**
+ * Утверждённый ролик сделан графом из whenSketch. Метаданные важнее имени файла:
+ * файл могли переименовать. Имя — только когда ключа prompt в контейнере нет.
+ */
+function sketchMatches(episodeId: string, shotId: string, stageId: StageId, binding: GraphBinding | null): boolean {
+  const match = binding?.whenSketch;
+  if (!match) return false;
+  const input = binding?.inputs[match.of];
+  if (!input || input.kind !== "video") return false;
+  const file = resolveImageInput({ episodeId, shotId, stageId }, input)[0];
+  if (!file) return false;
+  const read = readVideoPromptText(file, match.nodes);
+  if (read.metadata) return read.text != null;
+  return Boolean(match.filename && path.basename(file).includes(match.filename));
 }
 
 function findByName(stageId: StageId, raw: string): LoadedBinding | undefined {
