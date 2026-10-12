@@ -4,7 +4,7 @@
   "graph": "qwen21_character_compositing.json",
   "stage": "first_frame",
   "label": "Первый кадр: персонажи в локации",
-  "description": "Вписать утверждённых персонажей (1–2) в утверждённую локацию. Для крупного плана агент добавляет лица фразой «face from image N».",
+  "description": "Вписать утверждённых персонажей в утверждённую локацию. В граф уходят все референсы этапа подряд: локация (image 1), персонажи, затем их портреты — до 6 картинок.",
   "playbook": "models/qwen_first_frame.en.md",
   "order": 10,
   "inputs": {
@@ -19,7 +19,7 @@
       "from": "approve:characters",
       "pick": "all",
       "min": 1,
-      "max": 2,
+      "max": 5,
       "label": "Утверждённые персонажи"
     },
     "faces": {
@@ -27,10 +27,9 @@
       "from": "library:faces",
       "pick": "all",
       "min": 0,
-      "max": 2,
-      "whenPrompt": "\\bface from image \\d+\\b",
+      "max": 5,
       "uploadAs": "{shotId}_face{index}{ext}",
-      "label": "Лица персонажей (только если в промпте есть «face from image N»)"
+      "label": "Портреты персонажей"
     },
     "text": {
       "kind": "text",
@@ -59,7 +58,10 @@
         }
       ],
       "value": {
-        "input": "people",
+        "inputs": [
+          "people",
+          "faces"
+        ],
         "index": 0
       }
     },
@@ -71,7 +73,10 @@
         }
       ],
       "value": {
-        "input": "people",
+        "inputs": [
+          "people",
+          "faces"
+        ],
         "index": 1
       },
       "whenEmpty": {
@@ -94,8 +99,11 @@
         }
       ],
       "value": {
-        "input": "faces",
-        "index": 0
+        "inputs": [
+          "people",
+          "faces"
+        ],
+        "index": 2
       },
       "whenEmpty": {
         "remove": [
@@ -117,8 +125,11 @@
         }
       ],
       "value": {
-        "input": "faces",
-        "index": 1
+        "inputs": [
+          "people",
+          "faces"
+        ],
+        "index": 3
       },
       "whenEmpty": {
         "remove": [
@@ -128,6 +139,32 @@
           {
             "node": "488",
             "field": "images.image_5"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "906",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people",
+          "faces"
+        ],
+        "index": 4
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "906"
+          },
+          {
+            "node": "488",
+            "field": "images.image_6"
           }
         ]
       }

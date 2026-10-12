@@ -107,6 +107,27 @@ test("approveFiles для персонажей: имя файла → слот �
   );
 });
 
+test("approveFiles: в имени файла два персонажа (Lena_mom — мама Лены) — Лена не перезаписывается", () => {
+  for (const [shotId, order] of [
+    ["s21", ["Lena_home_2.png", "Lena_mom_body.png"]],
+    ["s22", ["Lena_mom_body.png", "Lena_home_2.png"]],
+  ] as const) {
+    makeShot("e01", shotId, "# Дом\n\n- characters: lena, mom\n- location: home\n");
+    const output = path.join(stageDir("e01", shotId, "characters"), "output");
+    for (const name of order) fs.writeFileSync(path.join(output, name), Buffer.concat([PNG, Buffer.from(name)]));
+    for (const name of order) approveFiles({ episodeId: "e01", shotId, stageId: "characters", filenames: [name] });
+    const approve = path.join(stageDir("e01", shotId, "characters"), "approve");
+    assert.deepEqual(fs.readdirSync(approve).sort(), [`lena_${shotId}.png`, `mom_${shotId}.png`], shotId);
+    assert.match(fs.readFileSync(path.join(approve, `mom_${shotId}.png`)).toString(), /Lena_mom_body/);
+    assert.match(fs.readFileSync(path.join(approve, `lena_${shotId}.png`)).toString(), /Lena_home_2/);
+    assert.equal(deriveStageStatus("e01", shotId, "characters", ["lena", "mom"]), "approved");
+  }
+  // Новый вариант мамы при занятых обоих слотах — снова мама.
+  const output = path.join(stageDir("e01", "s21", "characters"), "output");
+  fs.writeFileSync(path.join(output, "Lena_mom_v2.png"), PNG);
+  assert.deepEqual(approveFiles({ episodeId: "e01", shotId: "s21", stageId: "characters", filenames: ["Lena_mom_v2.png"] }), ["mom_s21.png"]);
+});
+
 test("deriveStageStatus: активная фаза перекрывает папки", () => {
   const characters = ["katya", "mark"];
   assert.equal(deriveStageStatus("e01", "s01", "characters", characters), "approved");

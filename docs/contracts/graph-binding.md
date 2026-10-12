@@ -88,7 +88,7 @@ playbooks/workflows/comfy/
 
 `clamp: true` (у числа) — значение вне `min..max` прижимается к границе, а не отбрасывается. `{ "seed": "random", "max": N }` — случайный seed не больше `N` (HeyGen: 4294967295). Подходящего доступного нет — первый доступный по `order`.
 
-`whenPrompt` — регэксп (флаг `i`): вход подключается, только если `prompt.md` этапа с ним совпал; иначе вход пуст и срабатывает `whenEmpty`. Так агент сам решает, нужен ли вход. Вход с `whenPrompt` обязан быть необязательным (`min: 0`). Пример — лица первого кадра: `"whenPrompt": "\\bface from image \\d+\\b"`; для крупного плана агент пишет `Her face exactly as the face from image 3`, для среднего и общего фразы нет, и граф получает только персонажей. Номера картинок агент видит в задаче («Images the graph receives»).
+`whenPrompt` — регэксп (флаг `i`): вход подключается, только если `prompt.md` этапа с ним совпал; иначе вход пуст и срабатывает `whenEmpty`. Так агент сам решает, нужен ли вход. Вход с `whenPrompt` обязан быть необязательным (`min: 0`). Пример: `"whenPrompt": "\\bface from image \\d+\\b"` — вход уходит, только если агент написал эту фразу (так раньше подключались лица первого кадра; теперь портреты уходят всегда). Номера картинок агент видит в задаче («Images the graph receives»).
 
 В `prompt.md` нельзя писать пути и имена файлов (`refs/x.png`, `lena_s01.png`): модель видит картинки только по номерам. Такой промпт доска не запускает.
 
@@ -130,6 +130,7 @@ playbooks/workflows/comfy/
 | Вид | Что подставляется |
 |---|---|
 | `{ input, index? }` для картинки | имя загруженного файла (`index` — номер во входе, по умолчанию 0) |
+| `{ inputs: [...], index }` | файл номер `index` из входов подряд (все файлы первого, затем второго…). Так первый кадр заполняет `image_2`…`image_6` персонажами и их портретами без пропусков. Слот обязателен, только если `index` меньше `min` первого входа |
 | `{ input, steps?, templates? }` для текста | текст входа после `steps`, затем первый подходящий шаблон |
 | `{ input }` для числа | число |
 | `{ seed: "random" }` | новое случайное целое |
@@ -226,7 +227,8 @@ playbooks/workflows/comfy/
 | `location_views` | location | `location_views_multiple_angles.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
-| `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, промпт эскиза) |
+| `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |
+| `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с, промпт эскиза) |
 | `final_h3`, `final_h3_768`, `final_h3_768_face` | final_render | `minimax_h3_creator_api.json` (MiniMax H3) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
 

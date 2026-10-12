@@ -1,4 +1,4 @@
-// Лица для крупного плана: вход faces первого кадра включается фразой «face from image N» в prompt.md.
+// Первый кадр: все референсы этапа (локация, персонажи, их портреты) уходят в граф подряд, image 1…6.
 // Настоящий манифест и граф из playbooks/, данные — во временной DATA_ROOT.
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -73,36 +73,35 @@ test("лицо в библиотеке: face/portrait/portret, с именем �
   assert.equal(libraryFace("nobody"), null);
 });
 
-test("без фразы в промпте лица не уходят: граф как раньше", () => {
-  shot("s01", ["lena"]);
-  setPrompt("s01", "Place the girl from image 2 into the hall from image 1. Her face fills the frame.");
-  const { prompt, uploads } = build("s01");
-  assert.equal(prompt["904"], undefined);
-  assert.equal(prompt["905"], undefined);
-  assert.equal(prompt["903"], undefined, "второго персонажа нет");
-  const encoder = prompt["488"].inputs;
-  assert.deepEqual(Object.keys(encoder).filter((key) => key.startsWith("images.")), ["images.image_1", "images.image_2"]);
+test("персонаж без портрета: только локация и персонаж", () => {
+  shot("s00", ["professor"]);
+  setPrompt("s00", "Place the professor from image 2 into the hall from image 1.");
+  const { prompt, uploads } = build("s00");
+  for (const node of ["903", "904", "905", "906"]) assert.equal(prompt[node], undefined, node);
+  const keys = Object.keys(prompt["488"].inputs).filter((key) => key.startsWith("images."));
+  assert.deepEqual(keys, ["images.image_1", "images.image_2"]);
   assert.equal(uploads.length, 2);
 });
 
-test("один персонаж, крупный план: лицо идёт третьей картинкой", () => {
-  setPrompt("s01", "Close-up portrait of the girl from image 2 in the hall from image 1. Her face from image 3 exactly.");
+test("один персонаж: портрет идёт всегда, третьей картинкой, без пропуска в номерах", () => {
+  shot("s01", ["lena"]);
+  setPrompt("s01", "Place the girl from image 2 into the hall from image 1. Her face fills the frame.");
   const { prompt, uploads } = build("s01");
-  assert.equal(prompt["904"].inputs.image, "s01_face0.png");
-  assert.equal(prompt["905"], undefined);
+  assert.equal(prompt["903"].inputs.image, "s01_face0.png");
+  for (const node of ["904", "905", "906"]) assert.equal(prompt[node], undefined, node);
   const keys = Object.keys(prompt["488"].inputs).filter((key) => key.startsWith("images."));
-  assert.deepEqual(keys, ["images.image_1", "images.image_2", "images.image_4"], "нода сожмёт пропуск: лицо — image 3");
+  assert.deepEqual(keys, ["images.image_1", "images.image_2", "images.image_3"]);
   assert.deepEqual(
     uploads.map((upload) => [path.basename(upload.path), upload.filename]),
     [["hall.png", "hall.png"], ["lena_s01.png", "lena_s01.png"], ["portret.png", "s01_face0.png"]],
   );
 });
 
-test("лицо из refs/{name}_face этапа важнее библиотеки; два персонажа — в порядке approve", () => {
+test("портрет из refs/{name}_face этапа важнее библиотеки; два персонажа — в порядке approve", () => {
   shot("s02", ["lena", "julia"]);
   put(path.join(stageDir(EP, "s02", "first_frame"), "refs", "lena_face.jpg"));
-  setPrompt("s02", "Julia's face from image 4, Lena's face from image 5.");
-  const { uploads } = build("s02");
+  setPrompt("s02", "Place Julia (image 2) and Lena (image 3) into the hall from image 1.");
+  const { prompt, uploads } = build("s02");
   assert.deepEqual(
     uploads.map((upload) => [path.basename(upload.path), upload.filename]),
     [
@@ -113,21 +112,38 @@ test("лицо из refs/{name}_face этапа важнее библиотек�
       ["lena_face.jpg", "s02_face1.jpg"],
     ],
   );
+  assert.equal(prompt["906"], undefined);
+  assert.equal(prompt["488"].inputs["images.image_6"], undefined);
 });
 
-test("агенту — номера картинок, лица отдельно и с условием", () => {
+test("агенту — номера всех картинок и что на них", () => {
   const text = renderGraphImages(EP, "s02", "first_frame", WORKFLOW);
   assert.match(text, /- image 1: the location \(hall\.png\)/);
-  assert.match(text, /- image 2: julia \(julia_s02\.png\)/);
-  assert.match(text, /- image 3: lena \(lena_s02\.png\)/);
-  assert.match(text, /`face from image N`[\s\S]*- image 4: julia's face \(Julia_portret\.png\)\n- image 5: lena's face \(lena_face\.jpg\)/);
+  assert.match(text, /- image 2: julia \(approved character[^)]*\) \(julia_s02\.png\)/);
+  assert.match(text, /- image 3: lena \(approved character[^)]*\) \(lena_s02\.png\)/);
+  assert.match(text, /- image 4: portrait of julia \(face reference\) \(Julia_portret\.png\)/);
+  assert.match(text, /- image 5: portrait of lena \(face reference\) \(lena_face\.jpg\)/);
+  assert.doesNotMatch(text, /Not sent/);
   assert.equal(renderGraphImages(EP, "s02", "location", WORKFLOW), "");
 });
 
-test("страница этапа: лица видны, но помечены, пока промпт их не зовёт", () => {
-  setPrompt("s01", "Medium shot of the girl from image 2.");
-  const faces = stageInputs(EP, "s01", "first_frame").find((input) => input.label.startsWith("Лица"));
-  assert.equal(faces?.source, "сейчас не уйдёт: prompt.md этот вход не зовёт");
+test("больше шести картинок: лишние портреты не уходят, агент об этом знает", () => {
+  shot("s03", ["lena", "julia", "ivan"]);
+  setPrompt("s03", "Place Ivan (image 2), Julia (image 3) and Lena (image 4) into the hall from image 1.");
+  const { prompt, uploads } = build("s03");
+  assert.deepEqual(
+    uploads.map((upload) => path.basename(upload.path)),
+    ["hall.png", "ivan_s03.png", "julia_s03.png", "lena_s03.png", "portret_ivan.png", "Julia_portret.png"],
+  );
+  assert.equal(prompt["906"].inputs.image, "s03_face1.png");
+  const text = renderGraphImages(EP, "s03", "first_frame", WORKFLOW);
+  assert.match(text, /- image 6: portrait of julia/);
+  assert.match(text, /Not sent, the graph takes at most 6 images: portret\.png/);
+});
+
+test("страница этапа: портреты показаны как обычный вход", () => {
+  const faces = stageInputs(EP, "s01", "first_frame").find((input) => input.label.startsWith("Портреты"));
+  assert.notEqual(faces?.source, "сейчас не уйдёт: prompt.md этот вход не зовёт");
   assert.deepEqual(faces?.files.map((file) => file.name), ["portret.png"]);
 });
 
@@ -142,9 +158,17 @@ test("манифест: вход с whenPrompt должен быть необя�
   const loaded = stageBindings("first_frame" as StageId).find((item) => item.id === WORKFLOW)!;
   const broken = structuredClone(loaded.binding!) as GraphBinding;
   const faces = broken.inputs.faces as { min?: number; whenPrompt?: string };
+  faces.whenPrompt = "\bface\b";
   faces.min = 1;
   assert.throws(() => validateBinding(broken, loaded.graph!), /min: 0/);
   faces.min = 0;
   faces.whenPrompt = "(";
   assert.throws(() => validateBinding(broken, loaded.graph!), /не регэксп/);
+});
+
+test("манифест: inputs слота — только входы-файлы", () => {
+  const loaded = stageBindings("first_frame" as StageId).find((item) => item.id === WORKFLOW)!;
+  const broken = structuredClone(loaded.binding!) as GraphBinding;
+  (broken.slots[1].value as { inputs: string[] }).inputs = ["people", "text"];
+  assert.throws(() => validateBinding(broken, loaded.graph!), /text не вход-файл/);
 });

@@ -7,6 +7,8 @@ export async function register() {
   // Очередь ComfyUI — модуль 3, связь с агентом — модуль 5. Каждый регистрирует свой цикл сам.
   const { startComfyQueue } = await import("./lib/comfy/queue");
   const { startAgentDispatch } = await import("./lib/series/agent-dispatch");
+  const { startDescriptionLoop } = await import("./lib/series/descriptions");
   startComfyQueue();
   startAgentDispatch();
+  startDescriptionLoop();
 }

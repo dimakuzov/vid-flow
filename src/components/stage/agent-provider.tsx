@@ -117,9 +117,14 @@ export function agentLabel(
  * селектор не показывается, запрос уходит без `provider`.
  * `mode` — что нужно этапу: text, если у него есть доступный воркфлоу доски, иначе agent.
  * `initial` — агент кадра: выбран сразу, пока в этом меню не выбрали другого.
- * Без него — последний выбор в браузере.
+ * Без него — последний выбор в браузере. `stageId` — у этапа может быть своя модель
+ * (`stageModels` провайдера): она важнее агента кадра и браузера, пока в меню не выбрали другую.
  */
-export function useAgentProviders(mode: AgentMode, initial?: { provider: string; model: string | null } | null) {
+export function useAgentProviders(
+  mode: AgentMode,
+  initial?: { provider: string; model: string | null } | null,
+  stageId?: string,
+) {
   const [providers, setProviders] = useState<AgentProviderInfo[] | null>(null);
   const [preferred, setPreferred] = useState<string | null>(null);
   const [storedModels, setStoredModels] = useState<Record<string, string | null>>({});
@@ -156,8 +161,10 @@ export function useAgentProviders(mode: AgentMode, initial?: { provider: string;
     : null;
 
   const fromShot = selected && selected.id === initial?.provider ? initial.model : null;
+  const fromStage = (stageId && selected?.stageModels?.[stageId]) || null;
+  const pickedModel = selected ? picked.models[selected.id] : undefined;
   const model = selected
-    ? pickModel(selected, picked.models[selected.id] ?? fromShot ?? storedModels[selected.id] ?? null)
+    ? pickModel(selected, pickedModel ?? fromStage ?? fromShot ?? storedModels[selected.id] ?? null)
     : null;
 
   return {
@@ -166,8 +173,11 @@ export function useAgentProviders(mode: AgentMode, initial?: { provider: string;
     /** Модель выбранного провайдера. null — у провайдера нет выбора модели. */
     model,
     /** Выбор совпадает с агентом кадра. */
+    // Модель этапа без выбора в меню — тоже «как у агента кадра»: запоминать нечего.
     isInitial: Boolean(
-      initial && selected?.id === initial.provider && pickModel(selected, initial.model) === model,
+      initial &&
+        selected?.id === initial.provider &&
+        ((fromStage && !pickedModel) || pickModel(selected, initial.model) === model),
     ),
     choose(id: string) {
       setPicked((current) => ({ ...current, provider: id }));

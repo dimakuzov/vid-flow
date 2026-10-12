@@ -123,6 +123,17 @@
       "value": {
         "const": 1280
       }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:162",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "const": 24
+      }
     }
   ],
   "defaultWhen": "silent"

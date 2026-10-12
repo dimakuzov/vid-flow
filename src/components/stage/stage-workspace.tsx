@@ -15,6 +15,7 @@ import { LocationLibrary } from "./location-library";
 import { OutputPanel } from "./output-panel";
 import { PromptHistory } from "./prompt-history";
 import { RefFiles, usedRefNames } from "./ref-files";
+import { ShotContext } from "./shot-context";
 import { StageInputs } from "./stage-inputs";
 import { StageStatusBar } from "./stage-status-bar";
 import { useStageDetail, type DocField } from "./use-stage-detail";
@@ -40,7 +41,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const [viewer, setViewer] = useState<Viewer | null>(null);
 
   const agentMode = detail.workflows.some((item) => item.available) ? "text" : "agent";
-  const agent = useAgentProviders(agentMode, detail.shotAgent);
+  const agent = useAgentProviders(agentMode, detail.shotAgent, stageId);
   // Кадр без агента получает того, кому отдали этап; у кадра с агентом другой выбор — только на этот раз.
   const [rememberChoice, setRememberChoice] = useState<boolean | null>(null);
   const rememberForShot = rememberChoice ?? !detail.shotAgent;
@@ -261,6 +262,22 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     });
   };
 
+  const saveAction = (text: string) =>
+    act(async () => {
+      await requestJson(`${shotApi}/action`, { method: "PUT", body: { text }, fallbackError: "Не удалось сохранить действие" });
+      await stage.reload();
+      return text.trim()
+        ? "Действие кадра сохранено. Агент возьмёт вашу версию."
+        : "Действие кадра убрано. Агент напишет его заново при отправке.";
+    });
+
+  const deleteNote = (id: string) =>
+    act(async () => {
+      await requestJson(`${shotApi}/notes`, { method: "DELETE", body: { id }, fallbackError: "Не удалось убрать замечание" });
+      await stage.reload();
+      return "Замечание убрано. Агент его больше не увидит.";
+    });
+
   const setWatch = (stopped: boolean) =>
     act(async () => {
       const data = await requestJson<StageDetail["watch"]>(`${shotApi}/watch`, {
@@ -397,12 +414,12 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             Input
           </h2>
           <div className="mt-4 space-y-3">
-            {detail.shotSummary.trim() ? (
-              <div className="rounded-lg bg-stone-50 px-3 py-2">
-                <div className="text-xs font-medium text-stone-600">Действие кадра</div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{detail.shotSummary}</p>
-              </div>
-            ) : null}
+            <ShotContext
+              detail={detail}
+              disabled={busy}
+              onSaveAction={saveAction}
+              onDeleteNote={deleteNote}
+            />
             <DocFieldLabel htmlFor="doc-prompt" note="этот текст уходит в модель">
               Prompt
             </DocFieldLabel>
@@ -428,7 +445,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 })}
               </>
             ) : null}
-            <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · очищается после отправки">
+            <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · поле очищается после отправки, агент помнит все замечания кадра">
               Рекомендация
             </DocFieldLabel>
             {docField("llmNotes", {

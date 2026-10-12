@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { AgentProviderId } from "../contracts/agent-request";
-import { isProviderId } from "../agent/config";
+import { currentClaudeModel, isProviderId } from "../agent/config";
 import { readAgentRequest } from "../agent/files";
 import { getAgentProvider } from "../agent/providers";
 import { isAgentRunLive } from "../agent/runner";
@@ -44,7 +44,8 @@ export function readShotAgent(episodeId: string, shotId: string): ShotAgent | nu
     if (!isProviderId(data.provider)) return null;
     return {
       provider: data.provider,
-      model: typeof data.model === "string" && data.model ? data.model : null,
+      // Старый id (Haiku 4.5) читается как нынешний: меню и запуск видят ту же модель.
+      model: typeof data.model === "string" && data.model ? (data.provider === "claude" ? currentClaudeModel(data.model) : data.model) : null,
       updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : "",
     };
   } catch {
@@ -56,7 +57,8 @@ export function readShotAgent(episodeId: string, shotId: string): ShotAgent | nu
 export function checkShotAgent(provider: string, model?: string | null): { provider: AgentProviderId; model: string | null } {
   const id = provider.trim();
   if (!isProviderId(id)) throw new Error(`Неизвестный провайдер агента «${id}»`);
-  const chosen = model?.trim() || null;
+  const trimmed = model?.trim() || null;
+  const chosen = id === "claude" ? currentClaudeModel(trimmed) : trimmed;
   const configError = getAgentProvider(id).configError?.(chosen ?? undefined);
   if (configError) throw new Error(configError);
   return { provider: id, model: chosen };

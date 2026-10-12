@@ -21,7 +21,7 @@ const REPO = path.resolve(__dirname, "../../..");
 
 function task(mode: AgentTask["mode"], stageId: AgentRequestFile["stageId"], system = "Playbook text.") {
   return {
-    request: { id: "r1", episodeId: "e01", shotId: "s16", stageId, model: "claude-haiku-4-5-20251001" } as AgentRequestFile,
+    request: { id: "r1", episodeId: "e01", shotId: "s16", stageId, model: "claude-haiku-5-5" } as AgentRequestFile,
     mode,
     stageDir: stageDir("e01", "s16", stageId),
     projectRoot: REPO,
@@ -43,7 +43,7 @@ test("текст: без инструментов, MCP и системного �
   assert.ok(call.args.includes("--strict-mcp-config"));
   assert.ok(call.args.includes("--no-session-persistence"));
   assert.equal(flag(call.args, "--system-prompt"), "Playbook text.", "системная часть — только плейбук");
-  assert.equal(flag(call.args, "--model"), "claude-haiku-4-5-20251001");
+  assert.equal(flag(call.args, "--model"), "claude-haiku-5-5");
   assert.equal(call.stdin, "## User request\n\nВечер.\n");
   assert.equal(call.env?.MAX_THINKING_TOKENS, "0", "без скрытых размышлений");
   assert.ok(!path.resolve(call.cwd).startsWith(REPO), "CLAUDE.md и AGENTS.md проекта не подхватываются");

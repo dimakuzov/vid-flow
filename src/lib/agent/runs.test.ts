@@ -168,7 +168,7 @@ test("GET /api/agent/runs: один работает, один ждёт мест
 
 test("разметка сценария: pending у провайдера доски — в очереди, manual — нет", async () => {
   const createdAt = new Date().toISOString();
-  writeFormatRequest({ status: "pending", createdAt, episodeId: EP, provider: "claude", model: "claude-haiku-4-5-20251001" });
+  writeFormatRequest({ status: "pending", createdAt, episodeId: EP, provider: "claude", model: "claude-haiku-5-5" });
   let { queued } = await runs();
   assert.deepEqual(queued, [
     {
@@ -177,7 +177,7 @@ test("разметка сценария: pending у провайдера дос�
       shotId: null,
       stageId: null,
       provider: "claude",
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-haiku-5-5",
       since: createdAt,
     },
   ]);

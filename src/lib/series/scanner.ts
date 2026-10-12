@@ -20,6 +20,9 @@ import {
   toPosix,
 } from "./paths";
 import { readShotAgent, readShotAgentActivity } from "./shot-agent";
+import { describingNow, shotDescriptions, stageUsesContext } from "./descriptions";
+import { actionEditedByUser, actionStale, readShotAction } from "./shot-action";
+import { readShotNotes } from "./shot-notes";
 import { readShotMeta } from "./shot-meta";
 import {
   deriveStageStatus,
@@ -292,5 +295,23 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
     watch: readShotWatch(episodeId, shotId),
     shotAgent: shotAgentChoice(episodeId, shotId),
+    shotContext: stageUsesContext(stageId) ? shotContextOf(episodeId, shotId) : null,
+    notes: readShotNotes(episodeId, shotId).map((note) => ({ ...note, stageLabel: STAGE_LABELS[note.stageId] })),
+  };
+}
+
+/** Действие кадра и описания утверждённых картинок для страницы этапа. Ничего не запускает. */
+function shotContextOf(episodeId: string, shotId: string): NonNullable<StageDetail["shotContext"]> {
+  return {
+    action: readShotAction(episodeId, shotId),
+    actionEditedByUser: actionEditedByUser(episodeId, shotId),
+    actionStale: actionStale(episodeId, shotId),
+    images: shotDescriptions(episodeId, shotId).map((item) => ({
+      kind: item.image.kind,
+      subject: item.image.subject,
+      name: path.basename(item.image.file),
+      text: item.description?.text ?? null,
+      describing: item.sha256 ? describingNow(item.sha256) : false,
+    })),
   };
 }

@@ -1,0 +1,90 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "video_ltx",
+  "graph": "ltx25_i2v_api.json",
+  "stage": "video_preview",
+  "label": "Видео LTX 2.5 от первого кадра (i2v)",
+  "description": "LTX 2.5, 24 к/с, со звуком: персонажи могут говорить реплики из «Реплик» кадра. Движение от утверждённого первого кадра.",
+  "playbook": "models/ltx_video.en.md",
+  "order": 30,
+  "inputs": {
+    "start": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "uploadAs": "{shotId}_start{ext}",
+      "label": "Утверждённый первый кадр"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "label": "prompt.md"
+    },
+    "seconds": {
+      "kind": "number",
+      "from": "settings:seconds",
+      "fallback": "prompt:seconds",
+      "min": 2,
+      "max": 10,
+      "label": "Длительность клипа"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "395",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "start"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "398:376",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "text"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "398:339",
+          "field": "noise_seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "398:362",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "seconds"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "75",
+          "field": "filename_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/video/{shotId}_ltx"
+      }
+    }
+  ]
+}

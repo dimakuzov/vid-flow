@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { AgentMode, AgentRequestFile, AgentTask } from "../contracts/agent-request";
 import type { ImageInput, WorkflowChoice } from "../contracts/graph-binding";
-import { resolveImageInput, stageBindings, stageDuration } from "../comfy/binding";
+import { resolveImageInput, slotFile, stageBindings, stageDuration } from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
@@ -11,6 +11,7 @@ import { excludedFiles, readRunSettings } from "../series/run-settings";
 import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
 import { LLM_TASK, readAgentDispatch } from "./files";
+import { renderShotContext } from "./shot-context";
 
 /*
  * Сборка AgentTask для провайдера (docs/contracts/agent-request.md, режим text).
@@ -38,26 +39,27 @@ export function selectedWorkflow(episodeId: string, shotId: string, stageId: Sta
   return choices.find((choice) => choice.id === id) ?? choices.find((choice) => choice.isDefault) ?? null;
 }
 
-/** Кто на картинке входа: имя персонажа из `julia_s05.png`, лицо — по папке библиотеки или `{name}_face`. */
+/** Кто на картинке входа: имя персонажа из `julia_s05.png`, портрет — по папке библиотеки или `{name}_face`. */
 function imageSubject(input: ImageInput, file: string, shotId: string): string {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   const stem = path.parse(file).name;
   if (sources.includes("library:faces")) {
     const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
-    return `${name.toLowerCase()}'s face`;
+    return `portrait of ${name.toLowerCase()} (face reference)`;
   }
   if (sources.includes("approve:characters")) {
     const suffix = `_${shotId}`;
-    return stem.toLowerCase().endsWith(suffix.toLowerCase()) ? stem.slice(0, -suffix.length) : stem;
+    const name = stem.toLowerCase().endsWith(suffix.toLowerCase()) ? stem.slice(0, -suffix.length) : stem;
+    return `${name} (approved character: figure and clothes for this shot)`;
   }
   if (sources.some((source) => source.endsWith(":location") || source === "approve:location")) return "the location";
   return input.label;
 }
 
 /**
- * Номера картинок, которые получит граф первого кадра: `image N` в prompt.md. Нода Qwen берёт
- * подключённые картинки по порядку и сжимает пропуски, поэтому номера идут подряд.
- * Входы с whenPrompt (лица) — отдельным списком: граф получит их, только если промпт их зовёт.
+ * Номера картинок, которые получит граф первого кадра: `image N` в prompt.md. Номер — порядок
+ * слотов-картинок манифеста, которым достался файл (тот же slotFile, что и при запуске): ряд
+ * `image_2`…`image_6` заполняется подряд, без пропусков. Что не влезло в граф — отдельной строкой.
  */
 export function renderGraphImages(
   episodeId: string,
@@ -69,31 +71,31 @@ export function renderGraphImages(
   const binding = stageBindings(stageId).find((item) => item.id === workflowId)?.binding;
   if (!binding) return "";
   const ctx = { episodeId, shotId, stageId };
-  const always: string[] = [];
-  const optional: { line: string; when: string }[] = [];
-  let number = 0;
-  for (const input of Object.values(binding.inputs)) {
-    if (input.kind !== "image" && input.kind !== "video") continue;
-    for (const file of resolveImageInput(ctx, { ...input, whenPrompt: undefined })) {
-      number += 1;
-      const line = `- image ${number}: ${imageSubject(input, file, shotId)} (${path.basename(file)})`;
-      if (input.whenPrompt) optional.push({ line, when: input.whenPrompt });
-      else always.push(line);
-    }
+  const images: Record<string, string[]> = {};
+  for (const [name, input] of Object.entries(binding.inputs)) {
+    if (input.kind === "image" || input.kind === "video") images[name] = resolveImageInput(ctx, input);
   }
-  if (!always.length) return "";
+  const lines: string[] = [];
+  const sent = new Set<string>();
+  for (const slot of binding.slots) {
+    const found = slotFile(binding, slot, images);
+    if (!found) continue;
+    sent.add(`${found.name}:${found.index}`);
+    lines.push(`- image ${lines.length + 1}: ${imageSubject(found.input, found.file, shotId)} (${path.basename(found.file)})`);
+  }
+  if (!lines.length) return "";
+  const left = Object.entries(images).flatMap(([name, files]) =>
+    files.filter((_, index) => !sent.has(`${name}:${index}`)).map((file) => path.basename(file)),
+  );
   const parts = [
     "## Images the graph receives (use these numbers in prompt.md)",
     "",
-    ...always,
+    ...lines,
+    "",
+    "Every image above goes to the model. Say in prompt.md what each one is, by its number: who the person from image 2 is, and for a portrait whose face it is, e.g. `Julia's face exactly as in image 4`.",
   ];
-  if (optional.length) {
-    parts.push(
-      "",
-      "Face references, only for a close-up (playbook section «Face for a close-up»). The board attaches them only if prompt.md contains the phrase `face from image N`; without that phrase they are not sent and the numbers above stay as they are:",
-      "",
-      ...optional.map((item) => item.line),
-    );
+  if (left.length) {
+    parts.push("", `Not sent, the graph takes at most ${lines.length} images: ${left.join(", ")}. Do not refer to them.`);
   }
   parts.push("", "Never write file names or paths in prompt.md: the model sees only the image numbers.");
   return parts.join("\n");
@@ -160,7 +162,7 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     "",
     request.message.trim(),
     "",
-    `## Shot ${shotId}: ${meta.title}`,
+    `## Shot ${shotId}: ${meta.title} (original scenario text from shot.md, written before the pictures)`,
     "",
     meta.summary || "(no action text in shot.md)",
     "",
@@ -173,6 +175,10 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
           `- clip duration: ${seconds} s, chosen by the user in the board menu. The action must fit into this time. The board sets the duration itself: do not write "N sec" in prompt.md.`,
         ]
       : []),
+  ];
+  const context = renderShotContext(episodeId, shotId, stageId, request.createdAt);
+  if (context) lines.push("", context);
+  lines.push(
     "",
     "## Current prompt.md",
     "",
@@ -181,7 +187,7 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     "## Files in refs/",
     "",
     refs.length ? refs.map((name) => `- ${name}`).join("\n") : "(none)",
-  ];
+  );
   if (stageHasSpeech(stageId)) {
     // Кто где стоит в кадре — из промпта первого кадра: нужно для реплик «Person 1 (left) says».
     const firstFrame = readTextIfExists(path.join(stageDir(episodeId, shotId, "first_frame"), "prompt.md")).trim();

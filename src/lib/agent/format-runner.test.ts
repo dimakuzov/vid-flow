@@ -84,10 +84,10 @@ test("новая серия: модель размечает, таблица с�
     status: "done",
     prompt: "```md\n# Тест\n\n## s01 Кафе\n- characters: katya\n- location: cafe\nКатя входит.\n\n## s02 Улица\n- characters: \n- location: \nПустая улица.\n```",
   };
-  const res = await post({ episodeId: "e05", rawText: "Катя входит в кафе. Потом пустая улица.", provider: "claude", model: "claude-haiku-4-5-20251001" });
+  const res = await post({ episodeId: "e05", rawText: "Катя входит в кафе. Потом пустая улица.", provider: "claude", model: "claude-haiku-5-5" });
   assert.equal(res.status, 200);
   await settle("e05");
-  assert.equal(calls.at(-1)?.request.model, "claude-haiku-4-5-20251001", "модель доходит до провайдера");
+  assert.equal(calls.at(-1)?.request.model, "claude-haiku-5-5", "модель доходит до провайдера");
   const request = readFormatRequest(episodeRoot("e05"));
   assert.equal(request?.status, "done");
   assert.equal(request?.shots, 2);
@@ -133,11 +133,11 @@ test("запрос агенту хранит выбранную модель, п
     refsNote: "",
     workflowNote: "",
     provider: "claude",
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-5-5",
   });
-  assert.equal(request.model, "claude-haiku-4-5-20251001");
+  assert.equal(request.model, "claude-haiku-5-5");
   await agentRunPromise("e09", request.id);
-  assert.equal(calls.at(-1)?.request.model, "claude-haiku-4-5-20251001");
+  assert.equal(calls.at(-1)?.request.model, "claude-haiku-5-5");
   assert.equal(readAgentRequest("e09", "s01", "characters")?.status, "done");
 });
 

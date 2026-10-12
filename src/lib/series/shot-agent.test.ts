@@ -24,14 +24,14 @@ import { readAgentRequest } from "./agent-request";
 import { assignShotAgents, runStageForAllShots } from "./bulk";
 import { createEpisode, ensureStageDirs, shotDir } from "./paths";
 import { scanSeries } from "./scanner";
-import { readShotAgent, readShotAgentActivity, writeShotAgent } from "./shot-agent";
+import { checkShotAgent, readShotAgent, readShotAgentActivity, writeShotAgent } from "./shot-agent";
 import { STAGES } from "./constants";
 import { readStageStateFile } from "./stage-state";
 
 const EP = "e01";
 const SHOTS = ["s01", "s02", "s03"];
 const PNG = Buffer.from("89504e470d0a1a0a", "hex");
-const HAIKU = "claude-haiku-4-5-20251001";
+const HAIKU = "claude-haiku-5-5";
 
 /** Claude держит ответ, пока тест не отпустит; так видно «работает». */
 const gates: Array<() => void> = [];
@@ -183,4 +183,11 @@ test("страница этапа: другой агент на один раз;
     { provider: readShotAgent(EP, "s01")?.provider, model: readShotAgent(EP, "s01")?.model },
     { provider: "manual", model: null },
   );
+});
+
+test("старый id Haiku 4.5 в agent.json читается как Haiku 5.5 и проходит проверку", () => {
+  const dir = shotDir(EP, "s01");
+  fs.writeFileSync(path.join(dir, "agent.json"), JSON.stringify({ provider: "claude", model: "claude-haiku-4-5-20251001" }));
+  assert.equal(readShotAgent(EP, "s01")?.model, "claude-haiku-5-5");
+  assert.equal(checkShotAgent("claude", "claude-haiku-4-5-20251001").model, "claude-haiku-5-5");
 });
