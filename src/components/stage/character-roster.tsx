@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { errorText, requestJson } from "./api";
 
 /** Файл относится к персонажу: `lena.png`, `lena_clothes.png`, `lena-base.png`. */
 export function characterOwnsFile(filename: string, name: string): boolean {
@@ -27,7 +28,9 @@ export function CharacterRoster({
   onSelect: (name: string) => void;
   onChange: (names: string[]) => void;
 }) {
-  const [draft, setDraft] = useState("");
+  const [picking, setPicking] = useState(false);
+  const [options, setOptions] = useState<string[] | null>(null);
+  const [error, setError] = useState("");
 
   return (
     <div className="space-y-2 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
@@ -73,35 +76,60 @@ export function CharacterRoster({
           })}
         </ul>
       ) : (
-        <p className="text-xs text-stone-500">В кадре никого. Добавьте имя ниже.</p>
+        <p className="text-xs text-stone-500">В кадре никого. Добавьте имя из библиотеки.</p>
       )}
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const name = draft.trim();
-          if (!name || disabled) return;
-          onChange([...names, name]);
-          setDraft("");
-        }}
-      >
-        <input
-          value={draft}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
           disabled={disabled}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="имя, латиница"
-          aria-label="Новый персонаж"
-          className="h-8 min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2 text-sm"
-        />
-        <Button type="submit" variant="outline" disabled={disabled || !draft.trim()}>
+          onClick={() => {
+            const next = !picking;
+            setPicking(next);
+            setError("");
+            if (!next || options) return;
+            requestJson<{ characters: string[] }>("/api/library/characters", {
+              fallbackError: "Не удалось прочитать персонажей",
+            })
+              .then((data) => setOptions(data.characters))
+              .catch((err) => setError(errorText(err)));
+          }}
+        >
           Добавить
         </Button>
-      </form>
+        {picking ? (
+          <select
+            aria-label="Имя из библиотеки"
+            defaultValue=""
+            disabled={disabled || !options}
+            className="h-8 min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2 text-sm"
+            onChange={(event) => {
+              const name = event.target.value;
+              if (!name || disabled) return;
+              onChange([...names, name]);
+              setPicking(false);
+            }}
+          >
+            <option value="">{options ? "Выберите имя" : "Загрузка…"}</option>
+            {(options ?? [])
+              .filter((name) => !names.some((item) => item.toLowerCase() === name.toLowerCase()))
+              .map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+          </select>
+        ) : null}
+      </div>
+      {picking && options && !options.length ? (
+        <p className="text-xs text-stone-500">В data/characters/ нет персонажей.</p>
+      ) : null}
+      {error ? <p className="text-xs text-red-800">{error}</p> : null}
       {active ? (
         <p className="text-xs text-stone-500">
-          База этого персонажа — файл <span className="font-mono">{active}_base</span>, одежда —{" "}
-          <span className="font-mono">{active}_clothes</span>. Загрузка без такого начала имени получит префикс{" "}
-          <span className="font-mono">{active}_</span>. Промпт — раздел <span className="font-mono">## {active}</span>.
+          Картинку этого персонажа выбирают выше, в «Что уйдёт в граф». Одежда — файл{" "}
+          <span className="font-mono">{active}_clothes</span>. Промпт — раздел{" "}
+          <span className="font-mono">## {active}</span>.
         </p>
       ) : null}
     </div>

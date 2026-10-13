@@ -13,7 +13,7 @@ import { characterBaseImage, characterFolder, missingCharacterBase, missingChara
 import { STAGE_LABELS, type StageId } from "./constants";
 import { mediaKind, mediaUrlPath } from "./media";
 import { getCharactersRoot, getDataRoot, getLocationsRoot, stageDir, toPosix } from "./paths";
-import { excludedFiles, readRunSettings } from "./run-settings";
+import { chosenCharacterFile, excludedFiles, readRunSettings } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
 import type { MediaFile, StageInput } from "./types";
 
@@ -140,13 +140,20 @@ function characterInputs(ctx: ShotContext): StageInput[] {
     const fromRefs = refByStem(ctx, name, "base");
     const folder = characterFolder(name);
     const fromLibrary = folder ? characterBaseImage(folder) : null;
-    const chosen = fromRefs ?? fromLibrary;
+    const manual = chosenCharacterFile(episodeId, shotId, stageId, name);
+    const manualPath = manual ? mediaUrlPath(manual) : null;
+    const manualActive = Boolean(manual && manualPath && !excluded.has(manualPath));
+    const automatic = fromRefs ?? fromLibrary;
+    const shown = manualActive && manual ? [manual] : automatic ? [automatic] : [];
+    const heldBack = manual && !manualActive ? [manual] : [];
     const hint =
-      chosen && path.basename(chosen).toLowerCase() !== "full_body.png"
+      !manualActive && automatic && path.basename(automatic).toLowerCase() !== "full_body.png"
         ? " Положите full_body.png во весь рост."
         : "";
     let source: string;
-    if (!chosen) {
+    if (manualActive && manual) {
+      source = `выбран вручную (${path.basename(manual)}). Это персонаж в графе; одежду меняет образец или текст.`;
+    } else if (!automatic) {
       source = missingCharacterBase(name);
     } else if (fromRefs) {
       source = `refs/ этого этапа (${path.basename(fromRefs)}).${hint}`;
@@ -155,8 +162,9 @@ function characterInputs(ctx: ShotContext): StageInput[] {
     }
     inputs.push({
       label: `Персонаж ${name}`,
+      characterName: name,
       source,
-      ...splitExcluded(chosen ? mediaFiles([chosen]) : [], excluded),
+      ...splitExcluded(mediaFiles([...shown, ...heldBack]), excluded),
     });
     const clothes = refByStem(ctx, name, "clothes");
     inputs.push({

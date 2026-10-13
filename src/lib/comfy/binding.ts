@@ -19,7 +19,7 @@ import { characterBaseImage, characterFolder } from "../series/character-base";
 import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
-import { excludedFiles, readRunSettings } from "../series/run-settings";
+import { chosenCharacterFile, excludedFiles, readRunSettings } from "../series/run-settings";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech, speechPhrases } from "../series/speech";
 
@@ -383,7 +383,8 @@ function libraryCharacter(ctx: ShotContext): string[] {
 /** Шаблон имени в refs/: `{character}` и `*`. К библиотеке не применяется. */
 function matchName(filename: string, pattern: string, character: string | undefined): boolean {
   const filled = pattern.replaceAll("{character}", (character ?? "").toLowerCase());
-  const body = filled.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
+  // `*` — любая концовка имени. Сначала экранируем его как обычный символ, потом возвращаем как «.*».
+  const body = filled.replace(/[.+?^${}()|[\]\\*]/g, "\\$&").replace(/\\\*/g, ".*");
   return new RegExp(`^${body}$`, "i").test(filename);
 }
 
@@ -433,13 +434,24 @@ function isExcluded(excluded: Set<string>, file: string): boolean {
   return media !== null && excluded.has(media);
 }
 
+/** База персонажа: refs/{имя}_base или библиотека. Сюда же встаёт картинка, выбранная на странице. */
+function usesCharacterBase(input: ImageInput): boolean {
+  const from = Array.isArray(input.from) ? input.from : [input.from];
+  return from.includes("library:character") || (input.match ?? "").includes("{character}_base");
+}
+
 /**
  * Картинки входа: первый непустой источник, затем pick. Вход с whenPrompt без совпадения — пусто.
  * Убранные пользователем файлы пропускаются; источник, где остались только они, считается пустым.
+ * Выбранная на странице картинка персонажа заменяет базу.
  */
 export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[] {
   if (!promptEnablesInput(ctx, input)) return [];
   const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
+  if (ctx.character && usesCharacterBase(input)) {
+    const chosen = chosenCharacterFile(ctx.episodeId, ctx.shotId, ctx.stageId, ctx.character);
+    if (chosen && !isExcluded(excluded, chosen)) return [chosen];
+  }
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
     let files = sourceFiles(ctx, source, input.kind).filter((file) => !isExcluded(excluded, file));

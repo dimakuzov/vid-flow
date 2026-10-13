@@ -23,6 +23,7 @@ import { readShotAgent, readShotAgentActivity } from "./shot-agent";
 import { describingNow, shotDescriptions, stageUsesContext } from "./descriptions";
 import { actionEditedByUser, actionStale, readShotAction } from "./shot-action";
 import { readShotNotes } from "./shot-notes";
+import { previousCharacterImages } from "./character-base";
 import { readShotMeta } from "./shot-meta";
 import {
   deriveStageStatus,
@@ -286,6 +287,7 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     approve: listMediaFiles(path.join(dir, "approve")),
     inputs: stageInputs(episodeId, shotId, stageId),
     excluded: settings.excluded ?? [],
+    previousShot: stageId === "characters" ? previousCharacterImages(episodeId, shotId) : null,
     playbooks: playbooksForStage(stageId),
     relativeDir: toPosix(path.relative(episodeRoot(episodeId), dir)),
     state,

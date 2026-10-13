@@ -1,6 +1,7 @@
 "use client";
 
 import type { MediaFile, StageInput } from "@/lib/series/types";
+import { CharacterImagePicker } from "./character-image-picker";
 import { MediaCard } from "./media-card";
 
 /**
@@ -12,6 +13,8 @@ export function StageInputs({
   boardRuns,
   onOpen,
   onToggleExclude,
+  characterSources,
+  onPickCharacter,
 }: {
   inputs: StageInput[];
   /** true — этап запускает доска (есть воркфлоу), false — граф гоняет агент. */
@@ -19,6 +22,13 @@ export function StageInputs({
   onOpen: (files: MediaFile[], file: MediaFile) => void;
   /** Убрать из графа (true) или вернуть (false). Нет — этап занят, входы не меняются. */
   onToggleExclude?: (file: MediaFile, exclude: boolean) => void;
+  /** Откуда взять картинку персонажа. Нет — кнопки не показываются. */
+  characterSources?: {
+    output: MediaFile[];
+    refs: MediaFile[];
+    previous: { id: string; files: MediaFile[] } | null;
+  };
+  onPickCharacter?: (name: string, file: MediaFile) => void;
 }) {
   if (!inputs.length) return null;
   return (
@@ -38,6 +48,15 @@ export function StageInputs({
               {input.source}
             </span>
           </div>
+          {input.characterName && characterSources && onPickCharacter ? (
+            <CharacterImagePicker
+              output={characterSources.output}
+              refs={characterSources.refs}
+              previous={characterSources.previous}
+              disabled={!onToggleExclude}
+              onPick={(file) => onPickCharacter(input.characterName!, file)}
+            />
+          ) : null}
           {input.files.length || input.excluded.length ? (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {input.files.map((file) => (
