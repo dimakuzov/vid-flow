@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { getCharactersRoot } from "./paths";
+import { listMediaFiles } from "./media";
+import { getCharactersRoot, listShotIds, stageDir } from "./paths";
 
 /**
  * База персонажа в data/characters/{name}/. Одна функция на страницу этапа и на граф,
@@ -58,6 +59,42 @@ export function characterBaseImage(folder: string): string | null {
     if (fs.existsSync(file)) return file;
   }
   return imagesIn(folder)[0] ?? null;
+}
+
+/** Папки `data/characters/`, как они лежат на диске. Старые `_old` и скрытые не предлагаются. */
+export function listLibraryCharacterNames(): string[] {
+  const root = getCharactersRoot();
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !/(^|_)old$/i.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+/** Предыдущий кадр эпизода по номеру (`s02` → `s01`). Первого кадра нет — null. */
+export function previousShotId(episodeId: string, shotId: string): string | null {
+  const ids = listShotIds(episodeId);
+  const index = ids.findIndex((id) => id.toLowerCase() === shotId.toLowerCase());
+  return index > 0 ? ids[index - 1] : null;
+}
+
+/** Картинки этапа персонажей предыдущего кадра: сначала approve, потом output. */
+export function previousCharacterImages(
+  episodeId: string,
+  shotId: string,
+): { id: string; files: ReturnType<typeof listMediaFiles> } | null {
+  const id = previousShotId(episodeId, shotId);
+  if (!id) return null;
+  const dir = stageDir(episodeId, id, "characters");
+  const files = [...listMediaFiles(path.join(dir, "approve")), ...listMediaFiles(path.join(dir, "output"))].filter(
+    (file) => file.kind === "image",
+  );
+  return { id, files };
 }
 
 /** Текст ошибки, когда персонажа не из чего собрать. */

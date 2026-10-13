@@ -25,6 +25,8 @@ export interface StageInput {
   files: MediaFile[];
   /** Файлы входа, которые пользователь убрал из графа (на диске остаются, их можно вернуть). */
   excluded: MediaFile[];
+  /** Имя персонажа, если строка — его картинка в графе (image 1). */
+  characterName?: string;
 }
 
 export interface StageSummary {
@@ -118,6 +120,8 @@ export interface StageDetail {
   inputs: StageInput[];
   /** Убранные из графа файлы этапа: пути как MediaFile.relativePath (run_settings.json). */
   excluded: string[];
+  /** Картинки персонажей предыдущего кадра (approve и output). null — это первый кадр или не этап персонажей. */
+  previousShot: { id: string; files: MediaFile[] } | null;
   playbooks: string[];
   relativeDir: string;
   state: StageState;

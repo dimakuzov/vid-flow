@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
-import { readRunSettings, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
+import { readRunSettings, setCharacterImage, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
 import { setShotCharacters } from "@/lib/series/shot-meta";
 import { readStatusFile, writeStatusFile } from "@/lib/series/status";
 import { assertStageFree } from "@/lib/series/stage-state";
@@ -62,7 +62,18 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       exclude?: { path?: string; excluded?: boolean };
       /** Список персонажей кадра. Только этап characters. Пишет строку `- characters:` в shot.md. */
       characters?: string[];
+      /** Картинка персонажа в графе (image 1). path пустой — снова база по имени или библиотека. */
+      characterImage?: { name?: string; path?: string | null };
     };
+    if (body.characterImage) {
+      if (stageId !== "characters") throw new Error("Картинку персонажа выбирают на этапе персонажей");
+      assertStageFree(episodeId, shotId, stageId);
+      const name = body.characterImage.name;
+      if (typeof name !== "string" || !name.trim()) throw new Error("Не указан персонаж");
+      const raw = body.characterImage.path;
+      const mediaPath = typeof raw === "string" && raw.trim() ? raw.trim() : null;
+      setCharacterImage(episodeId, shotId, name, mediaPath);
+    }
     if (Array.isArray(body.characters)) {
       if (stageId !== "characters") throw new Error("Список персонажей меняется на этапе персонажей");
       assertStageFree(episodeId, shotId, stageId);

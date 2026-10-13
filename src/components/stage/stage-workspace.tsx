@@ -608,6 +608,26 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               boardRuns={canRun}
               onOpen={(files, file) => openImage(files, file, false, "refs")}
               onToggleExclude={excludeToggle}
+              characterSources={
+                stageId === "characters"
+                  ? { output: detail.output, refs: detail.refs, previous: detail.previousShot }
+                  : undefined
+              }
+              onPickCharacter={
+                stageId === "characters"
+                  ? (name, file) => {
+                      void act(async () => {
+                        const data = await requestJson<StageDetail>(stageApi, {
+                          method: "PATCH",
+                          body: { characterImage: { name, path: file.relativePath } },
+                          fallbackError: "Не удалось поставить персонажа в граф",
+                        });
+                        stage.merge(data);
+                        return `${name}: в граф пойдёт ${file.name}`;
+                      });
+                    }
+                  : undefined
+              }
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DocFieldLabel note={editingCharacter ? `файлы ${editingCharacter}_ из refs/` : "файлы из refs/"}>
