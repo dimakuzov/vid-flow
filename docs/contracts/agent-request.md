@@ -81,7 +81,7 @@
 
 | Метод и путь | Тело / ответ |
 |---|---|
-| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot?, allowCloud? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра; `allowCloud: true` — галочка платной отправки: доска запустит облачный воркфлоу после ответа агента, один раз; хранится в `agent_dispatch.json`). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
+| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot?, allowCloud?, takes? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра; `allowCloud: true` — галочка платной отправки: доска запустит облачный воркфлоу после ответа агента, один раз; `takes` — 1–8 файлов с тем же промптом и разными seed, нет — 1, финал всегда 1, между заходами не запоминается; хранится в `agent_dispatch.json`). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
 | `POST .../stages/{stage}/cancel` | отмена (общая с прогоном) |
 | `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }` — агент кадра и что он делает |
 | `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }` — «Сохранить» в меню агента кадра. Неизвестный провайдер или модель — 400 |
@@ -126,7 +126,7 @@
 | `data/descriptions/{sha256}.json` | что на утверждённой картинке на самом деле: `{ sha256, kind: location \| character \| first_frame, text, model, createdAt, source }` | фоновый цикл `image-descriptions` (20 с, текущий эпизод, не больше 2 сразу) и перед задачей агенту. Ключ — содержимое файла: один файл в нескольких кадрах описывается один раз, замена файла в approve — новое описание |
 | `shots/{shotId}/action.md`, `action.json` | действие кадра под утверждённые картинки, по-русски; `action.json` — `{ basis, textSha, source: agent \| user, at, model? }` | перед задачей агенту на `first_frame`, `video_preview`, `final_render`, если изменилась основа (shot.md, картинки и их описания, замечания). Правка на странице — `PUT /api/episodes/{ep}/shots/{shot}/action` `{ text }`: версия пользователя, она важнее модели и уходит в следующую пересборку как замечание; пустой текст — убрать |
 
-Описания и действие делает `claude -p` (`src/lib/agent/claude-oneshot.ts`): описания — `FRAMEBOARD_VISION_MODEL` (по умолчанию `claude-haiku-5-5`: только «что на картинке»), действие — `FRAMEBOARD_CONTEXT_MODEL` (по умолчанию `claude-sonnet-5-5`); пустая временная папка, картинка копируется туда и открывается инструментом Read. `FRAMEBOARD_DESCRIBE=off` выключает и то и другое; при `FRAMEBOARD_LOOPS=off` (тесты, скрипты) настоящий claude здесь не вызывается. Не вышло — агент работает с тем, что есть.
+Описание локации называет число пространств, их примерный размер, передний, средний и задний план, проёмы и препятствия, где можно стоять и как далеко будут люди, и свет. Описание первого кадра добавляет число людей, позу, видно ли лицо и примерную долю площади лица и тела, и те же факты о месте. Описания и действие делает `claude -p` (`src/lib/agent/claude-oneshot.ts`): описания — `FRAMEBOARD_VISION_MODEL` (по умолчанию `claude-haiku-5-5`: только «что на картинке»), действие — `FRAMEBOARD_CONTEXT_MODEL` (по умолчанию `claude-sonnet-5-5`); пустая временная папка, картинка копируется туда и открывается инструментом Read. `FRAMEBOARD_DESCRIBE=off` выключает и то и другое; при `FRAMEBOARD_LOOPS=off` (тесты, скрипты) настоящий claude здесь не вызывается. Не вышло — агент работает с тем, что есть.
 
 В задаче агента (text и `llm_task.md`) после shot.md: действие по картинкам, описания картинок (на первом кадре — без его прошлого утверждённого варианта), прошлые замечания кадра (текущее сообщение — только как запрос) и порядок приоритета: запрос → прошлые замечания (позднее важнее) → что на картинках → действие по картинкам → shot.md → остальное.
 
@@ -138,7 +138,7 @@
 
 ## Модель этапа
 
-`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude на `first_frame` — Sonnet, даже если агенту кадра назначен Haiku. Массовый запуск и «Запустить следующий этап» берут её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск.
+`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude на `first_frame` — Sonnet, даже если агенту кадра назначен Haiku. Массовый запуск и «Запустить следующий этап» берут её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск. В меню выбора (этап, агент кадра, разметка сценария) есть ещё Opus 5.5 (`claude-opus-5-5`); по умолчанию он не стоит.
 
 ## Ручной режим и `agent-mail/`
 

@@ -1,4 +1,5 @@
 import path from "path";
+import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, ImageInput } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
 import { missingCharacterBase } from "../series/character-base";
@@ -15,6 +16,29 @@ function relativeToCwd(absolute: string): string {
   return toPosix(path.relative(process.cwd(), absolute));
 }
 
+/** Сколько копий одного промпта ставить. Каждая собирается заново, поэтому seed другой. */
+function takeCount(value: number | undefined): number {
+  if (value == null || !Number.isInteger(value)) return 1;
+  return Math.min(8, Math.max(1, value));
+}
+
+/** id короче 82 символов: контракт очереди. Суффикс нужен, когда копий больше одной. */
+function takeJobId(base: string, take: number, takes: number): string {
+  if (takes <= 1) return base.slice(0, 81);
+  const suffix = `-t${take}`;
+  const room = 81 - suffix.length;
+  return `${base.slice(0, room)}${suffix}`;
+}
+
+/** Префикс файла копии, чтобы параллельные прогоны не записали один и тот же путь. */
+function markTake(prompt: ApiPrompt, take: number, takes: number): void {
+  if (takes <= 1) return;
+  for (const node of Object.values(prompt)) {
+    const prefix = node.inputs.filename_prefix;
+    if (typeof prefix === "string" && prefix) node.inputs.filename_prefix = `${prefix}_t${take}`;
+  }
+}
+
 /**
  * Ставит прогон этапа в очередь по манифесту графа (docs/contracts/graph-binding.md).
  * workflow — id манифеста или старое имя (`i2v`, `flf`); пусто — выбор этапа (run_settings.json),
@@ -29,6 +53,8 @@ export function queueStageRun(
     fromAgent?: boolean;
     /** Разрешение пользователя на платный запуск в Comfy Cloud — на этот один запуск. */
     allowCloud?: boolean;
+    /** Сколько файлов с тем же промптом и разными seed. 1 — как раньше. Финал всегда 1. */
+    takes?: number;
   },
 ): { id: string; message: string } {
   // Ручной запуск закрыт, пока идёт операция. Из цикла после ответа агента — разрешён.
@@ -52,10 +78,11 @@ export function queueStageRun(
   }
   const ctx: ShotContext = { episodeId, shotId, stageId };
   assertFireredRefLimit(binding, ctx);
+  const takes = stageId === "final_render" ? 1 : takeCount(options?.takes);
   const queued =
     binding.forEach === "character"
-      ? queueCharacters(binding, graph, ctx)
-      : [enqueueBuilt(binding, ctx, `${shotId}-${binding.id}-${Date.now()}`, buildPrompt(binding, graph, ctx))];
+      ? queueCharacters(binding, graph, ctx, takes)
+      : queueCopies(binding, graph, ctx, takes);
   const previous = readStageStateFile(episodeId, shotId, stageId);
   writeStageState(episodeId, shotId, stageId, {
     phase: "comfy",
@@ -101,6 +128,23 @@ function characterBaseInput(binding: GraphBinding): ImageInput | null {
   return null;
 }
 
+/** Несколько сборок одного промпта: у каждой свой seed и своё имя файла. */
+function queueCopies(
+  binding: GraphBinding,
+  graph: Parameters<typeof buildPrompt>[1],
+  ctx: ShotContext,
+  takes: number,
+): Queued[] {
+  const stamp = Date.now();
+  const queued: Queued[] = [];
+  for (let take = 1; take <= takes; take++) {
+    const built = buildPrompt(binding, graph, ctx);
+    markTake(built.prompt, take, takes);
+    queued.push(enqueueBuilt(binding, ctx, takeJobId(`${ctx.shotId}-${binding.id}-${stamp}`, take, takes), built));
+  }
+  return queued;
+}
+
 function enqueueBuilt(binding: GraphBinding, ctx: ShotContext, id: string, built: BuiltPrompt): Queued {
   const job = enqueueComfyJob({
     id,
@@ -125,6 +169,7 @@ function queueCharacters(
   binding: GraphBinding,
   graph: Parameters<typeof buildPrompt>[1],
   ctx: ShotContext,
+  takes: number,
 ): Queued[] {
   const names = readShotMeta(ctx.episodeId, ctx.shotId).characters;
   if (!names.length) throw new Error("В кадре нет персонажей.");
@@ -150,11 +195,15 @@ function queueCharacters(
       skipped.push(missingCharacterBase(name));
       continue;
     }
-    prepared.push({
-      id: characterJobId(ctx.shotId, binding.id, name, stamp),
-      ctx: run,
-      built: buildPrompt(binding, graph, run),
-    });
+    for (let take = 1; take <= takes; take++) {
+      const built = buildPrompt(binding, graph, run);
+      markTake(built.prompt, take, takes);
+      prepared.push({
+        id: takeJobId(characterJobId(ctx.shotId, binding.id, name, stamp), take, takes),
+        ctx: run,
+        built,
+      });
+    }
   }
   if (!prepared.length) {
     throw new Error(skipped.join(" ") || "Нечего запускать: в prompt.md нет текста для персонажей кадра.");

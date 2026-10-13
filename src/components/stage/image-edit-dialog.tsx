@@ -50,6 +50,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Рамка на весь кадр: улучшение идёт по исходному файлу, отдельная обрезка не нужна. */
+function isWholeFrame(value: Fraction): boolean {
+  return value.x <= 0.004 && value.y <= 0.004 && value.x + value.w >= 0.996 && value.y + value.h >= 0.996;
+}
+
 /**
  * Окно «Править»: обрезка в браузере и правка моделью.
  * Исходный файл не отправляется как замена — обрезка уходит новым PNG.
@@ -73,7 +78,7 @@ export function ImageEditDialog({
 }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
-  const [aspect, setAspect] = useState<Aspect>("free");
+  const [aspect, setAspect] = useState<Aspect>("9:16");
   const [rect, setRect] = useState<Fraction>({ x: 0, y: 0, w: 1, h: 1 });
   const [workflow, setWorkflow] = useState(workflows[0]?.id ?? "");
   const [megapixels, setMegapixels] = useState(
@@ -152,41 +157,47 @@ export function ImageEditDialog({
     drag.current = null;
   }
 
-  async function saveCrop() {
+  /** Байты текущей рамки уходят новым PNG. Исходник остаётся. */
+  async function uploadCrop(): Promise<{ savedAs: string; message?: string }> {
     const img = imgRef.current;
-    if (!img || !natural) return;
+    if (!img || !natural) throw new Error("Картинка ещё не загрузилась");
+    const canvas = document.createElement("canvas");
+    const width = Math.max(1, Math.round(rect.w * natural.w));
+    const height = Math.max(1, Math.round(rect.h * natural.h));
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Браузер не отдал холст");
+    context.drawImage(
+      img,
+      Math.round(rect.x * natural.w),
+      Math.round(rect.y * natural.h),
+      width,
+      height,
+      0,
+      0,
+      width,
+      height,
+    );
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((value) => (value ? resolve(value) : reject(new Error("Пустая обрезка"))), "image/png");
+    });
+    const form = new FormData();
+    form.set("file", blob, "crop.png");
+    form.set("source", file.name);
+    form.set("folder", folder);
+    const res = await fetch(`${stageApi}/crop`, { method: "POST", body: form });
+    const data = (await res.json()) as { error?: string; message?: string; savedAs?: string };
+    if (!res.ok || !data.savedAs) throw new Error(data.error || "Не удалось сохранить обрезку");
+    return { savedAs: data.savedAs, message: data.message };
+  }
+
+  async function saveCrop() {
     setPending("crop");
     setError("");
     try {
-      const canvas = document.createElement("canvas");
-      const width = Math.max(1, Math.round(rect.w * natural.w));
-      const height = Math.max(1, Math.round(rect.h * natural.h));
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Браузер не отдал холст");
-      context.drawImage(
-        img,
-        Math.round(rect.x * natural.w),
-        Math.round(rect.y * natural.h),
-        width,
-        height,
-        0,
-        0,
-        width,
-        height,
-      );
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((value) => (value ? resolve(value) : reject(new Error("Пустая обрезка"))), "image/png");
-      });
-      const form = new FormData();
-      form.set("file", blob, "crop.png");
-      form.set("source", file.name);
-      form.set("folder", folder);
-      const res = await fetch(`${stageApi}/crop`, { method: "POST", body: form });
-      const data = (await res.json()) as { error?: string; message?: string };
-      if (!res.ok) throw new Error(data.error || "Не удалось сохранить обрезку");
-      onCropped(data.message || "Обрезка сохранена.");
+      const saved = await uploadCrop();
+      onCropped(saved.message || "Обрезка сохранена.");
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -205,12 +216,20 @@ export function ImageEditDialog({
     setPending("edit");
     setError("");
     try {
+      // Рамка не на весь кадр: сначала обрезка, улучшение берёт уже её.
+      let filename = file.name;
+      let editFolder: "output" | "approve" = folder;
+      if (!isWholeFrame(rect)) {
+        const saved = await uploadCrop();
+        filename = saved.savedAs;
+        editFolder = "output";
+      }
       const res = await fetch(`${stageApi}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filename: file.name,
-          folder,
+          filename,
+          folder: editFolder,
           workflow,
           text,
           megapixels: parsed ?? chosen?.megapixels,
@@ -304,6 +323,7 @@ export function ImageEditDialog({
             Пустое поле — только текстуры и мелкие детали, объекты, свет и камера как есть.
             Если написать просьбу, Haiku соберёт промпт: сначала она, потом всё остальное.
             Камеру не двигаем. Картинку Haiku не смотрит.
+            Если рамка не на весь кадр, обрезка сохраняется сама, и улучшение идёт по ней.
           </p>
           <label className="block text-xs text-stone-600">
             Что изменить
@@ -354,7 +374,7 @@ export function ImageEditDialog({
           ) : null}
           <Button
             type="button"
-            disabled={pending !== null || !workflow}
+            disabled={pending !== null || !workflow || !natural}
             onClick={() => void sendEdit()}
           >
             {pending === "edit" ? "Ставлю в очередь…" : "Применить улучшение"}

@@ -29,6 +29,8 @@ export interface AgentDispatch {
   videoWorkflow?: string;
   /** Пользователь разрешил платный запуск в Comfy Cloud после ответа агента (один запуск). */
   allowCloud?: boolean;
+  /** Сколько файлов поставить после ответа агента. Нет — один. Не запоминается между заходами. */
+  takes?: number;
   jobId?: string;
   error?: string;
   updatedAt: string;

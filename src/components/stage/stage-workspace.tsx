@@ -67,6 +67,11 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     null;
   const cloudCost = activeWorkflow?.cloud ?? null;
   const [allowCloud, setAllowCloud] = useState(false);
+  // Число рендеров живёт только пока открыта эта страница. Новый заход в клетку — снова 1.
+  const [takes, setTakes] = useState(1);
+  useEffect(() => {
+    setTakes(1);
+  }, [episodeId, shotId, stageId]);
 
   /** Действие кнопки: блокирует кнопки, показывает результат или ошибку. */
   async function act(work: () => Promise<string | void>) {
@@ -148,6 +153,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             ...(agent.model ? { model: agent.model } : {}),
             ...(agent.selected && rememberForShot && !agent.isInitial ? { rememberForShot: true } : {}),
             ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
+            ...(stageId !== "final_render" ? { takes } : {}),
           },
           fallbackError: "Не отправлено",
         },
@@ -309,9 +315,16 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      const recommendation =
+        event.target instanceof HTMLTextAreaElement && event.target.id === "doc-llmNotes" && !event.target.readOnly;
+      // Enter в рекомендации отправляет агенту. Shift+Enter остаётся переносом строки.
+      if (recommendation && event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        keys.current.send();
+        return;
+      }
       if (event.ctrlKey && event.key === "Enter" && !event.shiftKey && !event.altKey && !event.metaKey) {
-        const el = event.target;
-        if (el instanceof HTMLTextAreaElement && el.id === "doc-llmNotes" && !el.readOnly) {
+        if (recommendation) {
           event.preventDefault();
           keys.current.send();
         }
@@ -563,6 +576,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               rememberForShot={rememberForShot}
               onRememberForShot={setRememberChoice}
               onSend={sendToAgent}
+              takes={stageId === "final_render" ? null : takes}
+              onTakes={setTakes}
             />
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
@@ -676,13 +691,27 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               : (file) => {
                   const folder = viewer.folder === "approve" ? "approve" : "output";
                   return (
-                  <button
-                    type="button"
-                    className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
-                    onClick={() => setEditing({ file, folder })}
-                  >
-                    Править
-                  </button>
+                    <>
+                      <button
+                        type="button"
+                        className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
+                        onClick={() => setEditing({ file, folder })}
+                      >
+                        Править
+                      </button>
+                      {folder === "output" ? (
+                        <button
+                          type="button"
+                          className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
+                          onClick={() => {
+                            closeViewer();
+                            approveSelected([file.name]);
+                          }}
+                        >
+                          Аппрув
+                        </button>
+                      ) : null}
+                    </>
                   );
                 }
           }

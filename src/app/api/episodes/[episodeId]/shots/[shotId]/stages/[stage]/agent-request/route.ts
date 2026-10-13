@@ -8,6 +8,14 @@ import { writeShotAgent } from "@/lib/series/shot-agent";
 
 export const runtime = "nodejs";
 
+/** 1–8 копий промпта. Финал и мусор — одна. */
+function parseTakes(value: unknown, stageId: string): number {
+  if (stageId === "final_render") return 1;
+  const count = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(count) || count < 1 || count > 8) return 1;
+  return count;
+}
+
 function submittedMessage(mode: AgentMode | undefined): string {
   if (mode === "text") return "Отдано агенту. Он перепишет промпт, затем доска сама поставит прогон в Comfy.";
   if (mode === "agent") return "Отдано агенту. Он сделает этап сам, файлы появятся в output/.";
@@ -37,7 +45,10 @@ export async function POST(request: Request, context: StageRouteContext) {
       rememberForShot?: unknown;
       /** Галочка «Разрешить платную отправку в Comfy Cloud»: доска запустит облако после ответа агента. */
       allowCloud?: unknown;
+      /** Сколько файлов с тем же промптом. 1–8, нет — 1. Финал всегда 1. */
+      takes?: unknown;
     };
+    const takes = parseTakes(body.takes, stageId);
     if (typeof body.speech === "string" && stageHasSpeech(stageId)) writeShotSpeech(episodeId, shotId, body.speech);
     const submitted = submitAgentRequest({
       episodeId,
@@ -56,6 +67,7 @@ export async function POST(request: Request, context: StageRouteContext) {
       provider: typeof body.provider === "string" ? body.provider : undefined,
       model: typeof body.model === "string" ? body.model : undefined,
       allowCloud: body.allowCloud === true,
+      takes,
     });
 
     // Агент кадра меняется только вместе с принятым запросом.

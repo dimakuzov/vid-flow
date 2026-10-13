@@ -37,6 +37,7 @@ function queueAfterAgent(episodeId: string, shotId: string, stageId: StageId): v
       workflow: dispatch?.workflow || dispatch?.videoWorkflow,
       fromAgent: true,
       allowCloud: dispatch?.allowCloud === true,
+      takes: dispatch?.takes,
     });
     if (dispatch) {
       writeAgentDispatch(episodeId, shotId, stageId, {

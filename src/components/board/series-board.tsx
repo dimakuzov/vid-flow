@@ -59,6 +59,8 @@ export function SeriesBoard({
   const [headerMessage, setHeaderMessage] = useState("");
   const [cell, setCell] = useState<{ shot: number; stage: number } | null>(null);
   const reloadInFlight = useRef(false);
+  // Кадр из адреса (?shot=) показываем один раз. Опрос таблицы не возвращает прокрутку.
+  const placedShot = useRef<string | null>(null);
   // Эпизод страницы задаётся URL (/e/{episodeId}); на смену эпизода страница монтируется заново.
   const episodeId = initialSeries.episodeId;
   if (seenSeries !== initialSeries) {
@@ -155,11 +157,13 @@ export function SeriesBoard({
   }, [cell, episodeId, router, series.shots]);
 
   useEffect(() => {
-    if (!focusShot) return;
+    if (!focusShot || placedShot.current === focusShot) return;
     const row = [...document.querySelectorAll<HTMLElement>(`[data-shot="${CSS.escape(focusShot)}"]`)].find(
       (item) => item.getClientRects().length > 0,
     );
-    row?.scrollIntoView({ block: "start" });
+    if (!row) return;
+    row.scrollIntoView({ block: "start" });
+    placedShot.current = focusShot;
   }, [focusShot, series.shots]);
 
   useEffect(() => {

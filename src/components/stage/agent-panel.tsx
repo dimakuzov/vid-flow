@@ -35,6 +35,8 @@ export function AgentPanel({
   rememberForShot,
   onRememberForShot,
   onSend,
+  takes,
+  onTakes,
 }: {
   detail: StageDetail;
   disabled: boolean;
@@ -50,6 +52,9 @@ export function AgentPanel({
   rememberForShot: boolean;
   onRememberForShot: (value: boolean) => void;
   onSend: () => void;
+  /** Сколько файлов с тем же промптом. null — списка нет (финал). */
+  takes: number | null;
+  onTakes: (count: number) => void;
 }) {
   const request = detail.agentRequest;
   const shotAgent = detail.shotAgent ? agentLabel(providers, detail.shotAgent) : null;
@@ -73,6 +78,25 @@ export function AgentPanel({
         <Button disabled={disabled || detail.state.busy} onClick={onSend}>
           Отправить агенту
         </Button>
+        {takes != null ? (
+          <label className="text-xs text-stone-600">
+            Рендеров
+            <select
+              aria-label="Сколько рендеров"
+              title="Сколько файлов с тем же промптом и разным seed. При следующем заходе снова 1."
+              value={takes}
+              disabled={disabled || detail.state.busy}
+              onChange={(event) => onTakes(Number(event.target.value))}
+              className="mt-1 block h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900"
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       {providers?.length ? (
         <div className="space-y-1 text-xs text-stone-600">
@@ -93,7 +117,8 @@ export function AgentPanel({
       ) : null}
       <p className="text-xs leading-5 text-stone-500">
         Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле. Пока
-        агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап в Comfy. На
+        агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап в Comfy:
+        столько заданий, сколько выбрано в «Рендеров», с разными seed. На
         персонажах прогон ставит агент. «Закончить кадр» останавливает проверку входящих. Она также
         останавливается, когда в final_render есть утверждённое видео.
       </p>

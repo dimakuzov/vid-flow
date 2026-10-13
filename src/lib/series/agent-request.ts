@@ -420,6 +420,8 @@ export function submitAgentRequest(options: {
   model?: string;
   /** Разрешение на платный запуск в Comfy Cloud после ответа агента (один запуск). */
   allowCloud?: boolean;
+  /** Сколько файлов с тем же промптом и разными seed. Нет и финал — один. */
+  takes?: number;
   /** Сообщение написала доска (массовый запуск), а не пользователь: в замечания кадра не идёт. */
   auto?: boolean;
 }): AgentRequestFile {
@@ -518,6 +520,7 @@ export function submitAgentRequest(options: {
     state: boardQueues ? "wait" : "agent",
     workflow,
     ...(options.allowCloud ? { allowCloud: true } : {}),
+    ...(options.takes && options.takes > 1 ? { takes: options.takes } : {}),
     updatedAt: request.createdAt,
   });
   writeAgentRequest(request);

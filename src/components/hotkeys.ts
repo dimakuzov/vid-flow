@@ -7,7 +7,7 @@ export interface HotkeyItem {
 }
 
 export const HOTKEYS: HotkeyItem[] = [
-  { keys: "Ctrl+Enter", action: "Отправить агенту, когда курсор в поле «Рекомендация»", scope: "Этап" },
+  { keys: "Enter", action: "Отправить агенту, когда курсор в поле «Рекомендация». Shift+Enter — новая строка", scope: "Этап" },
   { keys: "Ctrl+Shift+Enter", action: "Запустить", scope: "Этап" },
   { keys: "A", action: "Утвердить выбранные в output", scope: "Этап" },
   { keys: "← →", action: "Листать картинки в просмотре", scope: "Этап" },
@@ -18,7 +18,7 @@ export const HOTKEYS: HotkeyItem[] = [
   { keys: "Enter", action: "Открыть этап выбранной клетки", scope: "Таблица" },
 ];
 
-/** Фокус в поле ввода: клавиши этапа молчат, кроме Ctrl+Enter в рекомендации. */
+/** Фокус в поле ввода: клавиши этапа молчат, кроме Enter в рекомендации. */
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
