@@ -73,6 +73,8 @@ The model does not apply words like “sidewalk” or “edge of the bed” to a
 
 Describe the spot the way it looks on image 1: colour, neighbouring objects, part of the frame. This is a landmark for the person, not a new description of the location: do not add objects that image 1 does not have.
 
+When the location description shows more than one space, put each person in the space the shot action gives them, on a surface where a person can stand. Take the distance between them from the sizes of those spaces in the description. Keep an opening between the spaces shut, partly open or open exactly as image 1 shows it, and place the people on the sides the action needs. Do not invent a space or an opening that image 1 does not have.
+
 ### Shot size
 
 Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` mean a close-up. Each size has its own size block. The lock is the same for all of them (see «Lock»).

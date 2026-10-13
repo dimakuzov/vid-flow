@@ -151,14 +151,16 @@ export function describeTask(kind: DescriptionKind): string {
 ${RULES}
 
 Cover, in this order:
-1. What kind of place this is and which part of it is visible (for example: a landing between two flights of a stairwell, seen towards the window).
-2. The camera: its height, angle, which way it looks, how far the nearest and the farthest visible things are.
-3. The layout from the foreground to the background: surfaces, objects, openings (doors, windows, passages, stairs), each with its place in the frame (left, right, centre, near, far).
-4. Where a person can naturally stand or walk in this picture and where not (for example: on the sidewalk on the right, not on the road where cars drive), and from which side someone could enter.
-5. The light: sources, direction, time of day, weather, colour.
-6. What a viewer might expect in such a place but is NOT in the picture (for example: no stairs and no railing are visible).
+1. What kind of place this is, and how many separate spaces are actually visible (one space, or two or more joined by an opening). Name each space by what it is, and which part of it is in the frame.
+2. The size of each space, as far as the picture shows: narrow or wide, low or tall, and a rough distance in metres from the camera to the far end and across the floor where a person could stand. If metres are unclear, say so, and still compare the size to a standing person.
+3. The camera: its height, angle, and which way it looks.
+4. Three depth layers, each named: foreground, middle ground, background. For each layer, the surfaces, objects and openings, and where they sit (left, right, centre).
+5. Every opening that joins spaces: where it is, whether it is shut, partly open or fully open, and which space is visible through it. Obstacles a person cannot walk through.
+6. Where a person can stand or walk in each space, and how far apart two people would be if one stood in one visible space and another in the next. From which side someone could enter.
+7. The light: sources, direction, how bright, time of day, weather, colour.
+8. What a viewer might expect in such a place but is NOT in the picture.
 
-Under 180 words.`;
+Under 260 words.`;
   }
   if (kind === "character") {
     return `This picture is the reference of one character of a film. The character will later be placed into shots exactly as they look here.
@@ -174,17 +176,17 @@ Cover, in this order:
 
 Under 150 words. Do not name the character.`;
   }
-  return `This picture is the approved first frame of one shot of a film. A video will start from exactly this frame.
+  return `This picture is the approved first frame of one shot of a film. People have already been placed into the location. A video will start from exactly this frame.
 
 ${RULES}
 
 Cover, in this order:
-1. Every person: where they are in the frame (left, right, centre, near, far, how big), which way the body and the face are turned, where they look, the pose and the hands.
-2. What each person wears and carries, briefly (colours and shapes).
-3. The place around them, the camera angle, what is in the foreground and the background.
-4. The light: sources, direction, colour.
+1. How many people are in the frame. If there are none, say so and go on to the place.
+2. Each person, nearest first: which space they stand in, and where (left, right, centre; foreground, middle ground or background). The pose, which way the body and the face are turned, where they look, and whether the face is visible. A rough percent of the picture area taken by the face, and a rough percent taken by the whole body. If a percent is unclear, say so. Clothes and items, briefly.
+3. The place, the same facts as for an empty location: how many separate spaces are visible and the rough size of each; the camera height and angle; foreground, middle ground and background; openings and whether each is shut, partly open or fully open; obstacles a person cannot walk through; how far the people are from each other and from the far end of the space.
+4. The light: sources, direction, how bright, colour.
 
-Under 180 words.`;
+Under 280 words.`;
 }
 
 const INFLIGHT_KEY = "__frameboardDescribing";
