@@ -54,6 +54,39 @@ export function parseShotMarkdown(shotId: string, content: string): ShotMeta {
   return { id: shotId, title, summary, characters, location };
 }
 
+/** Имя для shot.md и файлов: строчная латиница, пробелы — подчёркивание. */
+export function normalizeCharacterName(raw: string): string {
+  const name = raw.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  if (!/^[a-z][a-z0-9_]*$/.test(name)) {
+    throw new Error("Имя персонажа — латиница, например lena");
+  }
+  return name;
+}
+
+/**
+ * Список персонажей кадра. Меняет только строку `- characters:` в shot.md.
+ * Остальной текст файла остаётся.
+ */
+export function setShotCharacters(episodeId: string, shotId: string, names: string[]): string[] {
+  const characters: string[] = [];
+  for (const raw of names) {
+    const name = normalizeCharacterName(raw);
+    if (!characters.includes(name)) characters.push(name);
+  }
+  const file = path.join(shotDir(episodeId, shotId), "shot.md");
+  const content = readTextIfExists(file);
+  const line = /^(-\s*(?:characters|персонажи)\s*:).*$/im;
+  const next = `- characters: ${characters.join(", ")}`;
+  if (line.test(content)) {
+    writeText(file, content.replace(line, next));
+  } else if (content.trim()) {
+    writeText(file, content.replace(/^(#.+)$/m, `$1\n\n${next}`));
+  } else {
+    writeText(file, `# ${shotId}\n\n${next}\n- location: \n`);
+  }
+  return characters;
+}
+
 export function readShotMeta(episodeId: string, shotId: string): ShotMeta {
   const content = readTextIfExists(path.join(shotDir(episodeId, shotId), "shot.md"));
   return parseShotMarkdown(shotId, content);

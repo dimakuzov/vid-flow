@@ -10,6 +10,7 @@ import type { EditWorkflow } from "@/lib/comfy/edit";
 import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { AgentPanel } from "./agent-panel";
+import { CharacterRoster, characterOwnsFile } from "./character-roster";
 import { useAgentProviders } from "./agent-provider";
 import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
 import { DocFieldLabel, DocTextarea } from "./doc-field";
@@ -44,6 +45,9 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const router = useRouter();
 
   const [message, setMessage] = useState("");
+  const [activeCharacter, setActiveCharacter] = useState<string | null>(
+    initialDetail.stageId === "characters" ? initialDetail.expectedCharacters[0] ?? null : null,
+  );
   const [busy, setBusy] = useState(false);
   const [selectedOutput, setSelectedOutput] = useState<string[]>([]);
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
@@ -59,6 +63,11 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   const [rememberChoice, setRememberChoice] = useState<boolean | null>(null);
   const rememberForShot = rememberChoice ?? !detail.shotAgent;
   const stageBusy = detail.state.busy;
+  const characterNames = stageId === "characters" ? detail.expectedCharacters : [];
+  const editingCharacter =
+    characterNames.find((name) => name.toLowerCase() === activeCharacter?.toLowerCase()) ??
+    characterNames[0] ??
+    null;
   const canRun = detail.workflows.length > 0;
   // Выбранный (или по умолчанию) воркфлоу: облачный — только с галочкой, на один запуск.
   const activeWorkflow =
@@ -236,6 +245,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         form.set("file", file);
         form.set("target", target);
         form.set("approveAfter", approveAfter ? "true" : "false");
+        if (target === "refs" && editingCharacter) form.set("character", editingCharacter);
         const res = await fetch(`${stageApi}/upload`, { method: "POST", body: form });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
@@ -588,13 +598,21 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               </details>
             ) : null}
             <StageInputs
-              inputs={detail.inputs}
+              inputs={
+                editingCharacter
+                  ? detail.inputs.filter((input) =>
+                      input.label.toLowerCase().endsWith(` ${editingCharacter.toLowerCase()}`),
+                    )
+                  : detail.inputs
+              }
               boardRuns={canRun}
               onOpen={(files, file) => openImage(files, file, false, "refs")}
               onToggleExclude={excludeToggle}
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <DocFieldLabel note="файлы из refs/">Референсы</DocFieldLabel>
+              <DocFieldLabel note={editingCharacter ? `файлы ${editingCharacter}_ из refs/` : "файлы из refs/"}>
+                Референсы{editingCharacter ? `: ${editingCharacter}` : ""}
+              </DocFieldLabel>
               <div className="flex flex-wrap gap-2">
                 {stageId === "location" || stageId === "characters" ? (
                   <PrevShotRefButton
@@ -619,11 +637,24 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             </div>
             {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
             <RefFiles
-              files={detail.refs}
+              files={
+                editingCharacter
+                  ? detail.refs.filter((file) => characterOwnsFile(file.name, editingCharacter))
+                  : detail.refs
+              }
               selectedName={selectedRef}
               usedNames={usedRefNames(detail.refs, detail.output, selectedOutput, shotId)}
               onSelect={(name) => setSelectedRef((current) => (current === name ? null : name))}
-              onOpen={(file) => openImage(detail.refs, file, false, "refs")}
+              onOpen={(file) =>
+                openImage(
+                  editingCharacter
+                    ? detail.refs.filter((item) => characterOwnsFile(item.name, editingCharacter))
+                    : detail.refs,
+                  file,
+                  false,
+                  "refs",
+                )
+              }
               excluded={detail.excluded}
               onToggleExclude={excludeToggle}
             />
@@ -639,6 +670,34 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
               </div>
             </details>
+            {stageId === "characters" ? (
+              <CharacterRoster
+                names={characterNames}
+                active={editingCharacter}
+                disabled={busy || stageBusy}
+                onSelect={setActiveCharacter}
+                onChange={(names) => {
+                  void act(async () => {
+                    const data = await requestJson<StageDetail>(stageApi, {
+                      method: "PATCH",
+                      body: { characters: names },
+                      fallbackError: "Не удалось изменить персонажей",
+                    });
+                    stage.merge(data);
+                    const added = data.expectedCharacters.find(
+                      (name) => !characterNames.some((item) => item.toLowerCase() === name.toLowerCase()),
+                    );
+                    const still = data.expectedCharacters.find(
+                      (name) => name.toLowerCase() === editingCharacter?.toLowerCase(),
+                    );
+                    setActiveCharacter(added ?? still ?? data.expectedCharacters[0] ?? null);
+                    return data.expectedCharacters.length
+                      ? `Персонажи кадра: ${data.expectedCharacters.join(", ")}`
+                      : "В кадре никого";
+                  });
+                }}
+              />
+            ) : null}
           </div>
 
           {detail.playbooks.length ? (

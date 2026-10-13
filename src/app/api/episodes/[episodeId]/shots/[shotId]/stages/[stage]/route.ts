@@ -3,6 +3,8 @@ import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
 import { readRunSettings, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
+import { setShotCharacters } from "@/lib/series/shot-meta";
+import { readStatusFile, writeStatusFile } from "@/lib/series/status";
 import { assertStageFree } from "@/lib/series/stage-state";
 import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
@@ -58,7 +60,16 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       speech?: string;
       /** Убрать файл из графа этапа или вернуть (путь как MediaFile.relativePath). Файл не удаляется. */
       exclude?: { path?: string; excluded?: boolean };
+      /** Список персонажей кадра. Только этап characters. Пишет строку `- characters:` в shot.md. */
+      characters?: string[];
     };
+    if (Array.isArray(body.characters)) {
+      if (stageId !== "characters") throw new Error("Список персонажей меняется на этапе персонажей");
+      assertStageFree(episodeId, shotId, stageId);
+      const names = setShotCharacters(episodeId, shotId, body.characters.map(String));
+      const stored = readStatusFile(episodeId, shotId, stageId);
+      writeStatusFile(episodeId, shotId, stageId, { ...stored, expectedCharacters: names });
+    }
     if (body.exclude) {
       if (typeof body.exclude.path !== "string") throw new Error("Не указан файл");
       // Граф или агент могут как раз читать входы: менять их можно только у свободного этапа.
