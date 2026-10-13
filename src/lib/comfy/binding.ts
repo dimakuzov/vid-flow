@@ -514,6 +514,12 @@ function imageMin(input: ImageInput): number {
   return input.min ?? 1;
 }
 
+/** В кадре никого: картинки персонажей не обязательны, первый кадр собирается из локации. */
+function imageNeed(ctx: ShotContext, name: string, input: { min?: number }): number {
+  if (name === "people" && readShotMeta(ctx.episodeId, ctx.shotId).characters.length === 0) return 0;
+  return input.min ?? 1;
+}
+
 /** Файл, который слот-картинка получит. index — номер файла внутри его входа (для uploadAs). */
 export interface SlotFile {
   name: string;
@@ -547,9 +553,11 @@ export function missingInputs(ctx: ShotContext, binding: GraphBinding): string[]
     return readShotMeta(ctx.episodeId, ctx.shotId).characters.length ? [] : ["в кадре нет персонажей"];
   }
   const missing: string[] = [];
-  for (const input of Object.values(binding.inputs)) {
-    if ((input.kind !== "image" && input.kind !== "video") || imageMin(input) < 1) continue;
-    if (resolveImageInput(ctx, input).length < imageMin(input)) missing.push(input.label);
+  for (const [name, input] of Object.entries(binding.inputs)) {
+    if (input.kind !== "image" && input.kind !== "video") continue;
+    const need = imageNeed(ctx, name, input);
+    if (need < 1) continue;
+    if (resolveImageInput(ctx, input).length < need) missing.push(input.label);
   }
   return missing;
 }
@@ -1179,7 +1187,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   for (const [name, input] of Object.entries(binding.inputs)) {
     if (input.kind === "image" || input.kind === "video") {
       images[name] = resolveImageInput(ctx, input);
-      if (images[name].length < imageMin(input)) missing.push(input.label);
+      if (images[name].length < imageNeed(ctx, name, input)) missing.push(input.label);
     } else if (input.kind === "text") {
       const textInput = textInputFor(input, meta.characters);
       const resolved = resolveTextInput(ctx, binding, textInput, readPrompt, promptMd);
@@ -1242,7 +1250,8 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       if (!found) {
         // Ряд входов: слот обязателен, только если это один из обязательных файлов первого входа.
         const index = "index" in value && value.index != null ? value.index : 0;
-        empty(slot, input, "inputs" in value ? imageMin(input) > index : imageMin(input) >= 1);
+        const need = imageNeed(ctx, names[0], input);
+        empty(slot, input, "inputs" in value ? need > index : need >= 1);
         continue;
       }
       const filename = uploadName(found.input, found.file, found.index, ctx);

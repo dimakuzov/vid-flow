@@ -74,6 +74,7 @@ async function settle(episodeId: string) {
 test("подсказка модели: правила разметки, библиотека персонажей и локаций, сырой текст", () => {
   const prompt = buildFormatPrompt("Катя входит в кафе.");
   assert.match(prompt.system, /## s01/);
+  assert.match(prompt.system, /не дели один прописанный кадр/);
   assert.match(prompt.user, /персонажи: katya/);
   assert.match(prompt.user, /локации: cafe/);
   assert.match(prompt.user, /Катя входит в кафе\./);

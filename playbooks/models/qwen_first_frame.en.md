@@ -52,6 +52,10 @@ Never write a file name or a path (`refs/portret.png`, `shots/s10/...`) in the p
 
 Keep it short: `Place the girl from image 2 into the street from image 1`.
 
+### No character references
+
+When «Images the graph receives» lists only image 1, the shot has no characters. Do not write `image 2` and do not invent a person. image 1 stays exactly as it is: the same place, camera, objects and light. Add only what the shot action and the user's request ask to add, and nothing else. Start with `Edit image 1:` and name that addition. Do not describe the place again.
+
 ### Clothes and items
 
 Clothes, shoes, the bag, a hat, an umbrella and every other item come from the character's reference, unchanged. Do not describe them: no colour, cut, size, «closed», or «on the shoulder». The model draws any description its own way: in episode3 `a large black shoulder bag, big enough to hold several books` produced a different bag, and the user wrote «the bag is a sack» four times.

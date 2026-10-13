@@ -17,7 +17,7 @@ The board helps with this. A model with vision describes the approved location, 
 
 How to write this in the prompt: `playbooks/models/qwen_first_frame.en.md`, sections «First: the references win over the text», «Clothes and items», «Light», «Lock».
 
-When the location is approved but the shot has no characters (a figure with no reference, a silhouette), the rule is the same: the location from image 1 stays as it is and only the figure is added. Do not write a prompt that describes the place anew (`Top-down view of wet asphalt…`): the model will draw a different location.
+When the location is approved and `shot.md` names no characters, the board runs the same graph with only the location (image 1). The prompt adds only what the shot action and the user's request ask for, and does not describe the place anew (`Top-down view of wet asphalt…`): the model will draw a different location. When the shot names characters, the run does not start without their `characters/approve`.
 
 ## No character and no location
 

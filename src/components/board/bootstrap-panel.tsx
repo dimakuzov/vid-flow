@@ -15,6 +15,8 @@ interface TableShot {
 interface BootstrapPanelProps {
   initialEpisodeId: string | null;
   tableShots: TableShot[];
+  /** Кадры, спрятанные из таблицы. Папки на диске целы. */
+  hiddenShots: TableShot[];
   initialScenario: string;
   initialRawScenario: string;
   initialPreview: BootstrapPreview;
@@ -29,6 +31,7 @@ function sortShots(shots: BootstrapShotDraft[]): BootstrapShotDraft[] {
 export function BootstrapPanel({
   initialEpisodeId,
   tableShots,
+  hiddenShots,
   initialScenario,
   initialRawScenario,
   initialPreview,
@@ -60,6 +63,17 @@ export function BootstrapPanel({
           characters: shot.characters,
           location: shot.location,
         });
+      }
+      for (const shot of hiddenShots) {
+        if (!byId.has(shot.id)) {
+          byId.set(shot.id, {
+            id: shot.id,
+            title: shot.title,
+            summary: "",
+            characters: shot.characters,
+            location: shot.location,
+          });
+        }
       }
       for (const shot of preview.shots) {
         const current = byId.get(shot.id);
@@ -109,7 +123,7 @@ export function BootstrapPanel({
       setPreview(data.preview);
       setMessage(
         data.preview.shots.length
-          ? `Кадров в тексте: ${data.preview.shots.length}. Галка добавляет кадр в таблицу, снятая убирает.`
+          ? `Кадров в тексте: ${data.preview.shots.length}. Галка показывает кадр в таблице, снятая только прячет.`
           : "В этом тексте нет кадров «## s01». Сырой сценарий отправь на разметку.",
       );
     } catch (error) {
@@ -121,30 +135,40 @@ export function BootstrapPanel({
 
   async function toggleShot(id: string) {
     const removing = selected.includes(id);
-    if (!removing && !initialEpisodeId) {
+    if (!initialEpisodeId) {
       setMessage("Сначала выбери или добавь серию в заголовке");
       return;
     }
     setBusy(true);
     setMessage("");
     try {
-      const res = removing
-        ? await fetch(`/api/episodes/${initialEpisodeId}/shots/${id}`, { method: "DELETE" })
-        : await fetch("/api/series/bootstrap", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              scenario,
-              shotIds: [id],
-              overwriteDocs: false,
-              episodeId: initialEpisodeId,
-            }),
-            cache: "no-store",
-          });
+      const hidden = hiddenShots.some((shot) => shot.id === id);
+      const res =
+        removing || hidden
+          ? await fetch(`/api/episodes/${initialEpisodeId}/shots/${id}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ hidden: removing }),
+            })
+          : await fetch("/api/series/bootstrap", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                scenario,
+                shotIds: [id],
+                overwriteDocs: false,
+                episodeId: initialEpisodeId,
+              }),
+              cache: "no-store",
+            });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Не удалось изменить кадр");
       setSelected((prev) => (removing ? prev.filter((item) => item !== id) : [...prev, id]));
-      setMessage(removing ? `${id} убран из таблицы` : `${id} добавлен в таблицу`);
+      setMessage(
+        removing
+          ? `${id} скрыт из таблицы. Файлы кадра на месте.`
+          : `${id} снова в таблице`,
+      );
       onImported();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка");
@@ -161,7 +185,7 @@ export function BootstrapPanel({
             Импорт сценария
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-stone-600">
-            Галка ставит кадр в таблицу этой серии. Снятая галка убирает его из таблицы.
+            Галка показывает кадр в таблице. Снятая галка только прячет его: ничего не удаляется, включишь галку — кадр вернётся как был.
           </p>
         </div>
         <Button type="button" variant="outline" disabled={busy} onClick={previewScenario}>

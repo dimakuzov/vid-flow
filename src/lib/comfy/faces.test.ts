@@ -147,6 +147,16 @@ test("страница этапа: портреты показаны как об
   assert.deepEqual(faces?.files.map((file) => file.name), ["portret.png"]);
 });
 
+test("первый кадр без персонажей: только локация, вторая картинка вырезана", () => {
+  shot("s09", []);
+  setPrompt("s09", "Edit image 1. Add a closed diary on the nearest table. The place stays as in image 1.");
+  const built = build("s09");
+  assert.equal(built.prompt["902"], undefined);
+  assert.equal(built.prompt["488"].inputs["images.image_2"], undefined);
+  assert.equal(built.uploads.length, 1);
+  assert.match(built.uploads[0].path, /location/);
+});
+
 test("промпт с путями к файлам не уходит в модель", () => {
   assert.throws(() => assertModelText("Match the face from refs/portret - Copy.png."), /ссылается на файл/);
   assert.throws(() => assertModelText("Place Lena from shots/s10/characters/approve/x into it."), /ссылается на файл/);

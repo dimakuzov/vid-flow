@@ -55,13 +55,14 @@ export function RefSourcePicker({
     );
   }
 
-  async function add() {
+  async function add(paths = picked) {
+    if (!paths.length || pending) return;
     setPending(true);
     setError("");
     try {
       const data = await requestJson<{ message: string; stage: StageDetail }>(`${stageApi}/ref-sources`, {
         method: "POST",
-        body: { paths: picked },
+        body: { paths },
         fallbackError: "Не удалось добавить референс",
       });
       setOpen(false);
@@ -102,7 +103,7 @@ export function RefSourcePicker({
           >
             <h2 className="text-sm font-semibold text-stone-900">Добавить референс из…</h2>
             <p className="mt-1 text-xs text-stone-500">
-              Файл копируется в refs/. Исходник остаётся на месте. Можно выбрать несколько.
+              Файл копируется в refs/. Исходник остаётся на месте. Двойной щелчок добавляет сразу, несколько — галками и кнопкой внизу.
             </p>
             {groups === null && !error ? <p className="mt-3 text-sm text-stone-500">Загрузка…</p> : null}
             {groups?.length === 0 ? <p className="mt-3 text-sm text-stone-500">Нечего добавить.</p> : null}
@@ -119,6 +120,7 @@ export function RefSourcePicker({
                             type="button"
                             aria-pressed={on}
                             onClick={() => toggle(file.path)}
+                            onDoubleClick={() => void add([file.path])}
                             className={`grid w-full gap-1 rounded-md border p-1 text-left text-xs ${
                               on ? "border-teal-700 bg-teal-50" : "border-transparent hover:bg-stone-100"
                             }`}

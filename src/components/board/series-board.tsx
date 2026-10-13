@@ -372,6 +372,12 @@ export function SeriesBoard({
             characters: shot.characters,
             location: shot.location,
           }))}
+          hiddenShots={(series.hiddenShots ?? []).map((shot) => ({
+            id: shot.id,
+            title: shot.title,
+            characters: shot.characters,
+            location: shot.location,
+          }))}
           initialScenario={initialScenario}
           initialRawScenario={initialRawScenario}
           initialPreview={initialPreview}

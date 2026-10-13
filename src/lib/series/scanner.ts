@@ -9,6 +9,7 @@ import { listMediaFiles, readTextIfExists } from "./media";
 import { syncPromptHistory } from "./prompt-history";
 import { readShotWatch } from "./shot-watch";
 import { readFormatRequest } from "./format-request";
+import { readHiddenShotIds } from "./hidden-shots";
 import {
   episodeRoot,
   getDataRoot,
@@ -111,6 +112,7 @@ function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
     episodeTitle: "",
     episodes,
     shots: [],
+    hiddenShots: [],
     scenarioExists: false,
     hasRawScenario: false,
     formatRequestStatus: null,
@@ -141,7 +143,9 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
   const formatRequest = readFormatRequest(root);
   const raw = readTextIfExists(path.join(root, "scenario_raw.md"));
   const scenario = readTextIfExists(path.join(root, "scenario.md"));
+  const hidden = new Set(readHiddenShotIds(episodeId).map((id) => id.toLowerCase()));
   const shots: ShotSummary[] = [];
+  const hiddenShots: ShotSummary[] = [];
   for (const shotId of listShotIds(episodeId)) {
     try {
       const meta = readShotMeta(episodeId, shotId);
@@ -151,7 +155,7 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
           buildStageSummary(episodeId, shotId, stageId, meta.characters),
         ]),
       ) as Record<StageId, StageSummary>;
-      shots.push({
+      const summary: ShotSummary = {
         id: shotId,
         title: meta.title,
         characters: meta.characters,
@@ -159,7 +163,9 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
         stages,
         agent: shotAgentChoice(episodeId, shotId),
         agentActivity: readShotAgentActivity(episodeId, shotId),
-      });
+      };
+      if (hidden.has(shotId.toLowerCase())) hiddenShots.push(summary);
+      else shots.push(summary);
     } catch {
       // A file in this shot is still being written. Keep the rest of the series.
     }
@@ -176,6 +182,7 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
       : episodeTitle,
     episodes,
     shots,
+    hiddenShots,
     scenarioExists: scenario.trim().length > 0,
     hasRawScenario: raw.trim().length > 0,
     formatRequestStatus: formatRequest?.status ?? null,

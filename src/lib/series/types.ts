@@ -74,6 +74,8 @@ export interface SeriesSummary {
   episodeTitle: string;
   episodes: SeriesChoice[];
   shots: ShotSummary[];
+  /** Кадры на диске, скрытые из таблицы галкой импорта. Файлы у них на месте. */
+  hiddenShots: ShotSummary[];
   scenarioExists: boolean;
   hasRawScenario: boolean;
   formatRequestStatus: "pending" | "running" | "done" | "error" | null;
