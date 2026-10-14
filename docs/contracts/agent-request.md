@@ -132,7 +132,7 @@
 
 ## Модель этапа
 
-`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude на `first_frame` — Sonnet, даже если агенту кадра назначен Haiku. Массовый запуск и «Запустить следующий этап» берут её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск.
+`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude на `first_frame` — Sonnet, даже если агенту кадра назначен Haiku. Массовый запуск и «Запустить следующий этап» берут её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск. В меню выбора (этап, агент кадра, разметка сценария) есть ещё Opus 5.5 (`claude-opus-5-5`); по умолчанию он не стоит.
 
 ## Ручной режим и `agent-mail/`
 
