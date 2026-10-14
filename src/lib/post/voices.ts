@@ -2,9 +2,16 @@ import fs from "fs";
 import path from "path";
 import { getCharactersRoot } from "../series/paths";
 import { chunkLines, isV3Model, locateLines, refineBounds, type LineBounds } from "./align";
-import { DEFAULT_MODEL_ID, DEFAULT_TEXT_PREFIX, ttsWithTimestamps, type VoiceConfig } from "./elevenlabs";
-import { detectSilences, joinToWav } from "./ffmpeg";
-import type { PostLine } from "./lines";
+import {
+  DEFAULT_MODEL_ID,
+  DEFAULT_TEXT_PREFIX,
+  isolateVoice,
+  isolationCredits,
+  ttsWithTimestamps,
+  type VoiceConfig,
+} from "./elevenlabs";
+import { decodeToWavOfLength, detectSilences, joinToWav, probeMedia } from "./ffmpeg";
+import { estimateSpeechSec, type PostLine } from "./lines";
 import { characterKey, libraryCharacterDir, readJson, voicesDir, writeJson } from "./paths";
 
 /*
@@ -33,6 +40,7 @@ export function readVoiceConfig(character: string): VoiceConfig | null {
     voice_settings: data.voice_settings && typeof data.voice_settings === "object" ? data.voice_settings : undefined,
     seed: typeof data.seed === "number" ? data.seed : undefined,
     text_prefix: typeof data.text_prefix === "string" ? data.text_prefix.trim() : DEFAULT_TEXT_PREFIX,
+    isolate: data.isolate !== false,
   };
 }
 
@@ -49,7 +57,7 @@ export function writeVoiceConfig(character: string, input: Partial<VoiceConfig>)
   if (!/^[a-z0-9_]{3,64}$/.test(modelId)) throw new Error("model_id: например eleven_v3");
   const prefix = typeof input.text_prefix === "string" ? input.text_prefix.trim() : DEFAULT_TEXT_PREFIX;
   if (prefix.length > 200) throw new Error("Тег перед фразой: не длиннее 200 символов");
-  const config: VoiceConfig = { voice_id: voiceId, model_id: modelId, text_prefix: prefix };
+  const config: VoiceConfig = { voice_id: voiceId, model_id: modelId, text_prefix: prefix, isolate: input.isolate !== false };
   if (input.voice_settings && typeof input.voice_settings === "object") {
     const settings: Record<string, number | boolean> = {};
     for (const [key, value] of Object.entries(input.voice_settings)) {
@@ -98,6 +106,10 @@ export interface VoiceVersion {
   chars: number;
   chunks: VoiceChunk[];
   lines: VoiceLine[];
+  /** Звук до очистки (склейка ответов ElevenLabs); нет — `file` и есть исходник. */
+  rawFile?: string;
+  /** Voice Isolator: `done` — `file` очищен; `error` — очистка не удалась, `file` — исходник; `off` — выключена. */
+  isolation?: { status: "done" | "error" | "off"; credits?: number; error?: string; at?: string };
 }
 
 interface CurrentFile {
@@ -137,13 +149,35 @@ export function setCurrentVoice(episodeId: string, character: string, version: n
   writeJson(path.join(voicesDir(episodeId, character), "current.json"), { version, updatedAt: new Date().toISOString() });
 }
 
-/** Текст, который уйдёт в ElevenLabs, и число символов (оценка стоимости). */
+/**
+ * Текст, который уйдёт в ElevenLabs, и стоимость: символы озвучки и, если очистка включена,
+ * примерные кредиты Voice Isolator (по оценке длины речи и пауз между репликами).
+ */
 export function planCharacterVoice(lines: PostLine[], config: VoiceConfig) {
   const chunks = chunkLines(
     lines.map((line) => ({ line, text: ttsLineText(config, line.text) })),
     config.model_id,
   );
-  return { chunks, chars: chunks.reduce((sum, chunk) => sum + chunk.text.length, 0) };
+  const seconds = lines.reduce((sum, line) => sum + estimateSpeechSec(line.text) + 1, 0);
+  return {
+    chunks,
+    chars: chunks.reduce((sum, chunk) => sum + chunk.text.length, 0),
+    isolationChars: config.isolate ? isolationCredits(seconds) : 0,
+  };
+}
+
+/**
+ * Voice Isolator по склейке озвучки: ответ (mp3) рядом как `{base}.isolated.mp3`, звук для таймлайна —
+ * wav той же длины, что исходник, чтобы границы реплик не сдвинулись.
+ */
+async function cleanVoiceFile(dir: string, rawFile: string, cleanFile: string): Promise<number> {
+  const raw = path.join(dir, rawFile);
+  const { duration } = await probeMedia(raw);
+  const isolated = await isolateVoice(fs.readFileSync(raw), rawFile);
+  const mp3 = `${cleanFile.replace(/\.wav$/, "")}.isolated.mp3`;
+  fs.writeFileSync(path.join(dir, mp3), isolated);
+  await decodeToWavOfLength(path.join(dir, mp3), path.join(dir, cleanFile), duration);
+  return isolationCredits(duration);
 }
 
 /**
@@ -199,20 +233,36 @@ export async function generateCharacterVoice(
 
   onProgress(`${character}: склейка и границы реплик`);
   const wav = `${name}.wav`;
+  const raw = config.isolate ? `${name}.raw.wav` : wav;
   const joined = await joinToWav(
     parts.map((part) => path.join(dir, part.file)),
     CHUNK_GAP_SEC,
-    path.join(dir, wav),
+    path.join(dir, raw),
   );
+  // Очистка от шума и треска. Не удалась — озвучка уже оплачена: берём исходник и пишем ошибку.
+  let isolation: VoiceVersion["isolation"] = { status: "off" };
+  let file = raw;
+  if (config.isolate) {
+    onProgress(`${character}: очистка голоса (Voice Isolator)`);
+    try {
+      const credits = await cleanVoiceFile(dir, raw, wav);
+      isolation = { status: "done", credits, at: new Date().toISOString() };
+      file = wav;
+    } catch (error) {
+      isolation = { status: "error", error: error instanceof Error ? error.message : String(error), at: new Date().toISOString() };
+    }
+  }
   const speech = parts.flatMap((part, index) =>
     part.located.map((item) => ({ start: item.start + joined.offsets[index], end: item.end + joined.offsets[index] })),
   );
-  const bounds = refineBounds(speech, await detectSilences(path.join(dir, wav)), joined.duration);
+  const bounds = refineBounds(speech, await detectSilences(path.join(dir, file)), joined.duration);
   const data: VoiceVersion = {
     version: free,
     character,
     createdAt: new Date().toISOString(),
-    file: wav,
+    file,
+    rawFile: raw,
+    isolation,
     duration: joined.duration,
     config,
     chars,
@@ -229,4 +279,34 @@ export async function generateCharacterVoice(
   writeJson(path.join(dir, `${name}.json`), data);
   setCurrentVoice(episodeId, character, free);
   return data;
+}
+
+/**
+ * Очистить уже готовую текущую озвучку персонажа (Voice Isolator), без новой генерации.
+ * Версия та же: исходник остаётся (`rawFile`), `file` — очищенный wav, границы реплик — по новой тишине.
+ */
+export async function isolateCurrentVoice(
+  episodeId: string,
+  character: string,
+  onProgress: (text: string) => void = () => {},
+): Promise<VoiceVersion> {
+  const current = readCurrentVoice(episodeId, character);
+  if (!current) throw new Error(`У ${character} нет озвучки`);
+  if (current.isolation?.status === "done") return current;
+  const dir = voicesDir(episodeId, character);
+  const raw = current.rawFile ?? current.file;
+  const clean = `v${current.version}.clean.wav`;
+  onProgress(`${character}: очистка голоса (Voice Isolator)`);
+  const credits = await cleanVoiceFile(dir, raw, clean);
+  const speech = current.lines.map((line) => ({ start: line.speechStart, end: line.speechEnd }));
+  const bounds = refineBounds(speech, await detectSilences(path.join(dir, clean)), current.duration);
+  const updated: VoiceVersion = {
+    ...current,
+    file: clean,
+    rawFile: raw,
+    isolation: { status: "done", credits, at: new Date().toISOString() },
+    lines: current.lines.map((line, index) => ({ ...line, ...bounds[index] })),
+  };
+  writeJson(path.join(dir, `v${current.version}.json`), updated);
+  return updated;
 }

@@ -210,3 +210,26 @@ export async function synthesizeMedia(
   fs.mkdirSync(path.dirname(output), { recursive: true });
   await run(FFMPEG(), [...args, output]);
 }
+
+/** Звук в wav (44.1 кГц, моно) ровно заданной длины: короче — дополняется тишиной, длиннее — обрезается. */
+export async function decodeToWavOfLength(input: string, output: string, duration: number): Promise<void> {
+  const partial = `${output}.tmp.wav`;
+  await run(FFMPEG(), [
+    "-hide_banner",
+    "-y",
+    "-i",
+    input,
+    "-ac",
+    "1",
+    "-ar",
+    "44100",
+    "-af",
+    "apad",
+    "-t",
+    duration.toFixed(6),
+    "-c:a",
+    "pcm_s16le",
+    partial,
+  ]);
+  fs.renameSync(partial, output);
+}

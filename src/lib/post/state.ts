@@ -1,6 +1,6 @@
 import path from "path";
 import { collectPost, type LineVoiceStatus } from "./collect";
-import type { VoiceConfig } from "./elevenlabs";
+import { isolationCredits, type VoiceConfig } from "./elevenlabs";
 import { postDir, TIMELINE_FPS } from "./paths";
 import { listTimelines, readManifest, DEFAULT_SIZE } from "./timeline";
 import type { SpeechStatus } from "./speech-detect";
@@ -51,6 +51,10 @@ export interface PostCharacterView {
   versions: number[];
   /** Символов уйдёт в ElevenLabs при озвучке (оценка стоимости); 0 — нет voice.json. */
   chars: number;
+  /** Примерно кредитов Voice Isolator при новой озвучке (0 — очистка выключена). */
+  isolationChars: number;
+  /** Очистка текущей озвучки и сколько стоит очистить её сейчас. */
+  isolation: { status: "done" | "error" | "off" | "none"; error: string | null; cleanCost: number };
 }
 
 export interface PostState {
@@ -108,6 +112,12 @@ export async function getPostState(episodeId: string): Promise<PostState> {
       current: voice ? { version: voice.version, createdAt: voice.createdAt, chars: voice.chars } : null,
       versions: listVoiceVersions(episodeId, name),
       chars: config ? planCharacterVoice(own, config).chars : 0,
+      isolationChars: config ? planCharacterVoice(own, config).isolationChars : 0,
+      isolation: {
+        status: voice ? (voice.isolation?.status ?? "none") : "none",
+        error: voice?.isolation?.error ?? null,
+        cleanCost: voice && voice.isolation?.status !== "done" ? isolationCredits(voice.duration) : 0,
+      },
     };
   });
 

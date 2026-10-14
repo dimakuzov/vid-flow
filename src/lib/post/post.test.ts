@@ -20,7 +20,7 @@ import { readComfyJob } from "../comfy/queue";
 import { createEpisode, getCharactersRoot, getComfyQueueRoot, shotDir, stageDir } from "../series/paths";
 import { lineSeparator } from "./align";
 import { collectPost } from "./collect";
-import { synthesizeMedia } from "./ffmpeg";
+import { probeMedia, synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
 import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
 import { buildProject } from "./build";
@@ -37,7 +37,26 @@ const TONE = 0.8;
 const GAP = 1.0;
 
 type Seen = { url: string; key?: string; body: Record<string, unknown> };
+/** Запросы озвучки (text-to-speech). */
 const seen: Seen[] = [];
+/** Запросы Voice Isolator: имя поля и файла из multipart. */
+const isolationSeen: { key?: string; field: string; filename: string; bytes: number }[] = [];
+let isolationFails = false;
+
+/** Поддельный Voice Isolator: вынимает файл из multipart и отдаёт его тише и в mp3 (как «очищенный»). */
+async function fakeIsolation(raw: Buffer, contentType: string): Promise<{ field: string; filename: string; mp3: Buffer }> {
+  const boundary = contentType.match(/boundary=(.+)$/)![1];
+  const text = raw.toString("latin1");
+  const head = text.match(/name="([^"]+)"; filename="([^"]+)"/)!;
+  const start = text.indexOf("\r\n\r\n", text.indexOf(head[0])) + 4;
+  const end = text.lastIndexOf(`\r\n--${boundary}`);
+  const input = path.join(tmp, `iso-in-${isolationSeen.length}.wav`);
+  const output = path.join(tmp, `iso-out-${isolationSeen.length}.mp3`);
+  fs.writeFileSync(input, raw.subarray(start, end));
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-af", "volume=0.5", "-c:a", "libmp3lame", output]);
+  return { field: head[1], filename: head[2], mp3: fs.readFileSync(output) };
+}
 let server: http.Server;
 let requestNumber = 0;
 
@@ -89,9 +108,20 @@ async function fakeTts(text: string): Promise<{ audio: Buffer; alignment: unknow
 
 before(async () => {
   server = http.createServer((req, res) => {
-    let raw = "";
-    req.on("data", (chunk) => (raw += chunk));
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", async () => {
+      if (req.url === "/v1/audio-isolation") {
+        if (isolationFails) {
+          res.writeHead(500);
+          return res.end("isolation is down");
+        }
+        const { field, filename, mp3 } = await fakeIsolation(Buffer.concat(chunks), String(req.headers["content-type"]));
+        isolationSeen.push({ key: req.headers["xi-api-key"] as string | undefined, field, filename, bytes: mp3.length });
+        res.writeHead(200, { "Content-Type": "audio/mpeg" });
+        return res.end(mp3);
+      }
+      const raw = Buffer.concat(chunks).toString("utf8");
       const body = JSON.parse(raw || "{}") as Record<string, unknown>;
       seen.push({ url: req.url || "", key: req.headers["xi-api-key"] as string | undefined, body });
       if (!/^\/v1\/text-to-speech\/[^/]+\/with-timestamps/.test(req.url || "")) {
@@ -178,6 +208,7 @@ test("без галочки разрешения в ElevenLabs ничего не
     voice_id: "voiceJulia01",
     model_id: "eleven_multilingual_v2",
     text_prefix: "[strong Russian accent]",
+    isolate: true,
     voice_settings: { stability: 0.6 },
     seed: 7,
   });
@@ -192,7 +223,7 @@ test("озвучка персонажа: два куска склеены чер
   assert.equal(job.chars, julia.chars);
   const done = await runVoiceJob(EP, job.id);
   assert.equal(done.status, "done", done.error);
-  assert.deepEqual(done.results, [{ character: "Julia", version: 1 }]);
+  assert.deepEqual(done.results, [{ character: "Julia", version: 1, isolation: "done" }]);
 
   // Лимит 60 символов: две реплики Julia не влезают в один запрос.
   assert.equal(seen.length, 2);
@@ -206,8 +237,19 @@ test("озвучка персонажа: два куска склеены чер
   assert.equal(seen[0].body.previous_request_ids, undefined);
   assert.deepEqual(seen[1].body.previous_request_ids, ["req-1"]);
 
+  // Очистка включена по умолчанию: склейка ушла в Voice Isolator одним файлом, в работе — очищенный wav.
+  assert.equal(isolationSeen.length, 1);
+  assert.deepEqual([isolationSeen[0].key, isolationSeen[0].field, isolationSeen[0].filename], ["test-key", "audio", "v1.raw.wav"]);
+  assert.ok(job.isolationChars! > 0, "в оценке стоимости есть очистка");
+
   const voice = readCurrentVoice(EP, "Julia")!;
   assert.equal(voice.file, "v1.wav");
+  assert.equal(voice.rawFile, "v1.raw.wav");
+  assert.equal(voice.isolation?.status, "done");
+  assert.ok(fs.existsSync(path.join(voicesDir(EP, "Julia"), "v1.isolated.mp3")), "ответ Voice Isolator сохранён как есть");
+  const rawLength = (await probeMedia(path.join(voicesDir(EP, "Julia"), "v1.raw.wav"))).duration;
+  const cleanLength = (await probeMedia(path.join(voicesDir(EP, "Julia"), "v1.wav"))).duration;
+  assert.ok(Math.abs(rawLength - cleanLength) < 0.001, `очищенный файл той же длины: ${rawLength} / ${cleanLength}`);
   assert.ok(fs.existsSync(path.join(voicesDir(EP, "Julia"), "v1.wav")));
   assert.ok(fs.existsSync(path.join(voicesDir(EP, "Julia"), "v1.part2.mp3")));
   assert.equal(voice.chunks.length, 2);
@@ -421,6 +463,49 @@ test("«Собрать проект» сам распознаёт речь та�
   assert.equal(after, before + 1, "распознавание s02 поставлено заново");
   assert.match(manifest.warnings[0], /^s02: распознавание речи не ушло в ComfyUI/);
   assert.ok(fs.existsSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", ""))), "проект собран");
+});
+
+test("Voice Isolator: сбой не теряет оплаченную озвучку; готовую озвучку можно очистить отдельно", async () => {
+  // Очистка упала — озвучка в работе, в проекте исходный звук, ошибка видна в задании и версии.
+  isolationFails = true;
+  let job = await runVoiceJob(EP, (await enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true })).id);
+  isolationFails = false;
+  assert.equal(job.status, "done", job.error);
+  assert.equal(job.results[0].isolation, "error");
+  assert.match(job.results[0].isolationError!, /Voice Isolator: HTTP 500/);
+  let voice = readCurrentVoice(EP, "Julia")!;
+  assert.equal(voice.isolation?.status, "error");
+  assert.equal(voice.file, voice.rawFile, "в работе исходник");
+
+  // Без галочки очистка не ставится.
+  const sent = isolationSeen.length;
+  await assert.rejects(enqueueVoiceJob(EP, { characters: ["Julia"], kind: "isolate" }), /Разрешить платную отправку/);
+  assert.equal(isolationSeen.length, sent);
+
+  // «Очистить голос»: та же версия, новый файл, исходник остаётся.
+  job = await runVoiceJob(EP, (await enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true, kind: "isolate" })).id);
+  assert.equal(job.status, "done", job.error);
+  assert.equal(job.kind, "isolate");
+  assert.equal(job.chars, 0, "текст в ElevenLabs не уходит");
+  assert.ok(job.isolationChars! > 0);
+  assert.equal(isolationSeen.length, sent + 1);
+  const cleaned = readCurrentVoice(EP, "Julia")!;
+  assert.equal(cleaned.version, voice.version);
+  assert.equal(cleaned.file, `v${voice.version}.clean.wav`);
+  assert.equal(cleaned.rawFile, voice.file);
+  assert.equal(cleaned.isolation?.status, "done");
+  const { lines } = await collectPost(EP);
+  assert.ok(lines.find((item) => item.id === "s02-1")!.clip!.source.endsWith(`v${voice.version}.clean.wav`), "в проект идёт очищенный звук");
+  await assert.rejects(enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true, kind: "isolate" }), /уже очищена/);
+
+  // Очистка выключена в voice.json — Voice Isolator не вызывается.
+  writeVoiceConfig("Julia", { voice_id: "voiceJulia01", isolate: false });
+  job = await runVoiceJob(EP, (await enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true })).id);
+  voice = readCurrentVoice(EP, "Julia")!;
+  assert.equal(job.isolationChars, 0);
+  assert.equal(isolationSeen.length, sent + 1);
+  assert.equal(voice.isolation?.status, "off");
+  assert.equal(voice.file, `v${voice.version}.wav`);
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */

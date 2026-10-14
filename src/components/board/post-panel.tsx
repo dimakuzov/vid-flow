@@ -55,11 +55,17 @@ function seconds(value: number): string {
 }
 
 function jobText(job: VoiceJob): string {
-  if (job.status === "pending") return "Озвучка поставлена…";
-  if (job.status === "running") return `Озвучка идёт: ${job.progress ?? "запросы в ElevenLabs"}`;
-  if (job.status === "error") return `Озвучка не удалась: ${job.error ?? "ошибка"}`;
+  const what = job.kind === "isolate" ? "Очистка голоса" : "Озвучка";
+  if (job.status === "pending") return `${what} поставлена…`;
+  if (job.status === "running") return `${what} идёт: ${job.progress ?? "запросы в ElevenLabs"}`;
+  if (job.status === "error") return `${what} не удалась: ${job.error ?? "ошибка"}`;
   const versions = job.results.map((item) => `${item.character} v${item.version}`).join(", ");
-  return `Озвучено: ${versions} (${job.chars} символов)`;
+  const failed = job.results.filter((item) => item.isolation === "error");
+  const cost = job.kind === "isolate" ? `≈${job.isolationChars ?? 0} кредитов` : `${job.chars} символов${job.isolationChars ? ` + ≈${job.isolationChars} за очистку` : ""}`;
+  const done = `${job.kind === "isolate" ? "Очищено" : "Озвучено"}: ${versions} (${cost})`;
+  return failed.length
+    ? `${done}. Очистка не удалась у ${failed.map((item) => `${item.character} (${item.isolationError ?? "ошибка"})`).join(", ")} — в проекте исходный звук`
+    : done;
 }
 
 /** Поле секунд: правка уходит на сервер по Enter или при уходе с поля. */
@@ -125,6 +131,7 @@ function VoiceForm({
   const [speed, setSpeed] = useState(String(config?.voice_settings?.speed ?? ""));
   const [seed, setSeed] = useState(config?.seed === undefined ? "" : String(config.seed));
   const [prefix, setPrefix] = useState(config?.text_prefix ?? "[strong Russian accent]");
+  const [isolate, setIsolate] = useState(config?.isolate ?? true);
 
   const num = (value: string) => (value.trim() === "" ? undefined : Number(value.replace(",", ".")));
   const field = "rounded-md border border-stone-300 bg-white px-2 py-1 text-xs";
@@ -141,6 +148,10 @@ function VoiceForm({
       <label className="flex flex-col gap-1 sm:col-span-2 lg:col-span-4">
         Тег перед каждой фразой (аудиотег v3; в текст реплик и субтитры не попадает; пусто — без тега)
         <input className={`${field} font-mono`} value={prefix} onChange={(event) => setPrefix(event.target.value)} />
+      </label>
+      <label className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
+        <input type="checkbox" checked={isolate} onChange={(event) => setIsolate(event.target.checked)} />
+        Очищать голос через Voice Isolator после озвучки (убирает шум и треск; ≈1000 кредитов за минуту звука)
       </label>
       <label className="flex flex-col gap-1">
         stability
@@ -179,6 +190,7 @@ function VoiceForm({
               },
               seed: num(seed),
               text_prefix: prefix,
+              isolate,
             })
           }
         >
@@ -273,7 +285,12 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
 
   const voiceable = state.characters.filter((item) => item.config);
   const chosen = selected ?? voiceable.filter((item) => item.pending > 0).map((item) => item.name);
-  const chosenChars = state.characters.filter((item) => chosen.includes(item.name)).reduce((sum, item) => sum + item.chars, 0);
+  const chosenItems = state.characters.filter((item) => chosen.includes(item.name));
+  const chosenChars = chosenItems.reduce((sum, item) => sum + item.chars, 0);
+  const chosenIsolation = chosenItems.reduce((sum, item) => sum + item.isolationChars, 0);
+  // «Очистить голос» — у отмеченных, у кого есть озвучка и она ещё не очищена.
+  const cleanable = chosenItems.filter((item) => item.current && item.isolation.status !== "done");
+  const cleanCost = cleanable.reduce((sum, item) => sum + item.isolation.cleanCost, 0);
   const sizeChoice =
     SIZES.find((item) => item.label === size) ??
     SIZES.find((item) => item.width === state.defaultSize.width && item.height === state.defaultSize.height) ??
@@ -352,6 +369,24 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                     ) : (
                       <span className="text-xs text-stone-500">не озвучен</span>
                     )}
+                    {character.current ? (
+                      <span
+                        title={character.isolation.error ?? undefined}
+                        className={`text-xs ${
+                          character.isolation.status === "done"
+                            ? "text-emerald-800"
+                            : character.isolation.status === "error"
+                              ? "text-amber-800"
+                              : "text-stone-500"
+                        }`}
+                      >
+                        {character.isolation.status === "done"
+                          ? "очищен"
+                          : character.isolation.status === "error"
+                            ? "очистка не удалась"
+                            : "не очищен"}
+                      </span>
+                    ) : null}
                     {character.versions.length > 1 ? (
                       <select
                         className="rounded-md border border-stone-300 bg-white px-1 py-0.5 text-xs"
@@ -410,7 +445,9 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                 Разрешить платную отправку в ElevenLabs
               </label>
               <span className="text-xs text-amber-900">
-                {chosen.length ? `${chosen.join(", ")}: ${chosenChars} символов` : "Отметьте персонажей"}
+                {chosen.length
+                  ? `${chosen.join(", ")}: ${chosenChars} символов${chosenIsolation ? ` + ≈${chosenIsolation} кредитов на очистку` : ""}`
+                  : "Отметьте персонажей"}
               </span>
               <Button
                 size="sm"
@@ -432,6 +469,27 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                   ? "Перегенерировать"
                   : "Озвучить"}
               </Button>
+              {cleanable.length ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  title={`Voice Isolator по текущей озвучке: ${cleanable.map((item) => item.name).join(", ")}, ≈${cleanCost} кредитов`}
+                  disabled={!allowPaid || busy || jobActive || !state.keyConfigured}
+                  onClick={() =>
+                    act(async () => {
+                      await requestJson<VoiceJob>(postApi(episodeId, "/voice-job"), {
+                        method: "POST",
+                        body: { characters: cleanable.map((item) => item.name), allowPaid: true, kind: "isolate" },
+                      });
+                      setAllowPaid(false);
+                      setSelected(null);
+                      return null;
+                    })
+                  }
+                >
+                  Очистить голос (≈{cleanCost})
+                </Button>
+              ) : null}
               {!state.keyConfigured ? (
                 <span className="text-xs text-red-800">Нет ELEVENLABS_API_KEY в .env.local — впишите ключ и перезапустите доску.</span>
               ) : null}

@@ -4,7 +4,14 @@ import path from "path";
 import { elevenKey } from "./elevenlabs";
 import { readPostLines, writePostLines, type PostLine } from "./lines";
 import { jobsDir, readJson, writeJson } from "./paths";
-import { generateCharacterVoice, planCharacterVoice, readVoiceConfig } from "./voices";
+import { isolationCredits } from "./elevenlabs";
+import {
+  generateCharacterVoice,
+  isolateCurrentVoice,
+  planCharacterVoice,
+  readCurrentVoice,
+  readVoiceConfig,
+} from "./voices";
 
 /*
  * Задание озвучки `post/jobs/voice-*.json`. Ставит только кнопка «Озвучить» с галочкой
@@ -19,16 +26,20 @@ export interface VoiceJob {
   id: string;
   episodeId: string;
   characters: string[];
+  /** `voice` — новая озвучка (и очистка, если включена); `isolate` — только очистка текущей озвучки. */
+  kind?: "voice" | "isolate";
   status: VoiceJobStatus;
   /** Символов к отправке (оценка стоимости, показана при постановке). */
   chars: number;
+  /** Примерно кредитов на Voice Isolator. */
+  isolationChars?: number;
   allowPaid: true;
   createdAt: string;
   startedAt?: string;
   finishedAt?: string;
   pid?: number;
   progress?: string;
-  results: { character: string; version: number }[];
+  results: { character: string; version: number; isolation?: "done" | "error" | "off"; isolationError?: string }[];
   error?: string;
 }
 
@@ -77,6 +88,7 @@ export interface VoicePlan {
   character: string;
   lines: PostLine[];
   chars: number;
+  isolationChars: number;
 }
 
 /** Что уйдёт в ElevenLabs по персонажам (для кнопки и оценки стоимости). Без записи. */
@@ -87,14 +99,25 @@ export async function planVoices(episodeId: string, characters: string[]): Promi
     if (!own.length) throw new Error(`У ${character} нет реплик в speech.md`);
     const config = readVoiceConfig(character);
     if (!config) throw new Error(`У ${character} нет voice.json с voice_id — заполните голос`);
-    return { character: own[0].character, lines: own, chars: planCharacterVoice(own, config).chars };
+    const plan = planCharacterVoice(own, config);
+    return { character: own[0].character, lines: own, chars: plan.chars, isolationChars: plan.isolationChars };
+  });
+}
+
+/** Очистка текущей озвучки: сколько кредитов уйдёт (по длине готового файла). Без записи. */
+export function planIsolation(episodeId: string, characters: string[]): { character: string; isolationChars: number }[] {
+  return characters.map((character) => {
+    const current = readCurrentVoice(episodeId, character);
+    if (!current) throw new Error(`У ${character} нет озвучки — сначала озвучьте`);
+    if (current.isolation?.status === "done") throw new Error(`У ${character} озвучка v${current.version} уже очищена`);
+    return { character: current.character, isolationChars: isolationCredits(current.duration) };
   });
 }
 
 /** «Озвучить». Без `allowPaid` ничего не ставится и в ElevenLabs ничего не уходит. */
 export async function enqueueVoiceJob(
   episodeId: string,
-  options: { characters: string[]; allowPaid?: boolean },
+  options: { characters: string[]; allowPaid?: boolean; kind?: "voice" | "isolate" },
 ): Promise<VoiceJob> {
   if (options.allowPaid !== true) {
     throw new Error("Поставьте галочку «Разрешить платную отправку в ElevenLabs»: озвучка списывает символы тарифа");
@@ -107,14 +130,20 @@ export async function enqueueVoiceJob(
     if (!isInterrupted(job)) throw new Error("Озвучка уже идёт — дождитесь её");
     writeJson(jobFile(episodeId, job.id), { ...job, status: "error", error: interruptedText(job), finishedAt: new Date().toISOString() });
   }
-  const plan = await planVoices(episodeId, characters);
+  const kind = options.kind === "isolate" ? "isolate" : "voice";
+  const plan =
+    kind === "isolate"
+      ? planIsolation(episodeId, characters).map((item) => ({ ...item, chars: 0 }))
+      : await planVoices(episodeId, characters);
   const now = new Date();
   const job: VoiceJob = {
     id: `voice-${now.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${crypto.randomBytes(3).toString("hex")}`,
     episodeId,
     characters: plan.map((item) => item.character),
+    kind,
     status: "pending",
     chars: plan.reduce((sum, item) => sum + item.chars, 0),
+    isolationChars: plan.reduce((sum, item) => sum + item.isolationChars, 0),
     allowPaid: true,
     createdAt: now.toISOString(),
     results: [],
@@ -139,9 +168,27 @@ export async function runVoiceJob(episodeId: string, id: string): Promise<VoiceJ
   try {
     const { lines } = await readPostLines(episodeId);
     for (const character of job.characters) {
-      const own = lines.filter((line) => line.character.toLowerCase() === character.toLowerCase());
-      const version = await generateCharacterVoice(episodeId, character, own, (progress) => save({ progress }));
-      save({ results: [...job.results, { character, version: version.version }] });
+      const onProgress = (progress: string) => save({ progress });
+      const version =
+        job.kind === "isolate"
+          ? await isolateCurrentVoice(episodeId, character, onProgress)
+          : await generateCharacterVoice(
+              episodeId,
+              character,
+              lines.filter((line) => line.character.toLowerCase() === character.toLowerCase()),
+              onProgress,
+            );
+      save({
+        results: [
+          ...job.results,
+          {
+            character,
+            version: version.version,
+            ...(version.isolation ? { isolation: version.isolation.status } : {}),
+            ...(version.isolation?.error ? { isolationError: version.isolation.error } : {}),
+          },
+        ],
+      });
     }
     // Таблица реплик на диске — по текущим speech.md (правки доски сохраняются).
     writePostLines(episodeId, lines);

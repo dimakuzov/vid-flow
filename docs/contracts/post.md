@@ -8,7 +8,9 @@
 data/characters/{Name}/voice.json        голос персонажа, общий для всех эпизодов
 data/episodes/{ep}/post/
   lines.json                             правки реплик доски
-  voices/{Character}/v{N}.wav            озвучка персонажа: все его реплики одним файлом
+  voices/{Character}/v{N}.wav            озвучка персонажа: все его реплики одним файлом (очищенная Voice Isolator)
+  voices/{Character}/v{N}.raw.wav        та же склейка до очистки
+  voices/{Character}/v{N}.isolated.mp3   ответ Voice Isolator как есть
   voices/{Character}/v{N}.json           версия: границы реплик, куски, настройки
   voices/{Character}/v{N}.part{K}.mp3    ответ ElevenLabs как есть (+ .json: request-id, текст, таймстемпы)
   voices/{Character}/current.json        { version, updatedAt } — версия в работе
@@ -58,13 +60,22 @@ data/episodes/{ep}/post/
 
 Ошибка посреди — оплаченные куски остаются на диске, версия не становится текущей. Номер версии не переиспользуется.
 
+### Очистка голоса (Voice Isolator)
+
+`voice.json` → `"isolate"` (поля нет — `true`). После склейки `v{N}.raw.wav` уходит в `POST /v1/audio-isolation` (multipart, поле `audio`; ответ — mp3, ~1000 кредитов за минуту звука). Ответ сохраняется как `v{N}.isolated.mp3` и раскодируется в `v{N}.wav` ровно той же длины, что исходник (границы реплик не сдвигаются), тишина и границы считаются по очищенному файлу.
+
+- `v{N}.json` → `rawFile` (исходник) и `isolation: { status: "done" | "error" | "off", credits?, error?, at? }`; `file` — то, что идёт в проект.
+- Очистка не удалась — озвучка уже оплачена: версия становится текущей с `file` = исходник, `isolation.status: "error"`, ошибка в задании (`results[].isolationError`). Повторной отправки нет.
+- «Очистить голос» (`POST .../post/voice-job` с `kind: "isolate"`, та же галочка) — очистка текущей озвучки без новой генерации: в той же версии появляется `v{N}.clean.wav`, `file` переключается на него, `rawFile` — прежний файл. Уже очищенную повторно не ставит.
+- Оценка стоимости в задании и на доске: `chars` (символы озвучки) и `isolationChars` (≈ кредиты очистки).
+
 Перегенерация персонажа не теряет правки: `at`, `trimIn`, `trimOut` хранятся в `lines.json` по `id` реплики и применяются к новой версии, пока текст реплики не изменился. Правки, сделанные в Resolve, доска не видит (бесплатная версия без скриптов): договорено, что грубо — на доске, окончательно — в Resolve, после этого таймлайн заново не собирают.
 
 ## Платная отправка
 
 Задание озвучки ставит только `POST .../post/voice-job` с `allowPaid: true` — галочка «Разрешить платную отправку в ElevenLabs» на один запуск, рядом оценка стоимости в символах. Без неё — ошибка, в ElevenLabs ничего не уходит. Ключ — `ELEVENLABS_API_KEY` в `.env.local` (вписывает пользователь). `ELEVENLABS_URL` — другой адрес (тесты).
 
-`jobs/voice-*.json` → `{ id, episodeId, characters, status: pending|running|done|error, chars, allowPaid, createdAt, startedAt, finishedAt, pid, progress, results: [{ character, version }], error }`. Выполняется в процессе доски сразу после постановки, одно задание на эпизод за раз. Повторной отправки нет: задание, которое процесс не выполняет (доска перезапускалась), показывается и записывается как `error` «Озвучка прервалась…».
+`jobs/voice-*.json` → `{ id, episodeId, characters, kind: voice|isolate, status: pending|running|done|error, chars, isolationChars, allowPaid, createdAt, startedAt, finishedAt, pid, progress, results: [{ character, version, isolation?, isolationError? }], error }`. Выполняется в процессе доски сразу после постановки, одно задание на эпизод за раз. Повторной отправки нет: задание, которое процесс не выполняет (доска перезапускалась), показывается и записывается как `error` «Озвучка прервалась…».
 
 ## Речь в кадрах — под губы
 
@@ -106,7 +117,7 @@ Resolve: File → Import → Timeline. Секвенция 24 fps, размер �
 | `PATCH .../post/lines` `{ id, at?, trimIn?, trimOut?, speed? }` | правка реплики (`at: null`, `speed: null` — вернуть авто) → `PostState` |
 | `PUT .../post/voices` `{ character, voice_id, model_id?, voice_settings?, seed? }` | `voice.json` → `PostState` |
 | `POST .../post/voices` `{ character, version }` | сделать версию озвучки текущей → `PostState` |
-| `POST .../post/voice-job` `{ characters, allowPaid: true }` | озвучка (платно) → `VoiceJob` |
+| `POST .../post/voice-job` `{ characters, allowPaid: true, kind? }` | озвучка (`voice`, с очисткой, если включена) или очистка текущей озвучки (`isolate`) — платно → `VoiceJob` |
 | `POST .../post/speech` `{ shotIds?, force? }` | распознать речь финалов (Whisper, очередь ComfyUI) → `{ queued, skipped }` |
 | `POST .../post/timeline` `{ width?, height? }` | новая версия: `.kdenlive` и `.fcpxml` → `Manifest` (`kdenlive`, `timeline`) |
 | `GET .../post/file?path=` | файл папки поста (`.wav .mp3 .json .fcpxml .kdenlive .srt`), Range для звука; таймлайны — на скачивание |

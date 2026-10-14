@@ -33,6 +33,8 @@ export interface VoiceConfig {
    * Пусто — без тега. Модели v2 теги не понимают и прочтут вслух.
    */
   text_prefix: string;
+  /** Очищать озвучку через Voice Isolator (шум, треск). Поля нет — да. */
+  isolate: boolean;
 }
 
 export function elevenBase(): string {
@@ -94,4 +96,37 @@ export async function ttsWithTimestamps(
     alignment: data.alignment,
     requestId: res.headers.get("request-id"),
   };
+}
+
+/** Voice Isolator списывает ~1000 кредитов за минуту звука (https://elevenlabs.io/docs/overview/capabilities/voice-isolator). */
+export const ISOLATION_CREDITS_PER_MINUTE = 1000;
+
+export function isolationCredits(seconds: number): number {
+  return Math.ceil((Math.max(0, seconds) / 60) * ISOLATION_CREDITS_PER_MINUTE);
+}
+
+/**
+ * Voice Isolator: POST /v1/audio-isolation (multipart, поле `audio`). Ответ — очищенный звук, mp3.
+ * https://elevenlabs.io/docs/api-reference/audio-isolation/convert. Платно; повторов нет.
+ */
+export async function isolateVoice(audio: Buffer, filename: string): Promise<Buffer> {
+  const form = new FormData();
+  form.append("audio", new Blob([new Uint8Array(audio)]), filename);
+  const res = await fetch(`${elevenBase()}/v1/audio-isolation`, {
+    method: "POST",
+    headers: { "xi-api-key": elevenKey(), Accept: "audio/mpeg" },
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = (await res.text()).trim().slice(0, 300);
+    } catch {
+      // без тела
+    }
+    throw new Error(`ElevenLabs Voice Isolator: ${statusText(res.status)} ${detail}`.trim());
+  }
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length < 100) throw new Error("ElevenLabs Voice Isolator: пустой ответ");
+  return bytes;
 }
