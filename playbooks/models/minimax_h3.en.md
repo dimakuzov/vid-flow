@@ -35,6 +35,8 @@ Exception: if the low-res video has flicker or noise that the final must not hav
 
 The board guarantees both: if the body lacks `use @vid-1 as a reference`, it puts the fixed phrase first; if it lacks `required motion guide`, it adds the closing line at the end (manifest `steps`). Write them yourself when you need a variant (S4), and the board will not add a second copy.
 
+**LoRA trigger** — the word `r34l1sm`. The board puts it first in the body, ahead of the fixed phrase and the rest of the text. Do not write it yourself: if the body already contains it, the board does not add it again. The LoRA is `minimax/h3-realism-people-t2v-i2v-r2v.safetensors` at strength 0.7, on all three H3 variants (in the graph's `loras`, beside the turbo LoRA).
+
 To see what H3 really got, read the metadata of the output video file itself, or `data/comfy_queue/<id>.json`. Do not open the video in the ComfyUI interface to check it: the Continuity node's frontend overwrites `creator_data` with its own empty state (empty prompt, no assets, 16:9), and the saved workflow shows that instead.
 
 **The source to refine** is the prompt of the approved sketch, as saved in the video metadata (`video_preview/approve/`, the `prompt` key). No metadata — the sketch's `prompt.md`, and the board notes that in `run_log.md`. Not the prompt of an older H3 render: its action may differ (S6: in the old text the water turned red, in the approved video it washes away). An edit of `prompt.md` after the video was approved does not reach the final until the video is generated again.
@@ -161,7 +163,7 @@ Stage `final_render`, graph `playbooks/workflows/comfy/minimax_h3_creator_api.js
 | duration | = the length of the low-res video | read from the mp4 |
 | the sketch prompt | segment `prompt` and `refined.source` | metadata of the video in `video_preview/approve/`; if there is none, the sketch's `prompt.md` |
 
-**`prompt.md` is the refine, split into sections. The board adds nothing.** Return exactly this, in English, no other headings:
+**`prompt.md` is the refine, split into sections.** Do not write `r34l1sm`: the board puts that word first in the body. Return exactly this, in English, no other headings:
 
 ```md
 ## body
@@ -186,7 +188,7 @@ Rules:
 2. Write `subject_definitions`, `summary`, `retention_analysis` (section 4). An empty or missing one is derived by the node, which is where the refiner errors come from.
 3. `@img-N` numbers follow the table above. Two characters: `@img-2` is the first by file name, `@img-3` the second. A character whose face is not visible gets no reference: say so in the message to the user instead of inventing a label.
 4. Start from the approved sketch prompt (the video metadata; if it has none, `video_preview/prompt.md`), not from an older final.
-5. No Russian text: the board refuses such a `prompt.md`. The only exception is the lines below.
+5. The prompt is always English. Do not translate any of it into Russian: the board refuses a `prompt.md` with Russian text. The only text copied as written is a line from `speech.md` (below); that is not a translation.
 6. Lines: see «Dialogue» below. No lines — `## soundscape` is the environment only.
 
 **Dialogue** (the shot has lines in `speech.md`, section «Реплики» / `Lines`). MiniMax voices the shot and moves the lips itself, so every line goes into `## body` word for word, as a numbered dialogue, in the node's own grammar (Continuity refine guide: `families/h3/prompts/base-en.txt`, §4.4): the speaker by look and position in the frame, a stable speaker ID `(S1)`, `(S2)`, and the words inside `<d>[English] …</d>`. Use the first frame prompt from the task to know who is on the left and who is on the right. The ambient sound goes to `## soundscape`, never the lines (the guide: dialogue belongs in the description and is not repeated in the soundscape).

@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/stages/final_render.md`
 
 ## Decision: the final is MiniMax H3 from the approved preview
 
-The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Continuity): the low-res Wan video from `video_preview/approve/` is the motion reference, the approved first frame is the final's first frame, character references give the faces. How to write the text and the `prompt.md` format: `playbooks/models/minimax_h3.en.md`.
+The final render is made by MiniMax H3 (the `MiniMaxH3Creator` node, ComfyUI-Continuity): the low-res Wan video from `video_preview/approve/` is the motion reference, the approved first frame is the final's first frame, character references give the faces. How to write the text and the `prompt.md` format: `playbooks/models/minimax_h3.en.md`. `prompt.md` is always English. Do not translate any of it into Russian.
 
 ## Variants
 

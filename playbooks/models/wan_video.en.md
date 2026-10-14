@@ -154,7 +154,7 @@ The board puts `prompt.md` into the positive prompt node (`129:93`) **as is**: n
 
 ### What to return
 
-Only the prompt text. One paragraph in English. 55–90 words, never more than 100. No headings, quotes, markdown, lists, or notes to the user.
+Only the prompt text. One paragraph in English. Do not translate any of it into Russian. 55–90 words, never more than 100. No headings, quotes, markdown, lists, or notes to the user.
 
 ### i2v template (`video_i2v`, `final_i2v`)
 
@@ -211,4 +211,4 @@ The board does not switch by itself. If the selected variant does not fit, write
 | Final: one speaker | `final_h3_768_face` |
 | Final: two or more speakers | `final_heygen` (the cloud runs only after the user ticks the box for this one run) |
 
-A prompt that starts with `use image as the first frame.` is LTX, not Wan.
+An LTX caption is the paragraph in `playbooks/models/ltx_video.en.md`: it opens on the framing of the first frame. Do not paste it into Wan.

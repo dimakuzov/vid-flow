@@ -4,7 +4,7 @@ English copy for the model. Russian original: `playbooks/stages/video_preview.md
 
 Low resolution: check the movement. Wan 2.2 turbo sketch, 576×1024, 16 fps. The board runs the graph.
 
-Prompt: `playbooks/models/wan_video.en.md`, template in section 8. How the graph is built: `playbooks/workflows/video_preview_comfy.en.md`.
+Prompt: `playbooks/models/wan_video.en.md`, template in section 8. How the graph is built: `playbooks/workflows/video_preview_comfy.en.md`. `prompt.md` is always English. Do not translate any of it into Russian.
 
 ## Variants
 
