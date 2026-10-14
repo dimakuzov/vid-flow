@@ -4,7 +4,7 @@
 
 ## Решение: финал — MiniMax H3 по утверждённому превью
 
-Финальный рендер делает MiniMax H3 (нода `MiniMaxH3Creator`, ComfyUI-Continuity): low-res Wan-ролик из `video_preview/approve/` — референс движения, утверждённый первый кадр — первый кадр финала, референсы персонажей — лица. Как писать текст и формат `prompt.md` — `playbooks/models/minimax_h3.md`.
+Финальный рендер делает MiniMax H3 (нода `MiniMaxH3Creator`, ComfyUI-Continuity): low-res Wan-ролик из `video_preview/approve/` — референс движения, утверждённый первый кадр — первый кадр финала, референсы персонажей — лица. Как писать текст и формат `prompt.md` — `playbooks/models/minimax_h3.md`. `prompt.md` всегда на английском. На русский ничего не переводить.
 
 ## Варианты
 

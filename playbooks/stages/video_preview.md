@@ -4,7 +4,7 @@
 
 Низкое разрешение: проверить движение. Эскиз Wan 2.2 turbo, 576×1024, 16 fps. Граф запускает доска.
 
-Промпт: `playbooks/models/wan_video.md`, шаблон — раздел 8. Как устроен граф: `playbooks/workflows/video_preview_comfy.md`.
+Промпт: `playbooks/models/wan_video.md`, шаблон — раздел 8. Как устроен граф: `playbooks/workflows/video_preview_comfy.md`. `prompt.md` всегда на английском. На русский ничего не переводить.
 
 ## Варианты
 

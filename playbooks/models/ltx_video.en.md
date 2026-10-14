@@ -6,6 +6,8 @@ Source: ComfyUI-Continuity, `creator/families/ltx25/prompts/craft.txt` (how LTX 
 
 ## What the model reads
 
+The caption is always English. The task, the scenario and the notes may be Russian. Do not translate any of it into Russian: not the description, the camera, the sound, or the spoken lines.
+
 One flowing paragraph. Present tense, for the action, the camera and the sound. No headers, no bullet points, no numbered beats, no labels such as `Audio:`, `Visual:`, `Shot:` or `Camera:`, no timestamps, no file names, no paths, no image numbers. A label standing where a description should be is a token sequence these weights were trained never to see.
 
 Say it in this order, inside the sentences:
@@ -15,7 +17,7 @@ Say it in this order, inside the sentences:
 3. **Define the people.** Age, hair, clothing, build, a distinguishing feature, in the sentence they first appear in. Emotion is a physical cue — a jaw tightening, a hand hesitating — never an abstract label. Reuse the same identifier every time someone reappears (`the woman in the yellow raincoat`, not `she`, and not a character name).
 4. **Describe the action.** What starts, what changes, what it settles into. Order it in words — `initially`, `a moment later`, `simultaneously` — not by timestamps. One sustained action reads better than four crowded ones.
 5. **Move the camera.** Say how and when it moves, relative to the subject: follows, tracks, pans across, pushes in, pulls back. Then say what is in frame after the move. A shot that does not move says so in the opening framing (`A static medium close-up opens on…`), not as a separate label.
-6. **Speech.** Whenever someone speaks, write the words inside double quotation marks, in the sentence that describes them saying it: `She whispers, "He's late."` Lines from the task (section «Lines», from `speech.md`) are those words: use them exactly, in order, in their language. No lines in the task — nobody speaks, do not invent any. Where a line is not English, name the language beside the quotation. Do not invent an accent the task did not give. About two to three words of speech per second of the shot, so the line finishes inside it.
+6. **Speech.** Whenever someone speaks, write the words in English inside double quotation marks, in the sentence that describes them saying it: `She whispers, "He's late."` Lines from the task (section «Lines», from `speech.md`) are said in English, in order, even when `speech.md` is Russian. Do not copy the Russian wording and do not name the language. No lines in the task — nobody speaks, do not invent any. About two to three words of speech per second of the shot, so the line finishes inside it.
 7. **Length.** One continuous take is roughly four to eight sentences. A close-up wants more detail than a wide. On-screen text comes out unreliably, so keep any lettering short. Prefer motion that is plausible and readable.
 
 ## First frame (preview and final)
@@ -47,7 +49,7 @@ The paragraph opens on the frame and only then moves. Slow and calm became pacin
 ## Example with lines
 
 ```text
-A static medium shot opens on the young woman with the braid standing by the window, her back to the wall, looking at the man in the white jacket; cool daylight from the window is the only light. She speaks Russian and says, "Кто вы такой?" A moment later the man in the white jacket takes one slow step towards her and answers, "Ты меня не помнишь?" They hold each other's look. The room is quiet except for the floorboard under his step.
+A static medium shot opens on the young woman with the braid standing by the window, her back to the wall, looking at the man in the white jacket; cool daylight from the window is the only light. She says, "Who are you?" A moment later the man in the white jacket takes one slow step towards her and answers, "You don't remember me?" They hold each other's look. The room is quiet except for the floorboard under his step.
 ```
 
 ## Before a run
@@ -56,6 +58,6 @@ A static medium shot opens on the young woman with the braid standing by the win
 2. It opens on the approved first frame, then the action moves forward from it.
 3. People keep one visible feature; no character names; emotion is a physical cue.
 4. One sustained action with an end. The camera is said relative to the subject, then the frame after the move.
-5. Every line from the task, word for word, in double quotes, inside the sentence; the language is named when it is not English; no lines invented.
+5. Every line from the task, in English, in double quotes, inside the sentence; nothing translated into Russian; no lines invented.
 6. The soundscape is appended, unlabeled, one to four sentences. Music only if the task asked.
 7. About four to eight sentences. No `N sec` when the menu set the duration.

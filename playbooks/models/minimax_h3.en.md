@@ -188,7 +188,7 @@ Rules:
 2. Write `subject_definitions`, `summary`, `retention_analysis` (section 4). An empty or missing one is derived by the node, which is where the refiner errors come from.
 3. `@img-N` numbers follow the table above. Two characters: `@img-2` is the first by file name, `@img-3` the second. A character whose face is not visible gets no reference: say so in the message to the user instead of inventing a label.
 4. Start from the approved sketch prompt (the video metadata; if it has none, `video_preview/prompt.md`), not from an older final.
-5. No Russian text: the board refuses such a `prompt.md`. The only exception is the lines below.
+5. The prompt is always English. Do not translate any of it into Russian: the board refuses a `prompt.md` with Russian text. The only text copied as written is a line from `speech.md` (below); that is not a translation.
 6. Lines: see «Dialogue» below. No lines — `## soundscape` is the environment only.
 
 **Dialogue** (the shot has lines in `speech.md`, section «Реплики» / `Lines`). MiniMax voices the shot and moves the lips itself, so every line goes into `## body` word for word, as a numbered dialogue, in the node's own grammar (Continuity refine guide: `families/h3/prompts/base-en.txt`, §4.4): the speaker by look and position in the frame, a stable speaker ID `(S1)`, `(S2)`, and the words inside `<d>[English] …</d>`. Use the first frame prompt from the task to know who is on the left and who is on the right. The ambient sound goes to `## soundscape`, never the lines (the guide: dialogue belongs in the description and is not repeated in the soundscape).

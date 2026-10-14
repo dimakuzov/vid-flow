@@ -154,7 +154,7 @@ The board puts `prompt.md` into the positive prompt node (`129:93`) **as is**: n
 
 ### What to return
 
-Only the prompt text. One paragraph in English. 55–90 words, never more than 100. No headings, quotes, markdown, lists, or notes to the user.
+Only the prompt text. One paragraph in English. Do not translate any of it into Russian. 55–90 words, never more than 100. No headings, quotes, markdown, lists, or notes to the user.
 
 ### i2v template (`video_i2v`, `final_i2v`)
 
