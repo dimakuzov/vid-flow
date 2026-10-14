@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { AgentProviderId } from "../contracts/agent-request";
+import { FORMAT_CLAUDE_MODEL } from "../agent/config";
 import { rebuildAgentInbox } from "./agent-request";
 import { writeText } from "./media";
 import { agentInboxRelative, createEpisode, episodeRoot } from "./paths";
@@ -107,7 +108,10 @@ export function submitFormatRequest(
     createdAt: new Date().toISOString(),
     episodeId: id,
     provider,
-    model: provider === "manual" ? undefined : options.model?.trim() || undefined,
+    model:
+      provider === "manual"
+        ? undefined
+        : options.model?.trim() || (provider === "claude" ? FORMAT_CLAUDE_MODEL : undefined),
   };
   writeText(path.join(root, "scenario_raw.md"), `${text}\n`);
   writeFormatRequest(request);

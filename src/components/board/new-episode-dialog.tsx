@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FORMAT_CLAUDE_MODEL } from "@/lib/agent/config";
 import { ProviderSelect, useAgentProviders } from "@/components/stage/agent-provider";
 import { errorText, requestJson } from "@/components/stage/api";
 
@@ -38,7 +39,7 @@ export function NewEpisodeDialog({
   const [raw, setRaw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const agent = useAgentProviders("text");
+  const agent = useAgentProviders("text", null, undefined, FORMAT_CLAUDE_MODEL);
 
   useEffect(() => {
     if (!open) return;

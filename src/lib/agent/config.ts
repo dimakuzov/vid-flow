@@ -35,12 +35,16 @@ export function providerParallel(id: AgentProviderId): number {
   return id === "claude" ? 2 : 1;
 }
 
-/** Модели Claude Code на выбор. Первая — по умолчанию, если не задана FRAMEBOARD_CLAUDE_MODEL. */
+/** Модели Claude Code на выбор. */
 export const CLAUDE_MODELS = [
+  { id: "claude-haiku-5-5", label: "Haiku 5.5" },
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5" },
   { id: "claude-opus-5-5", label: "Opus 5.5" },
-  { id: "claude-haiku-5-5", label: "Haiku 5.5" },
 ];
+
+const DEFAULT_CLAUDE_MODEL = "claude-haiku-5-5";
+/** Разметка сырого сценария в таблицу. */
+export const FORMAT_CLAUDE_MODEL = "claude-opus-5-5";
 
 /** Старые id моделей → нынешние: agent.json кадров и запросы, записанные до замены (Haiku 4.5 → 5.5). */
 const CLAUDE_MODEL_ALIASES: Record<string, string> = {
@@ -54,13 +58,12 @@ export function currentClaudeModel<T extends string | null | undefined>(model: T
 
 export function defaultClaudeModel(): string {
   const configured = process.env.FRAMEBOARD_CLAUDE_MODEL?.trim();
-  return configured || CLAUDE_MODELS[0].id;
+  return configured || DEFAULT_CLAUDE_MODEL;
 }
 
 /**
- * Модель Claude этапа: важнее агента кадра. Первый кадр сводит сценарий, локацию и персонажей —
- * там нужен Sonnet, даже если кадру назначен Haiku. Другую модель можно выбрать на странице
- * этапа на один запуск.
+ * Модель Claude этапа: важнее агента кадра. Везде Haiku, на первом кадре — Sonnet,
+ * даже если кадру назначен другой. Другую модель можно выбрать на странице этапа на один запуск.
  */
 export const STAGE_CLAUDE_MODELS: Partial<Record<string, string>> = {
   first_frame: "claude-sonnet-5-5",

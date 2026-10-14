@@ -124,6 +124,8 @@ export function useAgentProviders(
   mode: AgentMode,
   initial?: { provider: string; model: string | null } | null,
   stageId?: string,
+  /** Модель этого меню, пока в нём ничего не выбрали. Важнее запомненной в браузере. */
+  modelPreset?: string,
 ) {
   const [providers, setProviders] = useState<AgentProviderInfo[] | null>(null);
   const [preferred, setPreferred] = useState<string | null>(null);
@@ -164,7 +166,10 @@ export function useAgentProviders(
   const fromStage = (stageId && selected?.stageModels?.[stageId]) || null;
   const pickedModel = selected ? picked.models[selected.id] : undefined;
   const model = selected
-    ? pickModel(selected, pickedModel ?? fromStage ?? fromShot ?? storedModels[selected.id] ?? null)
+    ? pickModel(
+        selected,
+        pickedModel ?? fromStage ?? fromShot ?? modelPreset ?? storedModels[selected.id] ?? null,
+      )
     : null;
 
   return {
