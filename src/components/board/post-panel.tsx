@@ -257,6 +257,14 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
     }
   }
 
+  /** Запускает Kdenlive на этом компьютере с последним проектом эпизода. */
+  const openProject = () =>
+    act(async () => {
+      const result = await requestJson<{ project: string }>(postApi(episodeId, "/open-project"), { method: "POST", body: {} });
+      setMessage(`Открываю в Kdenlive: ${result.project}`);
+      return null;
+    });
+
   const patchLine = (id: string, patch: Record<string, number | null>) =>
     act(() => requestJson<PostState>(postApi(episodeId, "/lines"), { method: "PATCH", body: { id, ...patch } }));
 
@@ -696,9 +704,14 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
               {building ? (speechActive ? "Распознаю речь…" : "Собираю…") : "Собрать проект"}
             </Button>
             {project ? (
-              <a href={project.url} className="text-teal-800 underline-offset-4 hover:underline" download>
-                Скачать {project.name}
-              </a>
+              <>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void openProject()}>
+                  Открыть в Kdenlive
+                </Button>
+                <a href={project.url} className="text-teal-800 underline-offset-4 hover:underline" download>
+                  Скачать {project.name}
+                </a>
+              </>
             ) : null}
             {latest ? (
               <a href={latest.url} className="text-xs text-stone-500 underline-offset-4 hover:underline" download>
@@ -774,6 +787,11 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             >
               {subtitlesActive ? "Делаю субтитры…" : "Добавить субтитры"}
             </Button>
+            {state.subtitles.project ? (
+              <Button size="sm" variant="outline" disabled={busy || subtitlesActive} onClick={() => void openProject()}>
+                Открыть в Kdenlive
+              </Button>
+            ) : null}
             {state.subtitles.renders.length ? (
               <a
                 href={state.subtitles.renders[state.subtitles.renders.length - 1].url}
