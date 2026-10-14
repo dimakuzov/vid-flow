@@ -211,6 +211,12 @@
             "at": "end",
             "unless": "required motion guide",
             "separator": "\n\n"
+          },
+          {
+            "ensure": "r34l1sm",
+            "at": "start",
+            "unless": "\\br34l1sm\\b",
+            "separator": " "
           }
         ]
       }

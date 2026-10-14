@@ -84,8 +84,11 @@ test("Wan: эскиз 576×1024 и 16 к/с, финал Wan 720×1280 и 24 к/�
 
 test("промпт без фиксированной фразы: доска ставит её в начало, требования к первому кадру, превью и качеству — в конец", () => {
   for (const workflow of ["final_h3", "final_h3_768", "final_h3_768_face"]) {
-    const body = creatorData(workflow, "Static shot. Lena holds her hand to her chest.").segments[0].refined.body as string;
-    assert.match(body, /^The scene begins from @img-1, the same camera position.*use @vid-1 as a reference/, workflow);
+    const data = creatorData(workflow, "Static shot. Lena holds her hand to her chest.");
+    const lora = data.loras.find((entry: { name: string }) => entry.name.endsWith("h3-realism-people-t2v-i2v-r2v.safetensors"));
+    assert.equal(lora?.strength, 0.7, workflow);
+    const body = data.segments[0].refined.body as string;
+    assert.match(body, /^r34l1sm The scene begins from @img-1, the same camera position.*use @vid-1 as a reference/, workflow);
     assert.match(body, /Static shot\. Lena holds her hand to her chest\.\n\n@img-1 is the required first frame/);
     assert.match(body, /@vid-1 is the required motion guide.*This is a quality pass over @vid-1.*precise lip sync/);
   }
@@ -93,7 +96,7 @@ test("промпт без фиксированной фразы: доска ст
 
 test("агент уже написал фразу и требования — доска их не дублирует", () => {
   const written =
-    "[Shot 1] The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it. Lena stands still.\n\n@vid-1 is the required motion guide for everything.";
+    "r34l1sm [Shot 1] The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it. Lena stands still.\n\n@vid-1 is the required motion guide for everything.";
   const body = creatorData("final_h3_768_face", written).segments[0].refined.body as string;
   assert.equal(body, written);
 });
