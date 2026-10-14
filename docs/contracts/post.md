@@ -102,7 +102,9 @@ data/episodes/{ep}/post/
 
 ## Музыка
 
-Файлы из `post/music/` (по имени) — нижняя дорожка «Музыка» проекта Kdenlive, по кругу до конца проекта. Громкость — эффект Kdenlive «Volume» (`kdenlive_id: volume`, ключевые кадры `level`, дБ) на дорожке: тишина → за 1 с до −18 дБ, под репликами −28 дБ (переход 0.3 с, паузы меньше 1 с не поднимают), за 2 с до конца — в тишину. Константы — `src/lib/post/music.ts`. В FCPXML музыки нет.
+Сборка проекта всегда оставляет пустую нижнюю дорожку «Музыка» (`MUSIC_TRACK_NAME`) — чтобы потом не сдвигать номера дорожек в отредактированном проекте (по ним Kdenlive хранит группы и переходы).
+
+«Добавить субтитры» (шаг 5 ниже) кладёт в неё файлы из `post/music/` (по имени, по кругу до конца проекта, последний обрезан) и эффект Kdenlive «Volume» (`kdenlive_id: volume`, ключевые кадры `level`, дБ): тишина → за 1 с до −18 дБ, там, где Whisper услышал речь в этом проекте (слова ближе 0.6 с — одна речь), −28 дБ (переход 0.3 с, паузы меньше 1 с не поднимают), за 2 с до конца — в тишину. Константы — `src/lib/post/music.ts`, вставка — `src/lib/post/music-insert.ts`. Свои клипы — `frameboard_music*` (в корзине — «Музыка: файл»); при повторе они и любой эффект Volume на этой дорожке заменяются (Kdenlive при сохранении переименовывает id). Нет дорожки «Музыка» (проект собран до этого) — субтитры делаются, музыка нет, причина в `musicNote`. В FCPXML музыки нет.
 
 ## Субтитры и рендер
 
@@ -112,10 +114,11 @@ data/episodes/{ep}/post/
 2. Whisper — `create_subtitles_file_from_video.json` через очередь (`saveText`).
 3. Пословные титры: слова реплик манифеста (с пунктуацией, без «...» в начале) выравниваются со словами Whisper; время — Whisper, слово держится ≥ 0.25 с, паузы < 0.6 с заполняются; не услышанные — между соседями (`missing`).
 4. `{проект}.kdenlive.ass`: шапка и стили — из `data/subtitles/style.ass` (всё до `[Events]`, первый стиль), события — свои. Старый `.ass` и проект копируются (`*.before-subs-{время}.*`).
-5. В проект — как пишет Kdenlive 26.08: в последовательности (`kdenlive:docproperties.activetimeline`; Kdenlive при сохранении зовёт её `tractorN`, uuid — свойство `kdenlive:uuid`) свойство `kdenlive:sequenceproperties.subtitlesList` (`[{ file, id: 0, name }]`), `hidesubtitle = 0` и фильтр `avfilter.subtitles` с `av.filename` (абсолютный путь). Повторный запуск заменяет, а не добавляет.
-6. Рендер `melt`: H.264 1.6 Мбит/с, yuv420p, AAC 192 кбит/с 48 кГц, размер и fps проекта → `render/{проект}_rK.mp4`.
+5. Музыка — в дорожку «Музыка» (раздел выше).
+6. В проект — как пишет Kdenlive 26.08: в последовательности (`kdenlive:docproperties.activetimeline`; Kdenlive при сохранении зовёт её `tractorN`, uuid — свойство `kdenlive:uuid`) свойство `kdenlive:sequenceproperties.subtitlesList` (`[{ file, id: 0, name }]`), `hidesubtitle = 0` и фильтр `avfilter.subtitles` с `av.filename` (абсолютный путь). Повторный запуск заменяет, а не добавляет.
+7. Рендер `melt`: H.264 1.6 Мбит/с, yuv420p, AAC 192 кбит/с 48 кГц, размер и fps проекта → `render/{проект}_rK.mp4`.
 
-Задание `post/jobs/subs-*.json`: `{ id, kind: subtitles, episodeId, project, status, progress, ass, backup, render, words, missing, error }`. Проект в Kdenlive перед запуском должен быть сохранён и закрыт.
+Задание `post/jobs/subs-*.json`: `{ id, kind: subtitles, episodeId, project, status, progress, ass, backup, render, words, missing, music, musicNote, error }`. Проект в Kdenlive перед запуском должен быть сохранён и закрыт.
 
 ## Таймлайн (FCPXML 1.9)
 

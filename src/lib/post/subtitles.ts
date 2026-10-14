@@ -10,6 +10,8 @@ import { jobsDir, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from
 import { readSpeechGraph, speechGraphNodes, type SpeechWord } from "./speech-detect";
 import { tokens } from "./speech-fit";
 import { readManifest } from "./timeline";
+import { listMusic, musicLevelKeyframes } from "./music";
+import { insertMusic, MusicTrackMissingError, speechFromWords } from "./music-insert";
 
 /*
  * «Добавить субтитры»: последний проект Kdenlive эпизода (`post/timeline/{ep}_vN.kdenlive`, его правит пользователь)
@@ -17,6 +19,7 @@ import { readManifest } from "./timeline";
  *   2. Whisper по нему — граф create_subtitles_file_from_video.json через очередь ComfyUI;
  *   3. пословные титры: время — Whisper, текст — реплики манифеста (speech.md), стиль — data/subtitles/style.ass;
  *   4. `{проект}.kdenlive.ass` рядом с проектом и ссылка на него в проекте (как делает сам Kdenlive), до правки — копия;
+ *      музыка из post/music — в дорожку «Музыка», тише там, где Whisper услышал речь;
  *   5. рендер `melt`: H.264 1.6 Мбит/с, AAC → post/render/.
  */
 
@@ -322,6 +325,9 @@ export interface SubtitlesJob {
   backup?: string;
   render?: string;
   words?: number;
+  /** Музыка, положенная в проект (имена файлов из post/music), или почему её нет. */
+  music?: string[];
+  musicNote?: string;
   missing?: string[];
   error?: string;
 }
@@ -488,10 +494,35 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
     // 4. Ссылка на субтитры в проекте; до правки — копия проекта.
     const backup = path.join(path.dirname(project), `${base}.before-subs-${stamp}.kdenlive`);
     fs.copyFileSync(project, backup);
-    const patched = patchProjectSubtitles(fs.readFileSync(project, "utf8"), ass);
+    let patched = patchProjectSubtitles(fs.readFileSync(project, "utf8"), ass);
+
+    // Музыка из post/music — в дорожку «Музыка»; тише там, где Whisper услышал речь в этом проекте.
+    const musicFiles = listMusic(episodeId);
+    let music: string[] = [];
+    let musicNote: string | undefined;
+    if (musicFiles.length) {
+      save({ progress: "музыка" });
+      const sources = await Promise.all(
+        musicFiles.map(async (file) => ({
+          file,
+          frames: Math.max(1, Math.ceil((await probeMedia(file)).duration * TIMELINE_FPS)),
+          label: `Музыка: ${path.basename(file)}`,
+        })),
+      );
+      const level = musicLevelKeyframes(totalFrames, speechFromWords(words, TIMELINE_FPS), TIMELINE_FPS)
+        .map(([frame, db]) => `${frame}=${db}`)
+        .join(";");
+      try {
+        patched = insertMusic(patched, sources, totalFrames, level);
+        music = musicFiles.map((file) => path.basename(file));
+      } catch (error) {
+        if (!(error instanceof MusicTrackMissingError)) throw error;
+        musicNote = error.message;
+      }
+    }
     fs.writeFileSync(`${project}.tmp`, patched, "utf8");
     fs.renameSync(`${project}.tmp`, project);
-    save({ ass: fromPost(episodeId, ass), backup: fromPost(episodeId, backup), words: cues.length, missing });
+    save({ ass: fromPost(episodeId, ass), backup: fromPost(episodeId, backup), words: cues.length, missing, music, musicNote });
 
     // 5. Рендер проекта с субтитрами.
     if (!options.skipRender) {

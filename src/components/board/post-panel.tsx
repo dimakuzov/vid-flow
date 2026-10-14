@@ -732,13 +732,13 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
           <p className="mt-1 text-xs text-stone-600">
             {state.music.files.length ? (
               <>
-                Музыка: {state.music.files.join(", ")} — нижняя дорожка «Музыка», по кругу до конца, тише под репликами
-                (эффект Volume, правится в Kdenlive). Войдёт в следующую сборку.
+                Музыка: {state.music.files.join(", ")} — ляжет в дорожку «Музыка» при «Добавить субтитры»: по кругу до конца,
+                тише там, где в отредактированном проекте звучит речь (эффект Volume, правится в Kdenlive).
               </>
             ) : (
               <>
-                Музыка: положите файл (mp3, wav, flac, m4a, ogg) в <span className="break-all font-mono">{state.music.dir}</span> — следующая
-                сборка добавит её дорожкой «Музыка».
+                Музыка: положите файл (mp3, wav, flac, m4a, ogg) в <span className="break-all font-mono">{state.music.dir}</span> — «Добавить
+                субтитры» положит её в дорожку «Музыка» проекта.
               </>
             )}
           </p>
@@ -817,6 +817,8 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                 : state.subtitles.job.status === "done"
                   ? `Готово: ${state.subtitles.job.words ?? 0} слов в субтитрах${
                       state.subtitles.job.missing?.length ? ` (Whisper не услышал: ${state.subtitles.job.missing.join(", ")} — время поставлено между соседями)` : ""
+                    }${state.subtitles.job.music?.length ? `, музыка: ${state.subtitles.job.music.join(", ")}` : ""}${
+                      state.subtitles.job.musicNote ? `. Музыка не добавлена: ${state.subtitles.job.musicNote}` : ""
                     }. Проект обновлён — откройте его в Kdenlive заново. Копия до правки: ${state.subtitles.job.backup ?? "—"}.`
                   : `Идёт: ${state.subtitles.job.progress ?? "начало"}`}
             </p>

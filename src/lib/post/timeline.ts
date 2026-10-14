@@ -5,7 +5,6 @@ import { listShotIds } from "../series/paths";
 import { collectPost, type CollectedLine } from "./collect";
 import { probeMedia } from "./ffmpeg";
 import { writeKdenliveProject } from "./kdenlive";
-import { listMusic } from "./music";
 import { readShotFinal, writePostLines, type ShotFinal } from "./lines";
 import { manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from "./paths";
 
@@ -66,8 +65,6 @@ export interface Manifest {
   timeline: string;
   /** Проект Kdenlive той же сборки: `timeline/ep2_v3.kdenlive`. */
   kdenlive?: string;
-  /** Файлы музыки из post/music, вошедшие в проект Kdenlive. */
-  music?: string[];
   duration: number;
   characters: { name: string; lane: number }[];
   shots: ManifestShot[];
@@ -351,7 +348,6 @@ ${spineXml}
     skipped,
     warnings,
   };
-  manifest.music = listMusic(episodeId).map((file) => path.basename(file));
   manifest.kdenlive = await writeKdenliveProject(episodeId, manifest, timelineDir(episodeId), project);
   writeJson(manifestFile(episodeId), manifest);
   writePostLines(episodeId, lines);

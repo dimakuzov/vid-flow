@@ -24,7 +24,7 @@ import { probeMedia, synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
 import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
 import { buildProject } from "./build";
-import { musicDir } from "./music";
+import { insertMusic, MusicTrackMissingError } from "./music-insert";
 import { enqueueSpeechDetect } from "./speech-detect";
 import { getPostState } from "./state";
 import { buildTimeline } from "./timeline";
@@ -509,25 +509,46 @@ test("Voice Isolator: сбой не теряет оплаченную озвуч
   assert.equal(voice.file, `v${voice.version}.wav`);
 });
 
-test("музыка из post/music: нижняя дорожка по кругу до конца проекта, громкость — эффект Volume", async () => {
-  const music = path.join(musicDir(EP), "theme.mp3");
-  await synthesizeMedia(music, { duration: 4, expr: "0.3*sin(2*PI*220*t)", codec: "libmp3lame" });
+test("музыка: сборка оставляет пустую дорожку «Музыка», вставка заполняет её по кругу и заменяет себя при повторе", async () => {
   const manifest = await buildTimeline(EP);
-  assert.deepEqual(manifest.music, ["theme.mp3"]);
-  const kd = fs.readFileSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", "")), "utf8");
-  assertWellFormed(kd);
-  const playlist = kd.match(/<playlist id="playlist_music">([\s\S]*?)<\/playlist>/)![1];
+  const file = path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", ""));
+  const built = fs.readFileSync(file, "utf8");
+  // Пустая нижняя дорожка — первая после чёрной.
+  assert.match(built, /<track producer="black_track"\/>\s*<track producer="tractor_music"\/>/);
+  assert.match(built, /<tractor id="tractor_music"[\s\S]*?"kdenlive:track_name">Музыка</);
+  assert.ok(!built.match(/<playlist id="playlist_music">[\s\S]*?<\/playlist>/)![0].includes("<entry"));
+
+  const total = Math.round(manifest.duration * 24);
+  const theme = { file: "C:\\music\\theme.mp3", frames: 96, label: "Музыка: theme.mp3" };
+  const once = insertMusic(built, [theme], total, "0=-60;24=-18");
+  assertWellFormed(once);
+  const playlist = once.match(/<playlist id="playlist_music">([\s\S]*?)<\/playlist>/)![1];
   const entries = [...playlist.matchAll(/<entry producer="(\w+)" in="(\d+)" out="(\d+)"/g)];
-  const covered = entries.reduce((sum, entry) => sum + Number(entry[3]) - Number(entry[2]) + 1, 0);
-  assert.equal(covered, Math.round(manifest.duration * 24), "музыка до конца проекта");
-  assert.ok(entries.length >= 3, "файл короче проекта — повторяется");
-  assert.ok(!playlist.includes("<blank"));
-  const tractor = kd.match(/<tractor id="tractor_music"[\s\S]*?<\/tractor>/)![0];
-  assert.match(tractor, /"kdenlive:track_name">Музыка</);
-  assert.match(tractor, /<filter id="tractor_music_level">[\s\S]*"kdenlive_id">volume<[\s\S]*"level">0=-60;24=-18;/);
-  // Нижняя дорожка: первая после чёрной в последовательности.
-  assert.match(kd, /<track producer="black_track"\/>\s*<track producer="tractor_music"\/>/);
-  fs.rmSync(music);
+  assert.equal(entries.reduce((sum, entry) => sum + Number(entry[3]) - Number(entry[2]) + 1, 0), total, "до конца проекта");
+  assert.ok(entries.length >= 3, "файл короче проекта — по кругу");
+  assert.ok(entries.every((entry) => entry[1] === "frameboard_music0_audio"));
+  assert.match(playlist, /"kdenlive:audio_track">1</, "свойства дорожки на месте");
+  assert.ok(once.indexOf('<chain id="frameboard_music0_audio"') < once.indexOf('<playlist id="playlist_music">'), "клип определён до использования");
+  assert.match(once, /<property name="resource">C:\/music\/theme\.mp3<\/property>/);
+  assert.match(once.slice(once.indexOf('<playlist id="main_bin"')), /<entry producer="frameboard_music0" in="0" out="95"\/>/);
+  const ids = [...once.matchAll(/<property name="kdenlive:id">(\d+)<\/property>/g)].map((m) => Number(m[1]));
+  const musicId = Number(once.match(/<chain id="frameboard_music0"[\s\S]*?"kdenlive:id">(\d+)</)![1]);
+  assert.equal(musicId, Math.max(...ids.filter((id) => id !== musicId)) + 1, "новый kdenlive:id");
+  const tractor = once.match(/<tractor id="tractor_music"[\s\S]*?<\/tractor>/)![0];
+  assert.match(tractor, /"kdenlive_id">volume<[\s\S]*"level">0=-60;24=-18</);
+
+  // Повтор: своя музыка заменяется, громкость не удваивается.
+  const twice = insertMusic(once, [theme], total, "0=-60;24=-20");
+  assertWellFormed(twice);
+  assert.equal(twice.match(/<chain id="frameboard_music0"/g)!.length, 1);
+  assert.equal(twice.match(/<entry producer="frameboard_music0" /g)!.length, 1);
+  const tractor2 = twice.match(/<tractor id="tractor_music"[\s\S]*?<\/tractor>/)![0];
+  assert.equal(tractor2.match(/"kdenlive_id">volume</g)!.length, 1);
+  assert.match(tractor2, /"level">0=-60;24=-20</);
+  assert.equal(twice.match(/<tractor id="tractor_music"/g)!.length, 1);
+
+  // Нет дорожки «Музыка» (старый проект) — понятная ошибка.
+  assert.throws(() => insertMusic(built.replace(/Музыка/g, "Music"), [theme], total, "0=-18"), MusicTrackMissingError);
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */
