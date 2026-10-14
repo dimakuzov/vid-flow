@@ -105,7 +105,7 @@
   },
   "398:376": {
     "inputs": {
-      "value": "use image as the first frame. <who, by visible look> <action 1>. Then <action 2>. Static camera. <end state>. Realistic, natural movement."
+      "value": "A static medium shot opens on <the approved first frame: who, by one visible feature, the light and the layout>. <what starts, what changes, what it settles into>. <how the camera moves relative to them, then what is in frame after>. <spoken lines in double quotes, only if the task has them>. <one to four sentences of what is heard, with no label>."
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {

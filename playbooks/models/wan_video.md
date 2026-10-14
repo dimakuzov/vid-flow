@@ -211,4 +211,4 @@ Static shot, fixed camera. The boy in the grey coat stands by the door at the ba
 | Финал: говорит один | `final_h3_768_face` |
 | Финал: говорят двое и больше | `final_heygen` (облако только по галочке пользователя на этот запуск) |
 
-Промпт, который начинается с `use image as the first frame.`, — это LTX, не Wan.
+Подпись LTX — абзац из `playbooks/models/ltx_video.md`: он открывается крупностью первого кадра. В Wan её не подставлять.

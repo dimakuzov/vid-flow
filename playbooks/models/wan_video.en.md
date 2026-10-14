@@ -211,4 +211,4 @@ The board does not switch by itself. If the selected variant does not fit, write
 | Final: one speaker | `final_h3_768_face` |
 | Final: two or more speakers | `final_heygen` (the cloud runs only after the user ticks the box for this one run) |
 
-A prompt that starts with `use image as the first frame.` is LTX, not Wan.
+An LTX caption is the paragraph in `playbooks/models/ltx_video.en.md`: it opens on the framing of the first frame. Do not paste it into Wan.
