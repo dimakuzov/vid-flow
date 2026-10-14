@@ -158,3 +158,80 @@
 - Точной доли лица и тела в пикселях нет ни в одном файле. В таблице оценка по картинке в `approve/`.
 - Времени HeyGen Video 1.0 и LTX 2.5 на финале нет: в очереди нет задания `final_render` с этими воркфлоу, поэтому нет пары `submittedAt` / `finishedAt`.
 - Журнала, какой файл стёрли из папки, нет. s04 на финале: в заметке референс мамы убран, в `excluded` этого пути нет.
+
+## Эпизод episode_5
+
+Папка `vid-flow-r3-test/data/episodes/episode_5`. В `vid-flow/data/episodes/` этой серии нет.
+
+Число персонажей — список кадра в `shot.md` (`- characters:`). Граф `character_outfit` (`forEach: character`) открывает по разделу `## имя` на каждое имя из этого списка. Пустой раздел персонажа не убирает: он в кадре, просто не перегенерируется. Файлы в `approve/` в это число не входят.
+
+Остальные колонки — файлы в `output/` плюс файл в `approve/`, если такого имени в `output/` нет. 22 кадра. Среднее — сумма делёная на 22.
+
+| Кадр | Персонажи | Локация | Первый кадр | Превью | Финал | Всего |
+|---|---:|---:|---:|---:|---:|---:|
+| s01 | 1 · lena | 8 | 1 | 2 | 1 | 13 |
+| s02 | 1 · lena | 1 | 4 | 4 | 2 | 12 |
+| s03 | 1 · lena | 10 | 8 | 5 | 3 | 27 |
+| s04 | 2 · lena, julia | 0 | 0 | 0 | 0 | 2 |
+| s05 | 2 · lena, julia | 0 | 0 | 0 | 0 | 2 |
+| s06 | 1 · lena | 0 | 0 | 0 | 0 | 1 |
+| s07 | 2 · lena, julia | 9 | 2 | 7 | 1 | 21 |
+| s08 | 2 · lena, julia | 7 | 2 | 3 | 1 | 15 |
+| s09 | 3 · katya, lena, julia | 10 | 1 | 1 | 2 | 17 |
+| s10 | 2 · katya, militsiya_officer | 4 | 0 | 0 | 0 | 6 |
+| s11 | 4 · katya, militsiya_officer, lena, julia | 3 | 3 | 6 | 1 | 17 |
+| s12 | 3 · lena, katya, julia | 4 | 0 | 0 | 1 | 8 |
+| s13 | 2 · julia, lena | 6 | 3 | 4 | 2 | 17 |
+| s14 | 3 · lena, ivan, katya | 7 | 6 | 2 | 2 | 20 |
+| s15 | 0 | 4 | 0 | 0 | 0 | 4 |
+| s16 | 2 · lena, julia | 8 | 6 | 3 | 2 | 21 |
+| s17 | 1 · luba | 4 | 0 | 0 | 1 | 6 |
+| s18 | 1 · lena | 4 | 0 | 0 | 0 | 5 |
+| s19 | 0 | 5 | 4 | 1 | 1 | 11 |
+| s20 | 0 | 8 | 3 | 6 | 1 | 18 |
+| s21 | 1 · lena | 10 | 1 | 3 | 4 | 19 |
+| s22 | 1 · lena | 5 | 7 | 4 | 3 | 20 |
+| Итого | 35 | 117 | 51 | 51 | 28 | 282 |
+| Среднее на кадр | 1.59 | 5.32 | 2.32 | 2.32 | 1.27 | 12.82 |
+
+У s04 в `prompt.md` записан только `## lena`. Вторая позиция, julia, есть в списке кадра, раздела под неё нет. У s11 в списке четверо, в `approve/` лежат только `katya_s11.png` и `militsiya_officer_s11.png`.
+
+Файл в `final_render/approve/`:
+
+| Кадр | Файл | Модель |
+|---|---|---|
+| s01 | `s01_ltx_00001_.mp4` | LTX 2.5 |
+| s02 | `s02_h3_00003_.mp4` | MiniMax H3 |
+| s03 | `video_HeyGen_video_1.0_i2v_00001_.mp4` | HeyGen Video 1.0 |
+| s04 | нет файла | |
+| s05 | нет файла | |
+| s06 | нет файла | |
+| s07 | `video_HeyGen_video_1.0_i2v_00001_.mp4` | HeyGen Video 1.0 |
+| s08 | `s08_ltx_00001_.mp4` | LTX 2.5 |
+| s09 | `s09_ltx_00001_.mp4` | LTX 2.5 |
+| s10 | нет файла | |
+| s11 | `s11_ltx_00001_.mp4` | LTX 2.5 |
+| s12 | `H3_00068_.mp4` | MiniMax H3 |
+| s13 | `s13_ltx_00002_.mp4` | LTX 2.5 |
+| s14 | `s14_wan720_00005_.mp4` | Wan 2.2, 720 |
+| s15 | нет файла | |
+| s16 | `s16_ltx_00001_.mp4` | LTX 2.5 |
+| s17 | `video_Minimax_h3_max_00001_(4).mp4` | MiniMax H3 |
+| s18 | нет файла | |
+| s19 | `s19_wan720_00003_.mp4` | Wan 2.2, 720 |
+| s20 | `s20_wan720_00001_.mp4` | Wan 2.2, 720 |
+| s21 | `video_HeyGen_video_1.0_i2v_00001_(2).mp4` | HeyGen Video 1.0 |
+| s22 | `video_HeyGen_video_1.0_i2v_00001_(2).mp4` | HeyGen Video 1.0 |
+| Итого | 16 файлов | LTX 6, HeyGen 4, MiniMax H3 3, Wan 720 3 |
+
+## Ошибки episode_5
+
+Четыре задания очереди со статусом `error`. Каждая формулировка один раз. Трёх `cancelled` в таблице нет: у них нет текста ошибки.
+
+| Ошибка | Раз | Где |
+|---|---:|---|
+| LTX: `SamplerCustomAdvanced`, `read_tensor_file_slice_into() got multiple values for argument 'stream'` | 1 | s02, финал, `final_ltx` |
+| LTX: `SamplerCustomAdvanced`, `keywords must be strings` | 1 | s03, превью, `video_ltx` |
+| Wan i2v: `CLIPLoader`, `unexpected_keys` не связан со значением | 1 | s14, превью, `video_i2v` |
+| LTX: `SamplerCustomAdvanced`, `not a sequence` | 1 | s16, финал, `final_ltx` |
+| Итого | 4 | |
