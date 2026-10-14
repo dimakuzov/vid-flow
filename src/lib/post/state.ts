@@ -5,6 +5,9 @@ import { postDir, TIMELINE_FPS } from "./paths";
 import { listTimelines, readManifest, DEFAULT_SIZE } from "./timeline";
 import type { SpeechStatus } from "./speech-detect";
 import { readLatestVoiceJob, type VoiceJob } from "./voice-job";
+import { listMusic, musicDir } from "./music";
+import { latestProject, readLatestSubtitlesJob, renderDir, subtitleStylePath, type SubtitlesJob } from "./subtitles";
+import fs from "fs";
 import { listVoiceVersions, planCharacterVoice, readVoiceConfig } from "./voices";
 
 /*
@@ -86,6 +89,16 @@ export interface PostState {
   } | null;
   defaultSize: { width: number; height: number };
   job: VoiceJob | null;
+  /** Музыка эпизода (post/music) и куда её класть. */
+  music: { dir: string; files: string[] };
+  /** Субтитры: какой проект возьмёт «Добавить субтитры», есть ли стиль, последнее задание, рендеры. */
+  subtitles: {
+    project: string | null;
+    styleFile: string;
+    hasStyle: boolean;
+    job: SubtitlesJob | null;
+    renders: { name: string; url: string; path: string }[];
+  };
 }
 
 export function postFileUrl(episodeId: string, relative: string, version?: number): string {
@@ -190,5 +203,23 @@ export async function getPostState(episodeId: string): Promise<PostState> {
       : null,
     defaultSize: manifest ? { width: manifest.width, height: manifest.height } : DEFAULT_SIZE,
     job: readLatestVoiceJob(episodeId),
+    music: { dir: musicDir(episodeId), files: listMusic(episodeId).map((file) => path.basename(file)) },
+    subtitles: {
+      project: latestProject(episodeId),
+      styleFile: subtitleStylePath(),
+      hasStyle: fs.existsSync(subtitleStylePath()),
+      job: readLatestSubtitlesJob(episodeId),
+      renders: (() => {
+        try {
+          return fs
+            .readdirSync(renderDir(episodeId))
+            .filter((name) => name.endsWith(".mp4") && !name.endsWith(".part.mp4"))
+            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+            .map((name) => ({ name, url: postFileUrl(episodeId, `render/${name}`), path: path.join(renderDir(episodeId), name) }));
+        } catch {
+          return [];
+        }
+      })(),
+    },
   };
 }

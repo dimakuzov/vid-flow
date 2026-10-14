@@ -12,6 +12,8 @@ const CONTENT_TYPES: Record<string, string> = {
   ".json": "application/json",
   ".fcpxml": "application/xml",
   ".kdenlive": "application/xml",
+  ".mp4": "video/mp4",
+  ".ass": "text/plain; charset=utf-8",
   ".srt": "text/plain; charset=utf-8",
 };
 

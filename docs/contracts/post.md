@@ -16,6 +16,9 @@ data/episodes/{ep}/post/
   voices/{Character}/current.json        { version, updatedAt } — версия в работе
   manifest.json                          манифест последней сборки таймлайна
   timeline/{ep}_v{N}.fcpxml              таймлайны, старые не затираются (рядом .kdenlive той же сборки)
+  music/*.mp3|wav|flac|m4a|ogg|aac       музыка эпизода (кладёт пользователь)
+  subtitles/                             Whisper по звуку проекта, `{проект}.whisper.mp4`
+  render/{ep}_vN_rK.mp4                  рендеры проекта с субтитрами
   speech/{shotId}.json                   распознавание речи финала: какой финал, какое задание очереди
   speech/{shotId}/{jobId}/*.txt          выходы Whisper (слова и фразы, JSON)
   jobs/voice-*.json                      задания озвучки
@@ -97,6 +100,23 @@ data/episodes/{ep}/post/
 
 Реплики одного персонажа не могут наезжать на одной дорожке: конец предыдущей обрезается по началу следующей (в `warnings` есть «наезжает»). Пути к файлам абсолютные: проект открывать из `post/timeline/`, файлы озвучки и кадров не переносить.
 
+## Музыка
+
+Файлы из `post/music/` (по имени) — нижняя дорожка «Музыка» проекта Kdenlive, по кругу до конца проекта. Громкость — эффект Kdenlive «Volume» (`kdenlive_id: volume`, ключевые кадры `level`, дБ) на дорожке: тишина → за 1 с до −18 дБ, под репликами −28 дБ (переход 0.3 с, паузы меньше 1 с не поднимают), за 2 с до конца — в тишину. Константы — `src/lib/post/music.ts`. В FCPXML музыки нет.
+
+## Субтитры и рендер
+
+«Добавить субтитры» (`POST .../post/subtitles`, бесплатно) — по последнему проекту `post/timeline/{ep}_vN.kdenlive`, который правит пользователь:
+
+1. Звук проекта — `melt` (из Kdenlive; путь — `MELT` или поиск `kdenlive*/bin/melt.exe` в `C:/Programs`, `Program Files`, Загрузках), 16 кГц моно; к нему — видео 64×64 1 кадр/с (`subtitles/{проект}.whisper.mp4`) для загрузчика графа.
+2. Whisper — `create_subtitles_file_from_video.json` через очередь (`saveText`).
+3. Пословные титры: слова реплик манифеста (с пунктуацией, без «...» в начале) выравниваются со словами Whisper; время — Whisper, слово держится ≥ 0.25 с, паузы < 0.6 с заполняются; не услышанные — между соседями (`missing`).
+4. `{проект}.kdenlive.ass`: шапка и стили — из `data/subtitles/style.ass` (всё до `[Events]`, первый стиль), события — свои. Старый `.ass` и проект копируются (`*.before-subs-{время}.*`).
+5. В проект — как пишет Kdenlive 26.08: в последовательности (`kdenlive:docproperties.activetimeline`; Kdenlive при сохранении зовёт её `tractorN`, uuid — свойство `kdenlive:uuid`) свойство `kdenlive:sequenceproperties.subtitlesList` (`[{ file, id: 0, name }]`), `hidesubtitle = 0` и фильтр `avfilter.subtitles` с `av.filename` (абсолютный путь). Повторный запуск заменяет, а не добавляет.
+6. Рендер `melt`: H.264 1.6 Мбит/с, yuv420p, AAC 192 кбит/с 48 кГц, размер и fps проекта → `render/{проект}_rK.mp4`.
+
+Задание `post/jobs/subs-*.json`: `{ id, kind: subtitles, episodeId, project, status, progress, ass, backup, render, words, missing, error }`. Проект в Kdenlive перед запуском должен быть сохранён и закрыт.
+
 ## Таймлайн (FCPXML 1.9)
 
 Resolve: File → Import → Timeline. Секвенция 24 fps, размер кадра — выбор на доске (720×1280 по умолчанию).
@@ -119,5 +139,6 @@ Resolve: File → Import → Timeline. Секвенция 24 fps, размер �
 | `POST .../post/voices` `{ character, version }` | сделать версию озвучки текущей → `PostState` |
 | `POST .../post/voice-job` `{ characters, allowPaid: true, kind? }` | озвучка (`voice`, с очисткой, если включена) или очистка текущей озвучки (`isolate`) — платно → `VoiceJob` |
 | `POST .../post/speech` `{ shotIds?, force? }` | распознать речь финалов (Whisper, очередь ComfyUI) → `{ queued, skipped }` |
+| `POST .../post/subtitles` | субтитры по последнему проекту и рендер → `SubtitlesJob` |
 | `POST .../post/timeline` `{ width?, height? }` | новая версия: `.kdenlive` и `.fcpxml` → `Manifest` (`kdenlive`, `timeline`) |
 | `GET .../post/file?path=` | файл папки поста (`.wav .mp3 .json .fcpxml .kdenlive .srt`), Range для звука; таймлайны — на скачивание |

@@ -57,7 +57,7 @@ function graphPath(): string {
   return path.join(getPlaybooksRoot(), "workflows", "comfy", SPEECH_GRAPH);
 }
 
-function readGraph(): ApiPrompt {
+export function readSpeechGraph(): ApiPrompt {
   const graph = readJson<ApiPrompt>(graphPath());
   if (!graph) throw new Error(`Нет графа ${SPEECH_GRAPH} в playbooks/workflows/comfy/`);
   return graph;
@@ -94,7 +94,7 @@ export async function enqueueSpeechDetect(
   episodeId: string,
   options: { shotIds?: string[]; force?: boolean } = {},
 ): Promise<{ queued: string[]; skipped: { shotId: string; reason: string }[] }> {
-  const graph = readGraph();
+  const graph = readSpeechGraph();
   const nodes = speechGraphNodes(graph);
   if (!nodes.words) throw new Error(`В ${SPEECH_GRAPH} нет превью слов Whisper (PreviewAny от выхода words_alignment)`);
   const queued: string[] = [];
@@ -169,7 +169,7 @@ export function readSpeechDetect(episodeId: string, shotId: string, final: ShotF
   }
   let nodes: ReturnType<typeof speechGraphNodes>;
   try {
-    nodes = speechGraphNodes(readGraph());
+    nodes = speechGraphNodes(readSpeechGraph());
   } catch (error) {
     return { ...base, status: "error", error: error instanceof Error ? error.message : String(error) };
   }

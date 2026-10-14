@@ -24,6 +24,7 @@ import { probeMedia, synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
 import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
 import { buildProject } from "./build";
+import { musicDir } from "./music";
 import { enqueueSpeechDetect } from "./speech-detect";
 import { getPostState } from "./state";
 import { buildTimeline } from "./timeline";
@@ -506,6 +507,27 @@ test("Voice Isolator: сбой не теряет оплаченную озвуч
   assert.equal(isolationSeen.length, sent + 1);
   assert.equal(voice.isolation?.status, "off");
   assert.equal(voice.file, `v${voice.version}.wav`);
+});
+
+test("музыка из post/music: нижняя дорожка по кругу до конца проекта, громкость — эффект Volume", async () => {
+  const music = path.join(musicDir(EP), "theme.mp3");
+  await synthesizeMedia(music, { duration: 4, expr: "0.3*sin(2*PI*220*t)", codec: "libmp3lame" });
+  const manifest = await buildTimeline(EP);
+  assert.deepEqual(manifest.music, ["theme.mp3"]);
+  const kd = fs.readFileSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", "")), "utf8");
+  assertWellFormed(kd);
+  const playlist = kd.match(/<playlist id="playlist_music">([\s\S]*?)<\/playlist>/)![1];
+  const entries = [...playlist.matchAll(/<entry producer="(\w+)" in="(\d+)" out="(\d+)"/g)];
+  const covered = entries.reduce((sum, entry) => sum + Number(entry[3]) - Number(entry[2]) + 1, 0);
+  assert.equal(covered, Math.round(manifest.duration * 24), "музыка до конца проекта");
+  assert.ok(entries.length >= 3, "файл короче проекта — повторяется");
+  assert.ok(!playlist.includes("<blank"));
+  const tractor = kd.match(/<tractor id="tractor_music"[\s\S]*?<\/tractor>/)![0];
+  assert.match(tractor, /"kdenlive:track_name">Музыка</);
+  assert.match(tractor, /<filter id="tractor_music_level">[\s\S]*"kdenlive_id">volume<[\s\S]*"level">0=-60;24=-18;/);
+  // Нижняя дорожка: первая после чёрной в последовательности.
+  assert.match(kd, /<track producer="black_track"\/>\s*<track producer="tractor_music"\/>/);
+  fs.rmSync(music);
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */

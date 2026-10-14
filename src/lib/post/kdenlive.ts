@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { episodeRoot } from "../series/paths";
 import { probeMedia } from "./ffmpeg";
+import { listMusic, musicLevelKeyframes } from "./music";
 import { postDir, TIMELINE_FPS } from "./paths";
 import type { Manifest } from "./timeline";
 
@@ -226,8 +227,47 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
 </producer>`;
   };
 
-  // Дорожки снизу вверх: звук финалов, персонажи (последний — ниже), видео.
-  const tracks: { id: string; name: string; audio: boolean; muted: boolean; playlist: string }[] = [];
+  // Музыка из post/music: файлы по порядку имён, по кругу до конца проекта.
+  const musicFiles = listMusic(episodeId);
+  const musicClips: Clip[] = [];
+  if (musicFiles.length) {
+    const musicSources = await Promise.all(musicFiles.map((file) => source(file, `Музыка: ${path.basename(file)}`)));
+    let cursor = 0;
+    for (let index = 0; cursor < totalFrames; index += 1) {
+      const src = musicSources[index % musicSources.length];
+      const length = Math.min(src.length, totalFrames - cursor);
+      musicClips.push({ start: cursor, in: 0, length, source: src, speed: 1 });
+      cursor += length;
+    }
+  }
+  const musicLevel = musicLevelKeyframes(
+    totalFrames,
+    manifest.lines.map((line) => ({ start: frames(line.timelineStart), end: frames(line.timelineEnd) })),
+    TIMELINE_FPS,
+  )
+    .map(([frame, db]) => `${frame}=${db}`)
+    .join(";");
+
+  // Дорожки снизу вверх: музыка, звук финалов, персонажи (последний — ниже), видео.
+  const tracks: { id: string; name: string; audio: boolean; muted: boolean; playlist: string; filters?: string }[] = [];
+  if (musicClips.length) {
+    tracks.push({
+      id: "tractor_music",
+      name: "Музыка",
+      audio: true,
+      muted: false,
+      playlist: playlistXml("playlist_music", musicClips, audioProducer, true),
+      // Эффект Kdenlive «Volume» (effects/volume.xml): громкость по ключевым кадрам, правится в Kdenlive.
+      filters: `  <filter id="tractor_music_level">
+   ${prop("window", 75)}
+   ${prop("max_gain", "20dB")}
+   ${prop("mlt_service", "volume")}
+   ${prop("kdenlive_id", "volume")}
+   ${prop("level", musicLevel)}
+   ${prop("kdenlive:collapsed", 0)}
+  </filter>`,
+    });
+  }
   if (finalAudioClips.length) {
     tracks.push({
       id: "tractor_final_audio",
@@ -272,7 +312,7 @@ export async function writeKdenliveProject(episodeId: string, manifest: Manifest
   ${prop("kdenlive:collapsed", 0)}
   <track hide="${hide}" producer="${track.playlist.match(/^<playlist id="([^"]+)"/)![1]}"/>
   <track hide="${hide}" producer="${spare}"/>
-${track.audio ? AUDIO_TRACK_FILTERS(track.id) : ""}
+${track.audio ? AUDIO_TRACK_FILTERS(track.id) : ""}${track.filters ? `\n${track.filters}` : ""}
 </tractor>`;
   });
 

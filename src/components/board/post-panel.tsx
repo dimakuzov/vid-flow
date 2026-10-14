@@ -233,13 +233,14 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
 
   const jobActive = state?.job?.status === "pending" || state?.job?.status === "running";
   const speechActive = Boolean(state?.shots.some((shot) => shot.speech.status === "queued" || shot.speech.status === "running"));
+  const subtitlesActive = state?.subtitles.job?.status === "pending" || state?.subtitles.job?.status === "running";
   // Сборка ждёт распознавание речи на сервере: пока идёт — обновляем статусы кадров.
   const [building, setBuilding] = useState(false);
   useEffect(() => {
-    if (!jobActive && !speechActive && !building) return;
+    if (!jobActive && !speechActive && !building && !subtitlesActive) return;
     const timer = setInterval(() => void load(), 3000);
     return () => clearInterval(timer);
-  }, [jobActive, speechActive, building, load]);
+  }, [jobActive, speechActive, building, subtitlesActive, load]);
 
   async function act(run: () => Promise<PostState | null>, done = "") {
     setBusy(true);
@@ -715,6 +716,19 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             подряд; дорожка на персонажа; внизу «Звук финалов (выкл.)» для сверки с губами. Бесплатно, локально.
             {state.projects.length > 1 ? ` Прошлые версии: ${state.projects.slice(0, -1).map((item) => item.name).join(", ")}.` : ""}
           </p>
+          <p className="mt-1 text-xs text-stone-600">
+            {state.music.files.length ? (
+              <>
+                Музыка: {state.music.files.join(", ")} — нижняя дорожка «Музыка», по кругу до конца, тише под репликами
+                (эффект Volume, правится в Kdenlive). Войдёт в следующую сборку.
+              </>
+            ) : (
+              <>
+                Музыка: положите файл (mp3, wav, flac, m4a, ogg) в <span className="break-all font-mono">{state.music.dir}</span> — следующая
+                сборка добавит её дорожкой «Музыка».
+              </>
+            )}
+          </p>
           {state.manifest && (state.manifest.warnings.length || state.manifest.skipped.length) ? (
             <ul className="mt-2 space-y-0.5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-950">
               {state.manifest.skipped.map((item) => (
@@ -731,9 +745,69 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
           {message ? <p className="mt-3 text-sm text-stone-700">{message}</p> : null}
         </div>
 
-        <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-4">
-          <h3 className="text-base font-semibold text-stone-500">Субтитры</h3>
-          <p className="mt-1 text-sm text-stone-500">После озвучки: по готовому видео с настоящей озвучкой.</p>
+        <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4">
+          <h3 className="text-base font-semibold text-stone-900">Субтитры и рендер</h3>
+          <p className="mt-1 max-w-3xl text-sm text-stone-600">
+            Берёт последний проект Kdenlive (как вы его отредактировали), достаёт из него звук, Whisper находит каждое слово,
+            субтитры — по одному слову, текст из реплик, стиль из <span className="break-all font-mono text-xs">{state.subtitles.styleFile}</span>.
+            Субтитры вставляются в проект (копия до правки сохраняется рядом), потом рендер: 720×1280, 24 fps, H.264 1.6 Мбит/с. Бесплатно, локально.
+          </p>
+          <p className="mt-1 text-xs text-amber-900">
+            Перед запуском сохраните проект в Kdenlive и закройте его — иначе Kdenlive при следующем сохранении затрёт субтитры.
+          </p>
+          {state.subtitles.project ? (
+            <p className="mt-1 break-all font-mono text-xs text-stone-600">Проект: {state.subtitles.project}</p>
+          ) : null}
+          {!state.subtitles.hasStyle ? (
+            <p className="mt-1 text-xs text-amber-800">Нет файла стиля — субтитры будут простым белым шрифтом.</p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              disabled={busy || subtitlesActive || !state.subtitles.project}
+              onClick={() =>
+                act(async () => {
+                  await requestJson(postApi(episodeId, "/subtitles"), { method: "POST", body: {} });
+                  return null;
+                })
+              }
+            >
+              {subtitlesActive ? "Делаю субтитры…" : "Добавить субтитры"}
+            </Button>
+            {state.subtitles.renders.length ? (
+              <a
+                href={state.subtitles.renders[state.subtitles.renders.length - 1].url}
+                className="text-sm text-teal-800 underline-offset-4 hover:underline"
+                download
+              >
+                Скачать {state.subtitles.renders[state.subtitles.renders.length - 1].name}
+              </a>
+            ) : null}
+          </div>
+          {state.subtitles.job ? (
+            <p
+              className={`mt-2 rounded-lg border px-3 py-2 text-sm ${
+                state.subtitles.job.status === "error"
+                  ? "border-red-300 bg-red-50 text-red-950"
+                  : state.subtitles.job.status === "done"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                    : "border-sky-300 bg-sky-50 text-sky-950"
+              }`}
+            >
+              {state.subtitles.job.status === "error"
+                ? `Не получилось: ${state.subtitles.job.error ?? "ошибка"}`
+                : state.subtitles.job.status === "done"
+                  ? `Готово: ${state.subtitles.job.words ?? 0} слов в субтитрах${
+                      state.subtitles.job.missing?.length ? ` (Whisper не услышал: ${state.subtitles.job.missing.join(", ")} — время поставлено между соседями)` : ""
+                    }. Проект обновлён — откройте его в Kdenlive заново. Копия до правки: ${state.subtitles.job.backup ?? "—"}.`
+                  : `Идёт: ${state.subtitles.job.progress ?? "начало"}`}
+            </p>
+          ) : null}
+          {state.subtitles.renders.length ? (
+            <p className="mt-1 break-all font-mono text-xs text-stone-500">
+              {state.subtitles.renders[state.subtitles.renders.length - 1].path}
+            </p>
+          ) : null}
         </div>
       </div>
     </section>
