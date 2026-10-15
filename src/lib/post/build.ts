@@ -1,5 +1,5 @@
 import { readComfyJob } from "../comfy/queue";
-import { listShotIds } from "../series/paths";
+import { activeShotIds } from "./paths";
 import { readShotFinal } from "./lines";
 import { enqueueSpeechDetect, readSpeechDetect } from "./speech-detect";
 import { buildTimeline, type Manifest, type TimelineOptions } from "./timeline";
@@ -27,7 +27,7 @@ export async function waitForSpeech(episodeId: string, options: BuildOptions = {
   const stallMs = options.stallMs ?? 90_000;
   const pollMs = options.pollMs ?? 2000;
   const started = Date.now();
-  const finals = new Map(await Promise.all(listShotIds(episodeId).map(async (shotId) => [shotId, await readShotFinal(episodeId, shotId)] as const)));
+  const finals = new Map(await Promise.all(activeShotIds(episodeId).map(async (shotId) => [shotId, await readShotFinal(episodeId, shotId)] as const)));
   const audible = [...finals.values()].filter((final) => final.probe?.hasAudio).map((final) => final.shotId);
   const given = new Set<string>();
   for (;;) {

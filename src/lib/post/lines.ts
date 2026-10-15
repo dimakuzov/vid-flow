@@ -1,10 +1,10 @@
 import path from "path";
 import { listMediaFiles } from "../series/media";
-import { listShotIds, stageDir } from "../series/paths";
+import { stageDir } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech } from "../series/speech";
 import { detectSilences, probeMedia, soundIntervals, type Interval, type MediaProbe } from "./ffmpeg";
-import { canonicalCharacter, linesFile, readJson, writeJson } from "./paths";
+import { activeShotIds, canonicalCharacter, linesFile, readJson, writeJson } from "./paths";
 
 /*
  * Таблица реплик `post/lines.json`. Текст и персонаж — всегда из speech.md кадров (правятся там),
@@ -184,7 +184,7 @@ export async function readPostLines(
   const finals = options.finals ?? new Map<string, ShotFinal>();
   const lines: PostLine[] = [];
   let order = 0;
-  for (const shotId of listShotIds(episodeId)) {
+  for (const shotId of activeShotIds(episodeId)) {
     const speech = parseSpeechLines(readShotSpeech(episodeId, shotId), readShotMeta(episodeId, shotId).characters);
     if (!speech.length) continue;
     if (!finals.has(shotId)) finals.set(shotId, await readShotFinal(episodeId, shotId));

@@ -17,6 +17,7 @@ process.env.POST_TTS_CHUNK_CHARS = "60";
 delete process.env.SERIES_ROOT;
 
 import { readComfyJob } from "../comfy/queue";
+import { setShotHidden } from "../series/hidden-shots";
 import { createEpisode, getCharactersRoot, getComfyQueueRoot, shotDir, stageDir } from "../series/paths";
 import { lineSeparator } from "./align";
 import { collectPost } from "./collect";
@@ -562,6 +563,30 @@ test("музыка: сборка оставляет пустую дорожку 
 
   // Нет дорожки «Музыка» (старый проект) — понятная ошибка.
   assert.throws(() => insertMusic(built.replace(/Музыка/g, "Music"), [theme], total, "0=-18"), MusicTrackMissingError);
+});
+
+test("скрытый с таблицы кадр не идёт в пост: ни реплик, ни распознавания, ни кадра, ни пустоты", async () => {
+  setShotHidden(EP, "s02", true);
+  try {
+    const { lines } = await readPostLines(EP);
+    assert.ok(!lines.some((line) => line.shotId === "s02"), "реплик скрытого кадра нет");
+    assert.deepEqual(lines.map((line) => line.order), lines.map((_, index) => index + 1), "номера реплик — подряд");
+    const { queued, skipped } = await enqueueSpeechDetect(EP, { force: true });
+    assert.ok(!queued.includes("s02") && !skipped.some((item) => item.shotId === "s02"), "речь скрытого кадра не распознаётся");
+
+    const manifest = await buildTimeline(EP);
+    assert.deepEqual(manifest.shots.map((shot) => shot.shotId), ["s01", "s03"]);
+    assert.equal(manifest.shots[1].start, manifest.shots[0].start + manifest.shots[0].duration, "следующий кадр — вплотную");
+    assert.ok(!manifest.lines.some((line) => line.shotId === "s02"));
+    assert.ok(!manifest.skipped.some((item) => item.id.startsWith("s02-")));
+    const kd = fs.readFileSync(path.join(timelineDir(EP), manifest.kdenlive!.replace("timeline/", "")), "utf8");
+    const video = kd.match(/<playlist id="playlist_video">([\s\S]*?)<\/playlist>/)![1];
+    assert.ok(!video.includes("<blank"), "в видео нет пустоты");
+    assert.equal([...video.matchAll(/<entry /g)].length, 2);
+    assert.ok(!kd.includes("s02_h3.mp4"), "финал скрытого кадра в проект не попал");
+  } finally {
+    setShotHidden(EP, "s02", false);
+  }
 });
 
 /** Проверка парности тегов XML (парсера XML в Node нет). */

@@ -1,12 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { listShotIds } from "../series/paths";
 import { collectPost, type CollectedLine } from "./collect";
 import { probeMedia } from "./ffmpeg";
 import { writeKdenliveProject } from "./kdenlive";
 import { readShotFinal, writePostLines, type ShotFinal } from "./lines";
-import { manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from "./paths";
+import { activeShotIds, manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from "./paths";
 
 /*
  * Таймлайн: проект Kdenlive (`kdenlive.ts`) и FCPXML 1.9 для Resolve (File → Import → Timeline), манифест к ним.
@@ -131,7 +130,8 @@ export async function buildTimeline(episodeId: string, options: TimelineOptions 
   if (!(width >= 64 && width <= 8192 && height >= 64 && height <= 8192)) throw new Error("Размер кадра: от 64 до 8192");
 
   const finals = new Map<string, ShotFinal>();
-  const shotIds = listShotIds(episodeId);
+  // Скрытые с таблицы кадры в видео не идут: ни кадра, ни пустоты, ни реплик.
+  const shotIds = activeShotIds(episodeId);
   for (const shotId of shotIds) finals.set(shotId, await readShotFinal(episodeId, shotId));
   const { lines } = await collectPost(episodeId, finals);
   const warnings: string[] = [...(options.notes ?? [])];

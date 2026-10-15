@@ -3,9 +3,9 @@ import fs from "fs";
 import path from "path";
 import { enqueueComfyJob, readComfyJob } from "../comfy/queue";
 import type { ApiPrompt, ComfyJobStatus } from "../contracts/comfy-job";
-import { getPlaybooksRoot, listShotIds, toPosix } from "../series/paths";
+import { getPlaybooksRoot, toPosix } from "../series/paths";
 import { readShotFinal, type ShotFinal } from "./lines";
-import { postDir, readJson, writeJson } from "./paths";
+import { activeShotIds, postDir, readJson, writeJson } from "./paths";
 
 /*
  * Где в финале кадра звучит речь: Whisper (ComfyUI-Whisper, граф
@@ -99,7 +99,7 @@ export async function enqueueSpeechDetect(
   if (!nodes.words) throw new Error(`В ${SPEECH_GRAPH} нет превью слов Whisper (PreviewAny от выхода words_alignment)`);
   const queued: string[] = [];
   const skipped: { shotId: string; reason: string }[] = [];
-  for (const shotId of options.shotIds ?? listShotIds(episodeId)) {
+  for (const shotId of options.shotIds ?? activeShotIds(episodeId)) {
     const final = await readShotFinal(episodeId, shotId);
     if (!final.file || !final.probe) {
       skipped.push({ shotId, reason: "нет финала в approve" });

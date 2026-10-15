@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { episodeRoot, getCharactersRoot, isInside } from "../series/paths";
+import { readHiddenShotIds } from "../series/hidden-shots";
+import { episodeRoot, getCharactersRoot, isInside, listShotIds } from "../series/paths";
 
 /*
  * Папка поста эпизода: `data/episodes/{ep}/post/` (контракт — docs/contracts/post.md).
@@ -89,4 +90,13 @@ export function writeJson(file: string, data: unknown): void {
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   fs.renameSync(tmp, file);
+}
+
+/**
+ * Кадры, которые идут в пост: все кадры эпизода по порядку, кроме скрытых с таблицы (`hidden_shots.json`).
+ * Скрытый кадр не нужен в видео: его реплик нет в озвучке и субтитрах, на таймлайне нет и пустоты на его месте.
+ */
+export function activeShotIds(episodeId: string): string[] {
+  const hidden = new Set(readHiddenShotIds(episodeId).map((id) => id.toLowerCase()));
+  return listShotIds(episodeId).filter((shotId) => !hidden.has(shotId.toLowerCase()));
 }
