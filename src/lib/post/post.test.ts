@@ -41,11 +41,11 @@ type Seen = { url: string; key?: string; body: Record<string, unknown> };
 /** Запросы озвучки (text-to-speech). */
 const seen: Seen[] = [];
 /** Запросы Voice Isolator: имя поля и файла из multipart. */
-const isolationSeen: { key?: string; field: string; filename: string; bytes: number }[] = [];
+const isolationSeen: { key?: string; field: string; filename: string; bytes: number; seconds: number }[] = [];
 let isolationFails = false;
 
 /** Поддельный Voice Isolator: вынимает файл из multipart и отдаёт его тише и в mp3 (как «очищенный»). */
-async function fakeIsolation(raw: Buffer, contentType: string): Promise<{ field: string; filename: string; mp3: Buffer }> {
+async function fakeIsolation(raw: Buffer, contentType: string): Promise<{ field: string; filename: string; mp3: Buffer; seconds: number }> {
   const boundary = contentType.match(/boundary=(.+)$/)![1];
   const text = raw.toString("latin1");
   const head = text.match(/name="([^"]+)"; filename="([^"]+)"/)!;
@@ -55,8 +55,9 @@ async function fakeIsolation(raw: Buffer, contentType: string): Promise<{ field:
   const output = path.join(tmp, `iso-out-${isolationSeen.length}.mp3`);
   fs.writeFileSync(input, raw.subarray(start, end));
   const { execFileSync } = await import("node:child_process");
+  const seconds = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", input]).toString());
   execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-af", "volume=0.5", "-c:a", "libmp3lame", output]);
-  return { field: head[1], filename: head[2], mp3: fs.readFileSync(output) };
+  return { field: head[1], filename: head[2], mp3: fs.readFileSync(output), seconds };
 }
 let server: http.Server;
 let requestNumber = 0;
@@ -117,8 +118,13 @@ before(async () => {
           res.writeHead(500);
           return res.end("isolation is down");
         }
-        const { field, filename, mp3 } = await fakeIsolation(Buffer.concat(chunks), String(req.headers["content-type"]));
-        isolationSeen.push({ key: req.headers["xi-api-key"] as string | undefined, field, filename, bytes: mp3.length });
+        const { field, filename, mp3, seconds } = await fakeIsolation(Buffer.concat(chunks), String(req.headers["content-type"]));
+        // Как настоящий Voice Isolator: звук короче 4.6 с не принимается.
+        if (seconds < 4.6) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ detail: { code: "audio_too_short", message: `Audio duration is ${seconds} seconds` } }));
+        }
+        isolationSeen.push({ key: req.headers["xi-api-key"] as string | undefined, field, filename, bytes: mp3.length, seconds });
         res.writeHead(200, { "Content-Type": "audio/mpeg" });
         return res.end(mp3);
       }
@@ -498,6 +504,13 @@ test("Voice Isolator: сбой не теряет оплаченную озвуч
   const { lines } = await collectPost(EP);
   assert.ok(lines.find((item) => item.id === "s02-1")!.clip!.source.endsWith(`v${voice.version}.clean.wav`), "в проект идёт очищенный звук");
   await assert.rejects(enqueueVoiceJob(EP, { characters: ["Julia"], allowPaid: true, kind: "isolate" }), /уже очищена/);
+
+  // Короткая озвучка (меньше 4.6 с) уходит дополненной тишиной, очищенный файл — исходной длины.
+  const shortSeen = isolationSeen.find((item) => item.seconds >= 4.6 && item.seconds < 5.1);
+  assert.ok(shortSeen, `короткая озвучка дополнена до 5 с: ${isolationSeen.map((item) => item.seconds).join(", ")}`);
+  const cleanedLength = (await probeMedia(path.join(voicesDir(EP, "Julia"), cleaned.file))).duration;
+  assert.ok(Math.abs(cleanedLength - cleaned.duration) < 0.001, `очищенный — исходной длины ${cleaned.duration}: ${cleanedLength}`);
+  assert.ok(!fs.readdirSync(voicesDir(EP, "Julia")).some((name) => name.includes(".padded.")), "временный файл удалён");
 
   // Очистка выключена в voice.json — Voice Isolator не вызывается.
   writeVoiceConfig("Julia", { voice_id: "voiceJulia01", isolate: false });

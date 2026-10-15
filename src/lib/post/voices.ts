@@ -21,6 +21,8 @@ import { characterKey, libraryCharacterDir, readJson, voicesDir, writeJson } fro
  */
 
 export const VOICE_FILE = "voice.json";
+/** Минимальная длина звука для Voice Isolator — 4.6 с; короче — дополняем тишиной до этой длины. */
+export const ISOLATION_MIN_SEC = 5;
 /** Тишина между кусками, если реплик персонажа больше, чем влезает в один запрос. */
 export const CHUNK_GAP_SEC = 1;
 
@@ -173,7 +175,19 @@ export function planCharacterVoice(lines: PostLine[], config: VoiceConfig) {
 async function cleanVoiceFile(dir: string, rawFile: string, cleanFile: string): Promise<number> {
   const raw = path.join(dir, rawFile);
   const { duration } = await probeMedia(raw);
-  const isolated = await isolateVoice(fs.readFileSync(raw), rawFile);
+  // Voice Isolator не берёт звук короче 4.6 с (audio_too_short): короткую озвучку дополняем тишиной,
+  // ответ ниже всё равно обрезается до исходной длины.
+  let upload = raw;
+  if (duration < ISOLATION_MIN_SEC) {
+    upload = path.join(dir, `${cleanFile.replace(/\.wav$/, "")}.padded.wav`);
+    await decodeToWavOfLength(raw, upload, ISOLATION_MIN_SEC);
+  }
+  let isolated: Buffer;
+  try {
+    isolated = await isolateVoice(fs.readFileSync(upload), rawFile);
+  } finally {
+    if (upload !== raw) fs.rmSync(upload, { force: true });
+  }
   const mp3 = `${cleanFile.replace(/\.wav$/, "")}.isolated.mp3`;
   fs.writeFileSync(path.join(dir, mp3), isolated);
   await decodeToWavOfLength(path.join(dir, mp3), path.join(dir, cleanFile), duration);
