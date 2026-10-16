@@ -87,6 +87,23 @@ export function setShotCharacters(episodeId: string, shotId: string, names: stri
   return characters;
 }
 
+/**
+ * Название кадра в таблице. Меняет заголовок `#` и строку `- title:`, если она есть.
+ * Остальной текст shot.md остаётся.
+ */
+export function setShotTitle(episodeId: string, shotId: string, title: string): string {
+  const next = title.trim().replace(/\s+/g, " ");
+  if (!next) throw new Error("Название кадра не может быть пустым");
+  const file = path.join(shotDir(episodeId, shotId), "shot.md");
+  let content = readTextIfExists(file);
+  const titleLine = /^(-\s*(?:title|название)\s*:).*$/im;
+  if (titleLine.test(content)) content = content.replace(titleLine, `$1 ${next}`);
+  if (/^#\s+.+$/m.test(content)) content = content.replace(/^#\s+.+$/m, `# ${next}`);
+  else content = content.trim() ? `# ${next}\n\n${content}` : `# ${next}\n\n- characters: \n- location: \n`;
+  writeText(file, content.endsWith("\n") ? content : `${content}\n`);
+  return next;
+}
+
 export function readShotMeta(episodeId: string, shotId: string): ShotMeta {
   const content = readTextIfExists(path.join(shotDir(episodeId, shotId), "shot.md"));
   return parseShotMarkdown(shotId, content);

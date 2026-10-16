@@ -13,7 +13,7 @@ delete process.env.SERIES_ROOT;
 process.env.FRAMEBOARD_LOOPS = "off";
 
 import { createEpisode, shotDir } from "./paths";
-import { readShotMeta, setShotCharacters } from "./shot-meta";
+import { readShotMeta, setShotCharacters, setShotTitle } from "./shot-meta";
 
 test("список персонажей меняет только строку characters", () => {
   createEpisode("e01");
@@ -34,4 +34,18 @@ test("список персонажей меняет только строку c
   assert.equal(readShotMeta("e01", "s01").location, "kitchen");
 
   assert.throws(() => setShotCharacters("e01", "s01", ["лена"]), /латиница/);
+});
+
+test("название кадра меняет заголовок и не трогает остальной текст", () => {
+  createEpisode("e01");
+  const file = path.join(shotDir("e01", "s02"), "shot.md");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "# Кухня\n\n- characters: lena\n- location: kitchen\n\nЧайник на столе.\n");
+  assert.equal(setShotTitle("e01", "s02", "  Кухня вечером  "), "Кухня вечером");
+  const text = fs.readFileSync(file, "utf8");
+  assert.match(text, /^# Кухня вечером$/m);
+  assert.match(text, /^- characters: lena$/m);
+  assert.match(text, /Чайник на столе\./);
+  assert.equal(readShotMeta("e01", "s02").title, "Кухня вечером");
+  assert.throws(() => setShotTitle("e01", "s02", "   "), /пустым/);
 });

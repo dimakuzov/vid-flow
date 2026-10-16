@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
-import { episodePagePath, errorText, requestJson, stagePagePath } from "@/components/stage/api";
+import { episodePagePath, errorText, requestJson, shotApiPath, stagePagePath } from "@/components/stage/api";
 import { STAGE_LABELS, STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/types";
 import { BootstrapPanel } from "./bootstrap-panel";
@@ -12,6 +12,96 @@ import { NewEpisodeDialog } from "./new-episode-dialog";
 import { PostPanel } from "./post-panel";
 import { ShotAgentLine, ShotAgentMenu } from "./shot-agent-menu";
 import { StageCell } from "./stage-cell";
+
+/** Название кадра прямо в таблице. Пишется в заголовок shot.md, остальной текст не трогается. */
+function ShotTitle({
+  episodeId,
+  shot,
+  onChanged,
+}: {
+  episodeId: string;
+  shot: ShotSummary;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(shot.title);
+  const [error, setError] = useState("");
+
+  if (!editing && value !== shot.title) setValue(shot.title);
+
+  function cancel() {
+    setValue(shot.title);
+    setError("");
+    setEditing(false);
+  }
+
+  async function commit() {
+    const next = value.trim();
+    if (!next) {
+      setError("Название не может быть пустым");
+      return;
+    }
+    if (next === shot.title) {
+      cancel();
+      return;
+    }
+    try {
+      await requestJson(shotApiPath(episodeId, shot.id), {
+        method: "POST",
+        body: { title: next },
+        fallbackError: "Не удалось переименовать кадр",
+      });
+      setError("");
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  function onKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commit();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancel();
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="mt-1 block w-full text-left text-sm font-medium text-stone-900 hover:underline"
+        title="Нажмите, чтобы переименовать"
+        onClick={() => {
+          setValue(shot.title);
+          setError("");
+          setEditing(true);
+        }}
+      >
+        {shot.title}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1">
+      <input
+        autoFocus
+        value={value}
+        aria-label={`Название кадра ${shot.id}`}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={onKey}
+        className="h-8 w-full rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-900"
+      />
+      {error ? <p className="mt-1 text-xs text-red-700">{error}</p> : null}
+    </div>
+  );
+}
 
 function ShotHeader({
   shot,
@@ -25,7 +115,7 @@ function ShotHeader({
   return (
     <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">{shot.id}</div>
-      <div className="mt-1 text-sm font-medium text-stone-900">{shot.title}</div>
+      <ShotTitle episodeId={episodeId} shot={shot} onChanged={onChanged} />
       <div className="mt-2 text-xs text-stone-500">
         {shot.characters.join(", ") || "—"}
         <br />
