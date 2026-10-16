@@ -25,7 +25,7 @@
       "pick": "newest",
       "min": 0,
       "uploadAs": "{shotId}_{character}_clothes{ext}",
-      "label": "Образец одежды в refs/ ({имя}_clothes.png). Нет файла — нода image 2 в bypass"
+      "label": "Один референс одежды из refs/. Нет файла — нода image 2 в bypass. Второй референс запуск не берёт"
     },
     "text": {
       "kind": "text",

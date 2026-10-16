@@ -74,6 +74,34 @@ function locationFolder(locationId: string): string {
   return folder;
 }
 
+/**
+ * Новая пустая папка `data/locations/{имя}`. Имя — латиница, цифры, _ и -.
+ * Уже существующую папку не затирает.
+ */
+export function createLibraryLocation(raw: string): string {
+  const name = raw.trim().replace(/\s+/g, "_");
+  if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(name) || isSkippedFolder(name)) {
+    throw new Error("Имя локации — латиница, цифры, _ и -. Например kitchen");
+  }
+  const root = getLocationsRoot();
+  fs.mkdirSync(root, { recursive: true });
+  const existing = fs.readdirSync(root).find((item) => item.toLowerCase() === name.toLowerCase());
+  if (existing) throw new Error(`Локация ${existing} уже есть`);
+  fs.mkdirSync(path.join(root, name));
+  return name;
+}
+
+/**
+ * Поставить кадр на локацию из библиотеки. Меняет только строку `- location:` в shot.md.
+ * Папка должна уже быть в `data/locations/`.
+ */
+export function assignShotLocation(episodeId: string, shotId: string, locationId: string): string {
+  const folder = locationFolder(locationId);
+  const id = path.basename(folder);
+  setShotLocation(episodeId, shotId, id);
+  return id;
+}
+
 /** Поменять `- location:` в shot.md, остальной текст файла не трогать. */
 function setShotLocation(episodeId: string, shotId: string, locationId: string): void {
   const file = path.join(shotDir(episodeId, shotId), "shot.md");

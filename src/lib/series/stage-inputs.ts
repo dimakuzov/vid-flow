@@ -9,7 +9,14 @@ import {
   type ShotContext,
 } from "../comfy/binding";
 import { resolveWorkflowId } from "../comfy/workflows";
-import { characterBaseImage, characterFolder, missingCharacterBase, missingCharacterClothes } from "./character-base";
+import {
+  characterBaseImage,
+  characterClothingFiles,
+  characterFolder,
+  missingCharacterBase,
+  missingCharacterClothes,
+  tooManyClothingRefs,
+} from "./character-base";
 import { STAGE_LABELS, type StageId } from "./constants";
 import { mediaKind, mediaUrlPath } from "./media";
 import { getCharactersRoot, getDataRoot, getLocationsRoot, stageDir, toPosix } from "./paths";
@@ -166,11 +173,17 @@ function characterInputs(ctx: ShotContext): StageInput[] {
       source,
       ...splitExcluded(mediaFiles([...shown, ...heldBack]), excluded),
     });
-    const clothes = refByStem(ctx, name, "clothes");
+    const clothes = characterClothingFiles(episodeId, shotId, stageId, name);
+    const clothesSource =
+      clothes.length > 1
+        ? tooManyClothingRefs(name, clothes.length)
+        : clothes.length === 1
+          ? `refs/ этого этапа (${path.basename(clothes[0])}). Второе изображение графа.`
+          : missingCharacterClothes(name);
     inputs.push({
       label: `Одежда ${name}`,
-      source: clothes ? `refs/ этого этапа (${path.basename(clothes)}).` : missingCharacterClothes(name),
-      ...splitExcluded(clothes ? mediaFiles([clothes]) : [], excluded),
+      source: clothesSource,
+      ...splitExcluded(mediaFiles(clothes), excluded),
     });
   }
   return inputs;

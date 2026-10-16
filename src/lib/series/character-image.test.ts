@@ -12,7 +12,9 @@ process.env.COMFY_URL = "http://127.0.0.1:9";
 delete process.env.SERIES_ROOT;
 process.env.FRAMEBOARD_LOOPS = "off";
 
-import { resolveImageInput } from "../comfy/binding";
+import { buildPrompt, resolveImageInput } from "../comfy/binding";
+import { queueStageRun } from "../comfy/stage-run";
+import { requireStageBinding } from "../comfy/workflows";
 import type { ImageInput } from "../contracts/graph-binding";
 import { listLibraryCharacterNames } from "./character-base";
 import { mediaUrlPath } from "./media";
@@ -68,12 +70,23 @@ test("выбранный референс, output и прошлый кадр с�
 
   const ctx = { episodeId: "e01", shotId: "s02", stageId: "characters" as const, character: "lena" };
   assert.equal(path.basename(resolveImageInput(ctx, baseInput)[0]), "full_body.png");
-  assert.equal(path.basename(resolveImageInput(ctx, clothesInput)[0]), "lena_clothes.png");
+  assert.deepEqual(
+    resolveImageInput(ctx, clothesInput).map((file) => path.basename(file)),
+    ["lena_clothes.png", "lena_coat.png"],
+  );
   assert.deepEqual(listLibraryCharacterNames(), ["Lena"]);
 
   setCharacterImage("e01", "s02", "lena", mediaUrlPath(coat)!);
   assert.equal(path.basename(resolveImageInput(ctx, baseInput)[0]), "lena_coat.png");
-  assert.equal(path.basename(resolveImageInput(ctx, clothesInput)[0]), "lena_clothes.png");
+  assert.deepEqual(resolveImageInput(ctx, clothesInput).map((file) => path.basename(file)), ["lena_clothes.png"]);
+  fs.writeFileSync(
+    path.join(stageDir("e01", "s02", "characters"), "prompt.md"),
+    "## lena\nChange the jacket to a wool coat.\n",
+  );
+  const { binding, graph } = requireStageBinding("characters", "character_outfit");
+  const built = buildPrompt(binding, graph, ctx);
+  assert.ok(built.prompt["22"], "референс одежды включает второе изображение");
+  assert.deepEqual(built.prompt["17"].inputs["images.image_2"], ["22", 0]);
   const row = stageInputs("e01", "s02", "characters").find((input) => input.label === "Персонаж lena");
   assert.equal(row?.files[0].name, "lena_coat.png");
   assert.match(row!.source, /выбран вручную/);
@@ -85,4 +98,7 @@ test("выбранный референс, output и прошлый кадр с�
   assert.equal(path.basename(resolveImageInput(ctx, baseInput)[0]), "lena_s01.png");
 
   assert.throws(() => setCharacterImage("e01", "s02", "lena", mediaUrlPath(path.join(library, "full_body.png"))!), /output, refs или предыдущего/);
+
+  fs.writeFileSync(path.join(refs, "lena_hat.png"), PNG);
+  assert.throws(() => queueStageRun("e01", "s02", "characters"), /не больше одного референса/);
 });

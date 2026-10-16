@@ -1,7 +1,7 @@
 import path from "path";
 import type { GraphBinding, ImageInput } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
-import { missingCharacterBase } from "../series/character-base";
+import { characterClothingFiles, missingCharacterBase, tooManyClothingRefs } from "../series/character-base";
 import { readTextIfExists } from "../series/media";
 import { stageDir, toPosix } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
@@ -150,6 +150,8 @@ function queueCharacters(
       skipped.push(missingCharacterBase(name));
       continue;
     }
+    const clothes = characterClothingFiles(ctx.episodeId, ctx.shotId, ctx.stageId, name);
+    if (clothes.length > 1) throw new Error(tooManyClothingRefs(name, clothes.length));
     prepared.push({
       id: characterJobId(ctx.shotId, binding.id, name, stamp),
       ctx: run,

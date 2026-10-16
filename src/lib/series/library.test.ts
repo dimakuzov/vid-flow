@@ -14,7 +14,7 @@ process.env.FRAMEBOARD_LOOPS = "off";
 
 import { buildPrompt, resolveImageInput } from "../comfy/binding";
 import { listWorkflowChoices, requireStageBinding } from "../comfy/workflows";
-import { copyLocationToRefs, listLibraryLocations } from "./library";
+import { assignShotLocation, copyLocationToRefs, createLibraryLocation, listLibraryLocations } from "./library";
 import { createEpisode, ensureStageDirs, getLocationsRoot, shotDir, stageDir } from "./paths";
 import { readShotMeta } from "./shot-meta";
 
@@ -114,6 +114,29 @@ test("«записать в кадр» меняет только строку lo
   assert.deepEqual(meta.characters, ["lena"]);
   const text = fs.readFileSync(path.join(shotDir("e01", "s01"), "shot.md"), "utf8");
   assert.match(text, /## Заметки\nСвой раздел\./);
+});
+
+test("смена локации кадра пишет только строку location; новая папка пустая", () => {
+  const id = createLibraryLocation(" Hall ");
+  assert.equal(id, "Hall");
+  assert.equal(fs.existsSync(path.join(getLocationsRoot(), "Hall")), true);
+  assert.equal(fs.readdirSync(path.join(getLocationsRoot(), "Hall")).length, 0);
+  assert.equal(assignShotLocation("e01", "s01", "Hall"), "Hall");
+  const text = fs.readFileSync(path.join(shotDir("e01", "s01"), "shot.md"), "utf8");
+  assert.match(text, /^- location: Hall$/m);
+  assert.match(text, /## Заметки\nСвой раздел\./);
+  assert.equal(readShotMeta("e01", "s01").location, "Hall");
+  assert.deepEqual(
+    listLibraryLocations().map((item) => item.id),
+    ["Empty", "Hall", "Kitchen", "Stairwell"],
+  );
+
+  assert.throws(() => createLibraryLocation("kitchen"), /уже есть/);
+  assert.throws(() => createLibraryLocation("Kitchen_old"), /латиница/);
+  assert.throws(() => createLibraryLocation("../secret"), /латиница/);
+  assert.throws(() => createLibraryLocation("hall/room"), /латиница/);
+  assert.throws(() => createLibraryLocation("  "), /латиница/);
+  assert.throws(() => assignShotLocation("e01", "s01", "Nowhere"), /Нет локации/);
 });
 
 test("выбранная локация сразу вход графа: первый файл refs/", () => {

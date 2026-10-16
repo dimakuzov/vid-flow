@@ -135,8 +135,8 @@ test("входы персонажей: одна база и один образ�
   assert.equal(base?.source, "библиотека data/characters/Katya/ (full_body.png).");
   assert.match(base!.files[0].url, /^\/api\/media\/characters\/Katya\/full_body\.png/);
   const clothes = inputs.find((input) => input.label === "Одежда katya");
-  assert.deepEqual(clothes?.files.map((file) => file.name), ["katya_clothes.png"]);
-  assert.equal(inputs.some((input) => input.files.some((file) => file.name === "katya_outfit.png")), false);
+  assert.deepEqual(clothes?.files.map((file) => file.name), ["katya_clothes.png", "katya_outfit.png"]);
+  assert.match(clothes!.source, /не больше одного референса/);
 
   // Старое имя базы, как у Лены: body.png. Копии не берутся. Лист не режется.
   const lena = path.join(getCharactersRoot(), "Lena");

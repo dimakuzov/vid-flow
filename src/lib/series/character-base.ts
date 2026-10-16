@@ -1,7 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { listMediaFiles } from "./media";
+import type { StageId } from "./constants";
+import { listMediaFiles, mediaUrlPath } from "./media";
 import { getCharactersRoot, listShotIds, stageDir } from "./paths";
+import { chosenCharacterFile, excludedFiles } from "./run-settings";
+import { readShotMeta } from "./shot-meta";
 
 /**
  * База персонажа в data/characters/{name}/. Одна функция на страницу этапа и на граф,
@@ -97,13 +100,56 @@ export function previousCharacterImages(
   return { id, files };
 }
 
+/**
+ * Референсы одежды персонажа в refs/. Картинка самого персонажа сюда не входит:
+ * ни `{имя}_base*`, ни файл, который пользователь поставил персонажем.
+ * Файл без чужого имени тоже считается одеждой. Убранные из графа не считаются.
+ */
+export function characterClothingFiles(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  character: string,
+): string[] {
+  const id = character.toLowerCase();
+  const people = readShotMeta(episodeId, shotId).characters.map((name) => name.toLowerCase());
+  const chosen = chosenCharacterFile(episodeId, shotId, stageId, character);
+  const excluded = excludedFiles(episodeId, shotId, stageId);
+  const refs = path.join(stageDir(episodeId, shotId, stageId), "refs");
+  let names: string[];
+  try {
+    names = fs.readdirSync(refs);
+  } catch {
+    return [];
+  }
+  const ownedBy = (stem: string, who: string) => stem === who || stem.startsWith(`${who}_`) || stem.startsWith(`${who}-`);
+  return names
+    .filter((name) => IMAGE.test(name))
+    .map((name) => path.join(refs, name))
+    .filter((file) => fs.statSync(file).isFile())
+    .filter((file) => {
+      const relative = mediaUrlPath(file);
+      if (relative && excluded.has(relative)) return false;
+      if (chosen && path.resolve(file) === path.resolve(chosen)) return false;
+      const stem = path.parse(file).name.toLowerCase();
+      if (stem === `${id}_base` || stem.startsWith(`${id}_base`)) return false;
+      if (ownedBy(stem, id)) return true;
+      return !people.some((who) => who !== id && ownedBy(stem, who));
+    })
+    .sort((a, b) => path.basename(a).localeCompare(path.basename(b), undefined, { numeric: true }));
+}
+
+/** Больше одного референса одежды в один граф не берём. */
+export function tooManyClothingRefs(name: string, count: number): string {
+  return `В этот граф идёт один персонаж и не больше одного референса одежды. У ${name} референсов ${count}. Лишний уберите кнопкой «Убрать».`;
+}
+
 /** Текст ошибки, когда персонажа не из чего собрать. */
 export function missingCharacterBase(name: string): string {
   return `нет базы для ${name}: положите картинку в data/characters/${name}/`;
 }
 
-/** Нет образца: прогон идёт, нода «image 2: образец одежды» в bypass. */
+/** Нет референса одежды: прогон идёт, нода «image 2: образец одежды» в bypass. */
 export function missingCharacterClothes(name: string): string {
-  const file = `${name.toLowerCase()}_clothes.png`;
-  return `нет образца одежды для ${name} (${file}): нода «image 2: образец одежды» в bypass`;
+  return `нет референса одежды для ${name}: нода «image 2: образец одежды» в bypass`;
 }

@@ -12,6 +12,7 @@ import { useAgentProviders } from "./agent-provider";
 import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
 import { DocFieldLabel, DocTextarea } from "./doc-field";
 import { ImageLightbox } from "./image-lightbox";
+import { LocationChoice } from "./location-choice";
 import { LocationLibrary } from "./location-library";
 import { OutputPanel } from "./output-panel";
 import { PromptHistory } from "./prompt-history";
@@ -562,6 +563,17 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onRememberForShot={setRememberChoice}
               onSend={sendToAgent}
             />
+            {stageId === "location" ? (
+              <LocationChoice
+                stageApi={stageApi}
+                location={detail.location}
+                disabled={busy || stageBusy}
+                onChanged={(picked, text) => {
+                  stage.merge(picked);
+                  setMessage(text);
+                }}
+              />
+            ) : null}
             {stageId === "characters" ? (
               <CharacterRoster
                 names={characterNames}
