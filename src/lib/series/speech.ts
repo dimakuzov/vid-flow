@@ -45,7 +45,7 @@ export function speechSpeakers(text: string): string[] {
 
 /**
  * Реплики без имени говорящего и кавычек: `Катя: «Мама, я дома.»` → `Мама, я дома.`
- * По ним проверка языка prompt.md пропускает дословные реплики (они могут быть по-русски).
+ * Английская реплика может стоять в prompt.md дословно. Реплика с кириллицей в промпт не копируется.
  */
 export function speechPhrases(text: string): string[] {
   return text

@@ -38,13 +38,13 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 ### Номера картинок
 
-В задаче есть список «Images the graph receives» — какие картинки получит граф и что на каждой. Номера брать ровно оттуда. image 1 — локация. Дальше персонажи по алфавиту имён, а не в порядке shot.md: у Лены и Юли Юля — image 2, Лена — image 3. Дальше портреты этих персонажей в том же порядке: Юлин портрет — image 4, Ленин — image 5. Всего до 6 картинок; что не влезло, задача называет отдельно, на это не ссылаться.
+В задаче есть список «Images the graph receives» — какие картинки получит граф и что на каждой. Номера брать ровно оттуда. image 1 — локация. Дальше персонажи по алфавиту имени файла, а не в порядке shot.md: у Лены и Юли Юля — image 2, Лена — image 3. В промпте это character1 и character2 в том же порядке, не Юля и не Лена. Дальше портреты с теми же номерами: лицо character1 — image 4, лицо character2 — image 5. Всего до 6 картинок; что не влезло, задача называет отдельно, на это не ссылаться.
 
 Все картинки из списка уходят в модель, поэтому в промпте названа каждая: кто на ней и зачем она. Картинка без слов в промпте сбивает модель: она не знает, куда её деть, и может вписать портрет вторым человеком.
 
-Если людей двое, у каждого в первом предложении имя и номер, дальше — по именам: `Place Julia (image 2) and Lena (image 3) into the lecture hall from image 1.` В ep2 промпты писали `Lena from image 2`, а image 2 была Юля, и девять прогонов девушки менялись ролями.
+Если людей двое, в первых предложениях привязать каждого к картинкам и дать одно-два предложения, чтобы модель их различала: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Place character1 and character2 into the lecture hall from image 1.` В ep2 промпты писали `Lena from image 2`, а image 2 была Юля, и девять прогонов девушки менялись ролями. Имя из задачи делает то же: модель не знает, к какой картинке оно относится.
 
-Внешность по памяти не описывать: волосы, очки, одежда берутся с референса. Неверное описание (`Lena in her sweater`, хотя свитер у Юли) тянет модель не к тому человеку.
+Внешность по памяти не описывать: волосы, очки, одежда берутся с референса. Неверное описание тянет модель не к тому человеку. Имя из задачи в промпт не писать.
 
 Имена файлов и пути (`refs/portret.png`, `shots/s10/...`) в промпт не писать. Модель видит только картинки по номерам. Промпт с именем файла доска не запустит.
 
@@ -63,7 +63,7 @@ No special lighting on her: she is lit by the same light as everything in image 
 Вместо описания — одна строка на каждого человека:
 
 - Один: `Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.`
-- Двое: `Ivan's clothes exactly as in image 2. Lena's clothes and bag exactly as in image 3. Nothing changed.`
+- Двое: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3. Nothing changed.`
 
 Одежду из текста кадра (shot.md) не брать: если она расходится с референсом, верен референс.
 
@@ -95,10 +95,10 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 ### Портреты
 
-В списке «Images the graph receives» после персонажей идут их портреты (`portrait of julia`). Доска отправляет их всегда, если портрет есть. Для каждого портрета в промпте одна строка: чьё это лицо, по номеру.
+В списке «Images the graph receives» после персонажей идут их портреты (`character1 face`). Доска отправляет их всегда, если портрет есть. Для каждого портрета в промпте одна строка: чьё это лицо, по номеру персонажа и номеру картинки.
 
-- С одним человеком: `Image 3 is her portrait: her face exactly as in image 3, the same eyes, nose, lips and skin.`
-- С двумя: `Julia's face exactly as in image 4, Lena's face exactly as in image 5.`
+- С одним человеком: `character1 is image 2 and the face from image 3: her face exactly as in image 3, the same eyes, nose, lips and skin.`
+- С двумя: `character1's face exactly as in image 4, character2's face exactly as in image 5.`
 - Портрет — только лицо. Одежда, поза и рост — с референса персонажа (image 2, image 3). Не писать `the girl from image 4`: модель добавит лишнего человека.
 
 Портреты идут после персонажей, поэтому номера локации и персонажей не зависят от того, есть ли портрет.
@@ -214,7 +214,7 @@ Her clothes exactly as in image 2, unchanged. No special lighting on her: she is
 Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
 ```
 
-Если у Лены есть портрет, добавляется строка `Her face exactly as in image 3`.
+Если у character1 есть портрет, добавляется строка `character1's face exactly as in image 3`.
 
 Средний план (s06, принят). Сработал, потому что локация уже снята с расстояния кафедры, а предмет (кафедра) режет тело:
 

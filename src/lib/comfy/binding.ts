@@ -587,7 +587,8 @@ export const BOARD_INSTRUCTION = /^\s*(Собери |Правила:\s*playbooks
 
 /**
  * Строка с русским текстом (5+ кириллических букв): модели нужен текст на её языке.
- * Не считаются имена персонажей кадра, дословные реплики из speech.md (передаются в names) и длительность («5 сек»).
+ * Не считаются имена персонажей кадра (передаются в names) и длительность («5 сек»).
+ * Реплика из speech.md пропускается, только если в ней нет кириллицы.
  */
 export function russianLine(text: string, names: string[] = []): string | null {
   for (const line of text.split(/\r?\n/)) {
@@ -614,10 +615,13 @@ function speechKey(text: string): string {
 /**
  * Каждая реплика из speech.md стоит в тексте дословно (вход с requireSpeech). Иначе модель,
  * которая сама озвучивает кадр, не будет двигать губами под нужные слова.
+ * Реплика с кириллицей не требуется: в prompt.md её пишут по-английски, без перевода на русский.
  */
 export function assertSpeechInText(text: string, speech: string, where = "prompt.md"): void {
   const body = speechKey(text);
-  const missing = speechPhrases(speech).filter((phrase) => !body.includes(speechKey(phrase)));
+  const missing = speechPhrases(speech).filter(
+    (phrase) => !russianLine(phrase) && !body.includes(speechKey(phrase)),
+  );
   if (missing.length) {
     throw new Error(
       `В ${where} нет реплик из speech.md: ${missing.map((line) => `«${line}»`).join(", ")}. ` +
@@ -1199,8 +1203,10 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   const promptMd = readPrompt(ctx.stageId);
   const durationSec = readRunSettings(ctx.episodeId, ctx.shotId, ctx.stageId).durationSec;
   const texts: Record<string, string> = {};
-  // Реплики из speech.md звучат на своём языке: проверка языка их пропускает.
-  const allowed = [...meta.characters, ...speechPhrases(readShotSpeech(ctx.episodeId, ctx.shotId))];
+  // Английская реплика из speech.md может стоять в prompt.md дословно. Кириллицу проверка не пропускает:
+  // реплику по-русски агент пишет по-английски.
+  const speech = readShotSpeech(ctx.episodeId, ctx.shotId);
+  const allowed = [...meta.characters, ...speechPhrases(speech).filter((phrase) => !russianLine(phrase))];
 
   const images: Record<string, string[]> = {};
   const missing: string[] = [];

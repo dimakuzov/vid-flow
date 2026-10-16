@@ -196,7 +196,7 @@ test("реплики: speech.md кадра, PATCH только на видео-�
   assert.equal(detail.docs.speech, "");
 });
 
-test("реплики: имя и кавычки снимаются; дословная реплика проходит проверку языка, другой русский текст — нет", async () => {
+test("реплики: имя и кавычки снимаются; кириллица в prompt.md не проходит, английская реплика — проходит", async () => {
   assert.deepEqual(speechPhrases('Катя: «Мама, я дома.»\n\n- Мама: "Иди есть."\nТишина в доме'), [
     "Мама, я дома.",
     "Иди есть.",
@@ -204,9 +204,9 @@ test("реплики: имя и кавычки снимаются; дослов�
   ]);
   makeShot("s07");
   await patch("s07", { speech: "Катя: Мама, я дома." });
+  setPrompt("s07", 'Static shot, fixed camera. She says: "Mom, I am home." Realistic, natural movement.');
+  assert.equal(seconds("s07"), 5, "реплика по-английски, кириллицы нет");
   setPrompt("s07", 'Static shot, fixed camera. She says: "Мама, я дома." Realistic, natural movement.');
-  assert.equal(seconds("s07"), 5, "реплика из speech.md пропущена");
-  setPrompt("s07", 'Static shot, fixed camera. She says: "Папа, я ухожу." Realistic, natural movement.');
   assert.throws(() => seconds("s07"), /русский текст/);
 });
 
@@ -235,4 +235,7 @@ test("реплики в задаче агенту: llm_task.md и text-режи�
   setIdle(EP, "s08", STAGE);
   submit();
   assert.match(readLlmTask(EP, "s08", STAGE), /## Реплики[^\n]*\n\nКатя: Мама, я дома\./);
+  assert.match(readLlmTask(EP, "s08", STAGE), /## Правила prompt\.md/);
+  assert.match(buildTextParts(request).system, /character1, character2, character3/);
+  assert.match(buildTextParts(request).system, /No Cyrillic/);
 });

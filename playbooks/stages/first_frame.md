@@ -30,7 +30,7 @@
 Не из сырых баз. У баз другой ракурс и другая одежда.
 
 - Локация: один файл из `shots/{shotId}/location/approve/`. Это image 1.
-- Персонаж: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Доска берёт их по алфавиту имени файла: при `julia_s05.png` и `lena_s05.png` Юля — image 2, Лена — image 3. В задаче агенту номера перечислены в «Images the graph receives».
+- Персонаж: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Доска берёт их по алфавиту имени файла: при `julia_s05.png` и `lena_s05.png` Юля — image 2, Лена — image 3. В prompt.md это character1 и character2 в том же порядке. В задаче агенту номера перечислены в «Images the graph receives». Имена — только для задачи.
 - Портрет: лицо персонажа, после всех персонажей, в том же порядке (image 3 для одного человека, image 4 и image 5 для двоих). Доска отправляет его всегда, если он есть. Откуда: `refs/{name}_face.png` этого этапа, иначе портрет в `data/characters/{name}/` (`portrait.png`, `portret.png`, `{Name}_portret.png`, `face.png`). Правила: `playbooks/models/qwen_first_frame.md`, «Портреты».
 - Всего граф берёт до 6 картинок: локация и 5 референсов подряд, без пропусков в номерах. Что не влезло, задача агенту называет отдельно. Убранное кнопкой «Убрать» в граф не идёт и номера не занимает.
 

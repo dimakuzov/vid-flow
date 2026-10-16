@@ -23,6 +23,23 @@ prompt.md is sent to the generation model exactly as written.
 Reply with the complete new text of prompt.md and nothing else: no preface, no explanation, no Markdown code fences, no quotes around it.
 Follow the playbook below for language, structure and length. Keep what the user did not ask to change.`;
 
+/** Последние три этапа: в модель уходит картинка или видео, и промпт читает она, а не человек. */
+const GENERATION_STAGES = new Set<StageId>(["first_frame", "video_preview", "final_render"]);
+
+/**
+ * Общие правила prompt.md этих этапов. Стоят над плейбуком модели: иначе каждый воркфлоу
+ * заново учит агента писать имена людей и «как в прошлый раз».
+ */
+export const GENERATION_PROMPT_RULES = `These rules override the playbook wherever it disagrees. They apply to every workflow of this stage.
+
+prompt.md is English. No Cyrillic anywhere in it. Do not translate any of it into Russian, including the spoken lines: write a line in English even when speech.md has it in Russian.
+
+People in prompt.md are character1, character2, character3, in the order of their reference images (the same order as «Images the graph receives»; if that list is absent, alphabetical order of the names in the characters line, so the same person keeps the same number on every stage). Names in the user message, in shot.md and in file names are only so you know whom the user means. Do not write those names in prompt.md. An example in the playbook that says Julia, Lena or any other name is the old form: write character1 and character2.
+
+Describe each person in one or two sentences, enough to tell them apart, with no production name. If that person has reference images, bind them in those sentences: \`character1 is image 2 and the face from image 4\`. Use the numbers from the image list. Where the playbook says @img-N, use that label the same way.
+
+prompt.md is the whole instruction for this one run. Do not mention an earlier prompt, an earlier result, or that something should be done "as before", "the same as last time" or "keep everything". When the user asks for one change, write the previous prompt out again in full with that change included. "All good, put a bag in Ivan's hands" becomes the previous prompt plus the bag in the hands of whichever character Ivan is, not a line that says to repeat the last result. "exactly as in image N" is about a reference picture, and that stays.`;
+
 /** Вариант, с которым доска поставит прогон после ответа агента. null — у этапа нет воркфлоу. */
 export function selectedWorkflow(episodeId: string, shotId: string, stageId: StageId): WorkflowChoice | null {
   const choices = listWorkflowChoices(episodeId, shotId, stageId);
@@ -39,21 +56,27 @@ export function selectedWorkflow(episodeId: string, shotId: string, stageId: Sta
   return choices.find((choice) => choice.id === id) ?? choices.find((choice) => choice.isDefault) ?? null;
 }
 
-/** Кто на картинке входа: имя персонажа из `julia_s05.png`, портрет — по папке библиотеки или `{name}_face`. */
-function imageSubject(input: ImageInput, file: string, shotId: string): string {
+/** Кто на картинке входа. Имя — только для задачи агенту; в prompt.md его заменяет characterN. */
+function personOnImage(
+  input: ImageInput,
+  file: string,
+  shotId: string,
+): { role: "location" | "figure" | "face" | "other"; name: string } {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   const stem = path.parse(file).name;
   if (sources.includes("library:faces")) {
     const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
-    return `portrait of ${name.toLowerCase()} (face reference)`;
+    return { role: "face", name: name.toLowerCase() };
   }
   if (sources.includes("approve:characters")) {
     const suffix = `_${shotId}`;
     const name = stem.toLowerCase().endsWith(suffix.toLowerCase()) ? stem.slice(0, -suffix.length) : stem;
-    return `${name} (approved character: figure and clothes for this shot)`;
+    return { role: "figure", name: name.toLowerCase() };
   }
-  if (sources.some((source) => source.endsWith(":location") || source === "approve:location")) return "the location";
-  return input.label;
+  if (sources.some((source) => source.endsWith(":location") || source === "approve:location")) {
+    return { role: "location", name: "" };
+  }
+  return { role: "other", name: "" };
 }
 
 /**
@@ -77,11 +100,32 @@ export function renderGraphImages(
   }
   const lines: string[] = [];
   const sent = new Set<string>();
+  const characterOf = new Map<string, number>();
+  const characterFor = (name: string) => {
+    const key = name.toLowerCase();
+    const existing = characterOf.get(key);
+    if (existing) return existing;
+    const next = characterOf.size + 1;
+    characterOf.set(key, next);
+    return next;
+  };
   for (const slot of binding.slots) {
     const found = slotFile(binding, slot, images);
     if (!found) continue;
     sent.add(`${found.name}:${found.index}`);
-    lines.push(`- image ${lines.length + 1}: ${imageSubject(found.input, found.file, shotId)} (${path.basename(found.file)})`);
+    const who = personOnImage(found.input, found.file, shotId);
+    const fileName = path.basename(found.file);
+    const number = lines.length + 1;
+    if (who.role === "location") {
+      lines.push(`- image ${number}: the location (${fileName})`);
+    } else if (who.role === "figure" || who.role === "face") {
+      const kind = who.role === "face" ? "face" : "approved figure and clothes";
+      lines.push(
+        `- image ${number}: character${characterFor(who.name)} ${kind} (${who.name} in the task; do not write that name) (${fileName})`,
+      );
+    } else {
+      lines.push(`- image ${number}: ${found.input.label} (${fileName})`);
+    }
   }
   if (!lines.length) return "";
   const left = Object.entries(images).flatMap(([name, files]) =>
@@ -92,7 +136,7 @@ export function renderGraphImages(
     "",
     ...lines,
     "",
-    "Every image above goes to the model. Say in prompt.md what each one is, by its number: who the person from image 2 is, and for a portrait whose face it is, e.g. `Julia's face exactly as in image 4`.",
+    "Every image above goes to the model. In prompt.md call the people character1, character2, … in this order. One or two sentences each, and bind the references by these numbers: `character1 is image 2 and the face from image 4`. Do not write the name from the task or the file.",
   ];
   if (left.length) {
     parts.push("", `Not sent, the graph takes at most ${lines.length} images: ${left.join(", ")}. Do not refer to them.`);
@@ -148,9 +192,10 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   const dir = stageDir(episodeId, shotId, stageId);
   const workflow = selectedWorkflow(episodeId, shotId, stageId);
   const playbook = resolvePlaybook(stageId, workflow?.playbook);
+  const rules = GENERATION_STAGES.has(stageId) ? `\n\n${GENERATION_PROMPT_RULES}` : "";
   const system = playbook
-    ? `${TEXT_RULES}\n\n# Playbook (${playbook.file})\n\n${playbook.text.trim()}\n`
-    : `${TEXT_RULES}\n`;
+    ? `${TEXT_RULES}${rules}\n\n# Playbook (${playbook.file})\n\n${playbook.text.trim()}\n`
+    : `${TEXT_RULES}${rules}\n`;
 
   const meta = readShotMeta(episodeId, shotId);
   const prompt = readTextIfExists(path.join(dir, "prompt.md")).trim();
@@ -204,7 +249,7 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     const speech = readShotSpeech(episodeId, shotId).trim();
     lines.push(
       "",
-      "## Lines (speech.md: what the characters say aloud, word for word)",
+      "## Lines (speech.md). An English line goes into prompt.md word for word. A line in Cyrillic is written in English: do not copy the Cyrillic and do not translate the line into Russian. The speaker is character1, character2, not the name before the colon.",
       "",
       speech || "(none: nobody speaks in this shot)",
     );
