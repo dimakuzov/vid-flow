@@ -154,6 +154,11 @@ test("промпт с путями к файлам не уходит в моде
   assert.throws(() => assertModelText("Place Lena from shots/s10/characters/approve/x into it."), /ссылается на файл/);
   assert.throws(() => assertModelText("Use lena_s10.png as the girl."), /ссылается на файл/);
   assertModelText("Place the girl from image 2 into the canteen from image 1. Her face from image 3.");
+  assert.throws(
+    () => assertModelText("She stands much closer to the camera than before, her face filling the frame."),
+    /прошлым результатом/,
+  );
+  assertModelText("She stands right in front of the camera, very close: her face and shoulders fill most of the frame.");
 });
 
 test("манифест: вход с whenPrompt должен быть необязательным, whenPrompt — регэксп", () => {

@@ -34,11 +34,13 @@ export const GENERATION_PROMPT_RULES = `These rules override the playbook wherev
 
 prompt.md is English. No Cyrillic anywhere in it. Do not translate any of it into Russian, including the spoken lines: write a line in English even when speech.md has it in Russian.
 
+Before every new agent run, check the lines again. The Lines section in this task is speech.md as of this request, and it can change between requests. Do not keep the lines already written in prompt.md when they differ from that section: replace them, even if the user asked for something else. An English line is copied word for word. A line in Cyrillic is written in English. No Lines section means nobody speaks: remove any spoken line from the prompt.
+
 People in prompt.md are character1, character2, character3, in the order of their reference images (the same order as «Images the graph receives»; if that list is absent, alphabetical order of the names in the characters line, so the same person keeps the same number on every stage). Names in the user message, in shot.md and in file names are only so you know whom the user means. Do not write those names in prompt.md. An example in the playbook that says Julia, Lena or any other name is the old form: write character1 and character2.
 
 Describe each person in one or two sentences, enough to tell them apart, with no production name. If that person has reference images, bind them in those sentences: \`character1 is image 2 and the face from image 4\`. Use the numbers from the image list. Where the playbook says @img-N, use that label the same way.
 
-prompt.md is the whole instruction for this one run. Do not mention an earlier prompt, an earlier result, or that something should be done "as before", "the same as last time" or "keep everything". When the user asks for one change, write the previous prompt out again in full with that change included. "All good, put a bag in Ivan's hands" becomes the previous prompt plus the bag in the hands of whichever character Ivan is, not a line that says to repeat the last result. "exactly as in image N" is about a reference picture, and that stays.`;
+prompt.md is the whole instruction for this one run. The model has not seen the previous result, so never compare this picture with it. Forbidden, even if the current prompt.md already says it: "than before", "as before", "like before", "last time", "much closer", "even closer", "closer than". When the user says "ещё ближе" or "much closer", rewrite the size sentences to say how close the person is now: \`very close: her face and shoulders fill most of the frame\`. Do not add "than before". When the user asks for one change, write the previous prompt out again in full with that change included, and drop any comparison with the previous result. "All good, put a bag in Ivan's hands" becomes the previous prompt plus the bag in the hands of whichever character Ivan is. "exactly as in image N" is about a reference picture, and that stays.`;
 
 /** Вариант, с которым доска поставит прогон после ответа агента. null — у этапа нет воркфлоу. */
 export function selectedWorkflow(episodeId: string, shotId: string, stageId: StageId): WorkflowChoice | null {
@@ -249,7 +251,9 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     const speech = readShotSpeech(episodeId, shotId).trim();
     lines.push(
       "",
-      "## Lines (speech.md). An English line goes into prompt.md word for word. A line in Cyrillic is written in English: do not copy the Cyrillic and do not translate the line into Russian. The speaker is character1, character2, not the name before the colon.",
+      "## Lines (speech.md, read again for this request; they may have changed since the last prompt)",
+      "",
+      "An English line goes into prompt.md word for word. A line in Cyrillic is written in English: do not copy the Cyrillic and do not translate the line into Russian. The speaker is character1, character2, not the name before the colon. If these lines differ from the ones in the current prompt.md, replace them.",
       "",
       speech || "(none: nobody speaks in this shot)",
     );
