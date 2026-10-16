@@ -38,13 +38,13 @@ For a man, change `girl` to `man` and `her`/`she` to `his`/`he`.
 
 ### Image numbers
 
-The task lists the images the graph receives under «Images the graph receives», and what each one shows. Use exactly those numbers. image 1 is the location. The characters follow in alphabetical order of their names, not in the order of shot.md: with Lena and Julia, Julia is image 2 and Lena is image 3. Then the portraits of those characters in the same order: Julia's portrait is image 4, Lena's is image 5. Up to 6 images in all; anything that did not fit is named separately in the task, do not refer to it.
+The task lists the images the graph receives under «Images the graph receives», and what each one shows. Use exactly those numbers. image 1 is the location. The characters follow in alphabetical order of the file name, not the order of shot.md: with Lena and Julia, Julia is image 2 and Lena is image 3. In the prompt they are character1 and character2 in that same order, never Julia and Lena. Then the portraits, same numbers: character1's face is image 4, character2's face is image 5. Up to 6 images in all; anything that did not fit is named separately in the task, do not refer to it.
 
 Every image in the list goes to the model, so the prompt names each one: who is on it and what it is for. An image the prompt does not mention confuses the model: it does not know where to put it and may paint a portrait in as a second person.
 
-With two people, give every person a name and a number in the first sentence, and use the names after that: `Place Julia (image 2) and Lena (image 3) into the lecture hall from image 1.` In ep2 the prompts said `Lena from image 2` while image 2 was Julia, and the two girls swapped roles for nine runs.
+With two people, bind each one to the images in the first sentences, then one or two sentences so the model can tell them apart: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Place character1 and character2 into the lecture hall from image 1.` In ep2 the prompts said `Lena from image 2` while image 2 was Julia, and the two girls swapped roles for nine runs. A production name does the same: the model does not know which picture it belongs to.
 
-Do not describe what a person looks like from memory: hair, glasses, clothes come from the reference. A wrong description (`Lena in her sweater`, when the sweater is Julia's) pulls the model to the wrong person.
+Do not describe what a person looks like from memory: hair, glasses, clothes come from the reference. A wrong description pulls the model to the wrong person. Do not write the name from the task.
 
 Never write a file name or a path (`refs/portret.png`, `shots/s10/...`) in the prompt. The model sees only images by number. The board refuses to run a prompt with a file name in it.
 
@@ -59,7 +59,7 @@ Clothes, shoes, the bag, a hat, an umbrella and every other item come from the c
 Instead of a description, one line per person:
 
 - One person: `Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.`
-- Two people: `Ivan's clothes exactly as in image 2. Lena's clothes and bag exactly as in image 3. Nothing changed.`
+- Two people: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3. Nothing changed.`
 
 Do not take clothes from the shot text (shot.md): when it differs from the reference, the reference is right.
 
@@ -91,10 +91,10 @@ If the location is shot from too far away and the person does not fit it at the 
 
 ### Portraits
 
-Under «Images the graph receives» the characters are followed by their portraits (`portrait of julia`). The board always sends a portrait when one exists. For every portrait the prompt has one line saying whose face it is, by number.
+Under «Images the graph receives» the characters are followed by their portraits (`character1 face`). The board always sends a portrait when one exists. For every portrait the prompt has one line saying whose face it is, by the character number and the image number.
 
-- One person: `Image 3 is her portrait: her face exactly as in image 3, the same eyes, nose, lips and skin.`
-- Two people: `Julia's face exactly as in image 4, Lena's face exactly as in image 5.`
+- One person: `character1 is image 2 and the face from image 3: her face exactly as in image 3, the same eyes, nose, lips and skin.`
+- Two people: `character1's face exactly as in image 4, character2's face exactly as in image 5.`
 - A portrait is the face only. Clothes, pose and height come from the character reference (image 2, image 3). Do not write `the girl from image 4`: the model adds an extra person.
 
 The portraits come after the characters, so the location and character numbers do not depend on whether a portrait exists.
@@ -210,7 +210,7 @@ Her clothes exactly as in image 2, unchanged. No special lighting on her: she is
 Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
 ```
 
-If Lena has a portrait, add the line `Her face exactly as in image 3`.
+If character1 has a portrait, add the line `character1's face exactly as in image 3`.
 
 Medium shot (s06, accepted). It worked because the location was already shot at the podium's distance, and an object (the podium) cuts the body:
 

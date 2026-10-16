@@ -119,10 +119,12 @@ test("портрет из refs/{name}_face этапа важнее библио�
 test("агенту — номера всех картинок и что на них", () => {
   const text = renderGraphImages(EP, "s02", "first_frame", WORKFLOW);
   assert.match(text, /- image 1: the location \(hall\.png\)/);
-  assert.match(text, /- image 2: julia \(approved character[^)]*\) \(julia_s02\.png\)/);
-  assert.match(text, /- image 3: lena \(approved character[^)]*\) \(lena_s02\.png\)/);
-  assert.match(text, /- image 4: portrait of julia \(face reference\) \(Julia_portret\.png\)/);
-  assert.match(text, /- image 5: portrait of lena \(face reference\) \(lena_face\.jpg\)/);
+  assert.match(text, /- image 2: character1 approved figure and clothes \(julia in the task; do not write that name\) \(julia_s02\.png\)/);
+  assert.match(text, /- image 3: character2 approved figure and clothes \(lena in the task; do not write that name\) \(lena_s02\.png\)/);
+  assert.match(text, /- image 4: character1 face \(julia in the task; do not write that name\) \(Julia_portret\.png\)/);
+  assert.match(text, /- image 5: character2 face \(lena in the task; do not write that name\) \(lena_face\.jpg\)/);
+  assert.match(text, /character1 is image 2 and the face from image 4/);
+  assert.doesNotMatch(text, /Julia's face/);
   assert.doesNotMatch(text, /Not sent/);
   assert.equal(renderGraphImages(EP, "s02", "location", WORKFLOW), "");
 });
@@ -137,7 +139,7 @@ test("больше шести картинок: лишние портреты н
   );
   assert.equal(prompt["906"].inputs.image, "s03_face1.png");
   const text = renderGraphImages(EP, "s03", "first_frame", WORKFLOW);
-  assert.match(text, /- image 6: portrait of julia/);
+  assert.match(text, /- image 6: character2 face \(julia in the task/);
   assert.match(text, /Not sent, the graph takes at most 6 images: portret\.png/);
 });
 

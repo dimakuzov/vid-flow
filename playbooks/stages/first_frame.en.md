@@ -30,7 +30,7 @@ Build the picture from the shot text and the files in this stage's `refs/`. Put 
 Not from the raw libraries. Those have a different angle and different clothes.
 
 - Location: the one file in `shots/{shotId}/location/approve/`. This is image 1.
-- Character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. The board takes them in alphabetical order of the file name: with `julia_s05.png` and `lena_s05.png`, Julia is image 2 and Lena is image 3. The agent task lists the numbers under «Images the graph receives».
+- Character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. The board takes them in alphabetical order of the file name: with `julia_s05.png` and `lena_s05.png`, Julia is image 2 and Lena is image 3. In prompt.md they are character1 and character2 in that order. The agent task lists the numbers under «Images the graph receives». The names are for the task only.
 - Portrait: the character's face, after all the characters, in the same order (image 3 for one person, image 4 and image 5 for two). The board always sends it when one exists. Source: `refs/{name}_face.png` of this stage, otherwise the portrait in `data/characters/{name}/` (`portrait.png`, `portret.png`, `{Name}_portret.png`, `face.png`). Rules: `playbooks/models/qwen_first_frame.en.md`, «Portraits».
 - The graph takes up to 6 images: the location and 5 references in a row, with no gaps in the numbers. The task names anything that did not fit. A file removed with «Убрать» does not go to the graph and takes no number.
 

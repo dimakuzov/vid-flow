@@ -212,7 +212,7 @@ function renderSpeech(episodeId: string, shotId: string, stageId: StageId): stri
   if (!stageHasSpeech(stageId)) return "";
   const speech = readShotSpeech(episodeId, shotId).trim();
   const body = speech
-    ? `${speech}\n\nЭто дословно то, что персонажи говорят вслух. Как перенести в prompt.md — плейбук модели выбранного воркфлоу.`
+    ? `${speech}\n\nРеплика уже на английском переносится в prompt.md дословно. Реплика по-русски пишется по-английски: кириллицу не копировать и на русский не переводить. Имя перед двоеточием в prompt.md не писать — говорящий там character1, character2.`
     : "Пусто: в кадре никто не говорит.";
   return `## Реплики (shots/${shotId}/${SPEECH_FILE})\n\n${body}\n\n`;
 }
@@ -235,6 +235,24 @@ function renderExcluded(episodeId: string, shotId: string, stageId: StageId): st
 Файлы остаются на диске, но граф их не получает. Не используй их, не считай в номерах картинок, не удаляй и не возвращай:
 
 ${excluded.map((item) => `- \`data/${item}\``).join("\n")}
+`;
+}
+
+/** Правила prompt.md последних трёх этапов: блок с пустой строкой после него, иначе пусто. */
+function renderPromptRules(stageId: StageId): string {
+  if (stageId !== "first_frame" && stageId !== "video_preview" && stageId !== "final_render") return "";
+  return `## Правила prompt.md
+
+Эти правила важнее плейбука, если он говорит иначе. Они одни для всех воркфлоу этого этапа.
+
+\`prompt.md\` всегда на английском. Кириллицы в нём нет. На русский ничего не переводить, в том числе реплики: реплику пиши по-английски, даже если в speech.md она по-русски.
+
+Люди в промпте — character1, character2, character3, в порядке их референсов (как в списке «Images the graph receives»; если списка нет — по алфавиту имён из строки персонажей, чтобы на всех этапах у человека был один номер). Имена из сообщения, shot.md и имён файлов нужны только чтобы понять, о ком речь. В prompt.md их не писать. Пример в плейбуке с Julia или Lena — старая форма: пиши character1 и character2.
+
+Каждого опиши одним-двумя предложениями, чтобы модель отличала людей, без имени из задачи. Если у человека есть референсы, в тех же предложениях привяжи их: \`character1 is image 2 and the face from image 4\`. Номера — из списка картинок. Где плейбук пишет \`@img-N\`, используй эту метку так же.
+
+\`prompt.md\` — вся инструкция этого запуска. Не ссылаться на прошлый промпт и прошлый результат и не писать «как раньше», «оставь всё как было», «the same as last time» вместо текста. Если пользователь просит одно изменение («всё хорошо, добавь пакет в руки Ивану»), заново выпиши прошлый промпт целиком и добавь это изменение: пакет в руках того, кто в задаче Иван, под его номером characterN. Не пиши фразу, что нужно повторить прошлый результат. \`exactly as in image N\` — это про референс, так и оставляй.
+
 `;
 }
 
@@ -333,7 +351,7 @@ ${meta.summary || "(действие кадра не описано)"}
 
 Это исходный текст сценария, написанный до картинок. Если он расходится с картинками или замечаниями ниже, верны они.
 
-${renderContext(request)}${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
+${renderContext(request)}${renderPromptRules(stageId)}${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
 ${renderDuration(episodeId, shotId, stageId, selected)}${renderImages(episodeId, shotId, stageId, boardQueues ? selected : null)}
