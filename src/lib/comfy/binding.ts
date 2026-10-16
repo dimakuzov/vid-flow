@@ -17,7 +17,7 @@ import type {
   TextStep,
   TextTemplate,
 } from "../contracts/graph-binding";
-import { characterBaseImage, characterFolder } from "../series/character-base";
+import { characterBaseImage, characterClothingFiles, characterFolder } from "../series/character-base";
 import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
@@ -484,6 +484,11 @@ function isExcluded(excluded: Set<string>, file: string): boolean {
   return media !== null && excluded.has(media);
 }
 
+/** Образец одежды: один референс из refs/, не картинка самого персонажа. */
+function usesCharacterClothes(input: ImageInput): boolean {
+  return (input.match ?? "").includes("{character}_clothes");
+}
+
 /** База персонажа: refs/{имя}_base или библиотека. Сюда же встаёт картинка, выбранная на странице. */
 function usesCharacterBase(input: ImageInput): boolean {
   const from = Array.isArray(input.from) ? input.from : [input.from];
@@ -501,6 +506,9 @@ export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[]
   if (ctx.character && usesCharacterBase(input)) {
     const chosen = chosenCharacterFile(ctx.episodeId, ctx.shotId, ctx.stageId, ctx.character);
     if (chosen && !isExcluded(excluded, chosen)) return [chosen];
+  }
+  if (ctx.character && usesCharacterClothes(input)) {
+    return characterClothingFiles(ctx.episodeId, ctx.shotId, ctx.stageId, ctx.character);
   }
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {

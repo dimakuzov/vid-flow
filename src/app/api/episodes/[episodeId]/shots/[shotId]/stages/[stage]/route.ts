@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
+import { assignShotLocation } from "@/lib/series/library";
 import { readRunSettings, setCharacterImage, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
 import { setShotCharacters } from "@/lib/series/shot-meta";
 import { readStatusFile, writeStatusFile } from "@/lib/series/status";
@@ -64,7 +65,14 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       characters?: string[];
       /** Картинка персонажа в графе (image 1). path пустой — снова база по имени или библиотека. */
       characterImage?: { name?: string; path?: string | null };
+      /** Имя папки в data/locations/. Только этап location. Пишет строку `- location:` в shot.md. */
+      location?: string;
     };
+    if (typeof body.location === "string") {
+      if (stageId !== "location") throw new Error("Локация кадра меняется на этапе локации");
+      assertStageFree(episodeId, shotId, stageId);
+      assignShotLocation(episodeId, shotId, body.location);
+    }
     if (body.characterImage) {
       if (stageId !== "characters") throw new Error("Картинку персонажа выбирают на этапе персонажей");
       assertStageFree(episodeId, shotId, stageId);

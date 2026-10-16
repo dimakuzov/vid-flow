@@ -17,6 +17,7 @@ import { DocFieldLabel, DocTextarea } from "./doc-field";
 import { HotkeyHelp } from "./hotkey-help";
 import { ImageEditDialog } from "./image-edit-dialog";
 import { ImageLightbox } from "./image-lightbox";
+import { LocationChoice } from "./location-choice";
 import { LocationLibrary } from "./location-library";
 import { RefSourcePicker } from "./ref-source-picker";
 import { OutputPanel } from "./output-panel";
@@ -655,7 +656,20 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 />
               </div>
             </div>
-            {stageId === "location" ? <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} /> : null}
+            {stageId === "location" ? (
+              <>
+                <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
+                <LocationChoice
+                  stageApi={stageApi}
+                  location={detail.location}
+                  disabled={busy || stageBusy}
+                  onChanged={(picked, text) => {
+                    stage.merge(picked);
+                    setMessage(text);
+                  }}
+                />
+              </>
+            ) : null}
             <RefFiles
               files={
                 editingCharacter

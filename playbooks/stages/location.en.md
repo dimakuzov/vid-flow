@@ -56,7 +56,9 @@ Edits of a finished Krea picture (light, an object, cleanup) are pass B below; a
 
 ## Location from the library
 
-The model that formatted the scenario may not have recognized the location. The "Из библиотеки" button next to "Референсы" (on this stage only) lists the `data/locations/` folders with a thumbnail and puts the general view into `refs/` as `{locationId}_view.png`. An existing file is not overwritten. The graph takes the first file in `refs/`, so the chosen location becomes the input right away. The "Записать в кадр" checkbox also changes `- location:` in `shot.md`. After such a pick the agent does not rebuild `refs/` (`agent_touch.json`).
+The shot's location name is the `- location:` line in `shot.md`: a folder in `data/locations/`. Under "Отправить агенту" a dropdown lists those folders. A choice changes only that line; files in `refs/` stay as they are. "Создать локацию" makes an empty folder `data/locations/{name}` (latin letters, digits, `_` and `-`) and writes that name into the shot. The user puts the general-view picture in the folder themselves.
+
+The "Из библиотеки" button next to "Референсы" (on this stage only) lists the `data/locations/` folders with a thumbnail and puts the general view into `refs/` as `{locationId}_view.png`. An existing file is not overwritten. The graph takes the first file in `refs/`, so the chosen location becomes the input right away. The "Записать в кадр" checkbox also changes `- location:` in `shot.md`. After such a pick the agent does not rebuild `refs/` (`agent_touch.json`).
 
 ## The location is the background of the first frame
 

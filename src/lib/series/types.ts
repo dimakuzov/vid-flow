@@ -97,6 +97,8 @@ export interface StageDetail {
   shotTitle: string;
   /** Действие кадра из shot.md (раздел Summary). Только для чтения. */
   shotSummary: string;
+  /** `- location:` кадра: имя папки в `data/locations/`. */
+  location: string;
   stageId: StageId;
   stageLabel: string;
   status: StageStatus;
