@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function NewEpisodeDialog({
   onOpenChange: (open: boolean) => void;
   onCreated: (episodeId: string) => void;
 }) {
+  const t = useT();
   const [episodeId, setEpisodeId] = useState("");
   const [scenarios, setScenarios] = useState<ScenarioFile[] | null>(null);
   const [scenarioFile, setScenarioFile] = useState("");
@@ -75,7 +77,7 @@ export function NewEpisodeDialog({
           provider: agent.selected ?? undefined,
           model: agent.model ?? undefined,
         },
-        fallbackError: "Не удалось создать серию",
+        fallbackError: t("new.failed"),
       });
       onOpenChange(false);
       setEpisodeId("");
@@ -95,14 +97,12 @@ export function NewEpisodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Новая серия</DialogTitle>
-          <DialogDescription>
-            Выберите сценарий и модель. Модель разметит его на кадры, доска сама соберёт таблицу.
-          </DialogDescription>
+          <DialogTitle>{t("new.title")}</DialogTitle>
+          <DialogDescription>{t("new.lead")}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 text-sm">
           <label className="grid gap-1 text-xs text-stone-600">
-            Имя серии (латиница, цифры, _ и -)
+            {t("new.id")}
             <input
               value={episodeId}
               onChange={(event) => setEpisodeId(event.target.value)}
@@ -112,7 +112,7 @@ export function NewEpisodeDialog({
           </label>
 
           <div className="grid gap-1 text-xs text-stone-600">
-            <label htmlFor="new-episode-scenario">Сценарий из библиотеки (data/scenarios/)</label>
+            <label htmlFor="new-episode-scenario">{t("new.library")}</label>
             <select
               id="new-episode-scenario"
               value={scenarioFile}
@@ -120,7 +120,7 @@ export function NewEpisodeDialog({
               onChange={(event) => setScenarioFile(event.target.value)}
               className="h-9 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900 disabled:opacity-60"
             >
-              <option value="">{scenarios === null ? "Загрузка…" : scenarios.length ? "— не выбран —" : "— в библиотеке пусто —"}</option>
+              <option value="">{scenarios === null ? t("common.loading") : scenarios.length ? t("new.none") : t("new.emptyLibrary")}</option>
               {(scenarios ?? []).map((item) => (
                 <option key={item.name} value={item.name}>
                   {item.name}
@@ -130,11 +130,11 @@ export function NewEpisodeDialog({
           </div>
 
           <div className="grid gap-1 text-xs text-stone-600">
-            <span>Или текст сценария (вставить или открыть файл .md / .txt)</span>
+            <span>{t("new.orText")}</span>
             <Textarea
               value={raw}
               onChange={(event) => setRaw(event.target.value)}
-              placeholder="Сырой сценарий без разметки кадров."
+              placeholder={t("new.placeholder")}
               className="min-h-32 font-mono text-xs"
               disabled={busy}
             />
@@ -161,17 +161,17 @@ export function NewEpisodeDialog({
           ) : null}
           {agent.selected === "manual" ? (
             <p className="text-xs text-stone-500">
-              Агент в чате: разметка попадёт во входящие эпизода, таблицу соберёте кнопкой «Создать выбранные» в импорте.
+              {t("new.manual")}
             </p>
           ) : null}
 
           {error ? <p className="text-sm text-red-800">{error}</p> : null}
           <div className="flex justify-end gap-2">
             <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
-              Отмена
+              {t("common.cancel")}
             </Button>
             <Button disabled={busy || !episodeId.trim() || !hasScenario} onClick={create}>
-              {busy ? "Создание…" : "Разметить и собрать таблицу"}
+              {busy ? t("new.creating") : t("new.submit")}
             </Button>
           </div>
         </div>

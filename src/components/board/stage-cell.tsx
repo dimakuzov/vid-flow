@@ -12,10 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useLang, useT } from "@/components/language";
 import { errorText, requestJson, stageApiPath, stagePagePath } from "@/components/stage/api";
 import { ImageLightbox } from "@/components/stage/image-lightbox";
 import { SuggestedWorkflow, WorkflowMenu } from "@/components/stage/workflow-menu";
-import { STATUS_LABELS, type StageId } from "@/lib/series/constants";
+import { clockLocale, statusName } from "@/lib/i18n";
+import type { StageId } from "@/lib/series/constants";
 import type { MediaFile, StageDetail, StageSummary } from "@/lib/series/types";
 import { StatusPill } from "./status-pill";
 
@@ -34,6 +36,8 @@ interface StageCellProps {
 }
 
 export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: StageCellProps) {
+  const lang = useLang();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -55,7 +59,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     try {
       const data = await requestJson<StageDetail>(stageApi);
       const files = data.output.filter((file) => file.kind === "image" || file.kind === "video");
-      if (!files.length) throw new Error("output пуст");
+      if (!files.length) throw new Error(t("cell.emptyOutput"));
       setDetail(data);
       setViewer({ files, index: newestIndex(files) });
     } catch {
@@ -75,7 +79,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
       await requestJson(`${stageApi}/approve`, {
         method: "POST",
         body: { filenames: [file.name], from: "output" },
-        fallbackError: "Не удалось утвердить",
+        fallbackError: t("cell.approveFailed"),
       });
       setViewer(null);
       onChanged();
@@ -103,7 +107,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         await requestJson<StageDetail>(stageApi, {
           method: "PATCH",
           body: { runWorkflow: workflowId },
-          fallbackError: "Не удалось выбрать воркфлоу",
+          fallbackError: t("cell.workflowFailed"),
         }),
       );
     } catch (error) {
@@ -121,7 +125,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         await requestJson<StageDetail>(stageApi, {
           method: "PATCH",
           body: { runDuration: seconds },
-          fallbackError: "Не удалось выбрать длительность",
+          fallbackError: t("cell.durationFailed"),
         }),
       );
     } catch (error) {
@@ -138,10 +142,10 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
       const data = await requestJson<{ message?: string; stage?: StageDetail }>(`${stageApi}/run`, {
         method: "POST",
         body: detail?.workflow ? { runWorkflow: detail.workflow } : {},
-        fallbackError: "Не удалось запустить",
+        fallbackError: t("cell.runFailed"),
       });
       if (data.stage) setDetail(data.stage);
-      setMessage(data.message || "Запущено");
+      setMessage(data.message || t("cell.started"));
       onChanged();
     } catch (error) {
       setMessage(errorText(error));
@@ -156,11 +160,11 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     try {
       const res = await fetch(`${stageApi}/cancel`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось отменить");
-      setMessage(data.message || "Отменено");
+      if (!res.ok) throw new Error(data.error || t("cell.cancelFailed"));
+      setMessage(data.message || t("cell.cancelled"));
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -180,15 +184,15 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         body: form,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось загрузить");
+      if (!res.ok) throw new Error(data.error || t("cell.uploadFailed"));
       setMessage(
         uploadMode === "approve"
-          ? `Загружено и утверждено: ${data.approvedAs || data.savedAs}`
-          : `Загружено в output: ${data.savedAs}`,
+          ? t("cell.uploadedApproved", { name: data.approvedAs || data.savedAs })
+          : t("cell.uploaded", { name: data.savedAs }),
       );
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -204,11 +208,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
           ? [stage.thumbnails[0].name]
           : [];
     if (!filenames.length) {
-      setMessage(
-        stage.outputCount
-          ? "Новый вариант в output. Откройте «Редактировать», отметьте имя файла и нажмите «Утвердить выбранные»."
-          : "Нет файлов для утверждения. Сначала загрузите вариант.",
-      );
+      setMessage(stage.outputCount ? t("cell.pickInEdit") : t("cell.nothingToApprove"));
       return;
     }
     setBusy(true);
@@ -219,16 +219,16 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         body: JSON.stringify({ filenames, from: "output" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось утвердить");
+      if (!res.ok) throw new Error(data.error || t("cell.approveFailed"));
       const approved = data.approved?.join(", ");
       setMessage(
         stageId === "characters" && data.stage?.status !== "approved"
-          ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
-          : `Утверждено: ${approved}`,
+          ? t("cell.approvedPartial", { names: approved })
+          : t("cell.approved", { names: approved }),
       );
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -238,7 +238,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     <>
       <button
         type="button"
-        title="Левая кнопка — открыть, правая — меню действий"
+        title={t("cell.hint")}
         onClick={() => void openCell()}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -258,7 +258,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         </div>
 
         {stage.busy && stage.phaseSince ? (
-          <p className="text-[11px] text-sky-900" suppressHydrationWarning>с {formatSince(stage.phaseSince)}</p>
+          <p className="text-[11px] text-sky-900" suppressHydrationWarning>{t("cell.since", { time: formatSince(stage.phaseSince, lang) })}</p>
         ) : null}
         {stage.status === "error" && stage.phaseError ? (
           <p className="line-clamp-3 text-[11px] leading-snug text-red-800">{stage.phaseError}</p>
@@ -290,15 +290,13 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
             </div>
             <span className="text-xs text-stone-600">
               {stage.outputCount > 0
-                ? `${stage.outputCount} в output`
-                : STATUS_LABELS[stage.status]}
+                ? t("cell.outputCount", { n: stage.outputCount })
+                : statusName(t, stage.status)}
             </span>
           </div>
         ) : (
           <p className="text-xs leading-relaxed text-stone-500">
-            {stage.status === "empty"
-              ? "Нет материалов"
-              : STATUS_LABELS[stage.status]}
+            {stage.status === "empty" ? t("cell.noMedia") : statusName(t, stage.status)}
           </p>
         )}
       </button>
@@ -307,12 +305,9 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {shotId} · действие
+              {t("cell.action", { shot: shotId })}
             </DialogTitle>
-            <DialogDescription>
-              Выберите, что сделать с этапом. Страница этапа открывается и левой кнопкой по
-              клетке.
-            </DialogDescription>
+            <DialogDescription>{t("cell.actionLead")}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-2">
@@ -324,7 +319,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
                 fileRef.current?.click();
               }}
             >
-              Загрузить вариант
+              {t("cell.upload")}
             </Button>
             <Button
               variant="outline"
@@ -334,13 +329,13 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
                 fileRef.current?.click();
               }}
             >
-              Загрузить и утвердить
+              {t("cell.uploadApprove")}
             </Button>
             <Link
               href={stagePagePath(episodeId, shotId, stageId)}
               className="inline-flex h-8 items-center justify-center rounded-lg bg-secondary px-2.5 text-sm font-medium text-secondary-foreground"
             >
-              Редактировать
+              {t("cell.edit")}
             </Link>
             {detail?.workflows.length ? (
               <>
@@ -365,24 +360,24 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
             {stage.busy ? (
               <>
                 <p className="text-sm text-sky-900">
-                  {STATUS_LABELS[stage.status]}. Запуск и отправка агенту закрыты до конца операции.
+                  {t("cell.busy", { status: statusName(t, stage.status) })}
                 </p>
                 <Button variant="destructive" disabled={busy} onClick={cancelAction}>
-                  Отменить
+                  {t("cell.cancel")}
                 </Button>
               </>
             ) : detail && !detail.workflows.length ? (
               <p className="text-xs text-stone-500">
-                Этот этап доска не запускает: прогон ставит агент («Редактировать» → «Отправить агенту»).
+                {t("cell.agentOnly")}
               </p>
             ) : (
               <Button disabled={busy || !detail} onClick={runAction}>
-                Запустить
+                {t("cell.run")}
               </Button>
             )}
             {stage.status === "error" ? (
               <Button variant="outline" disabled={busy} onClick={cancelAction}>
-                Сбросить ошибку
+                {t("cell.reset")}
               </Button>
             ) : null}
             <Button
@@ -390,7 +385,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
               disabled={busy}
               onClick={approveFirstOutput}
             >
-              Утвердить
+              {t("cell.approve")}
             </Button>
           </div>
 
@@ -423,10 +418,10 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
                 onClick={() => void approveViewed(file)}
                 className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm text-white disabled:opacity-50"
               >
-                Утвердить
+                {t("cell.approve")}
               </button>
               <Link href={pagePath} className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white">
-                Редактировать
+                {t("cell.edit")}
               </Link>
             </>
           )}
@@ -436,8 +431,8 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
   );
 }
 
-function formatSince(iso: string): string {
+function formatSince(iso: string, lang: "en" | "ru"): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(clockLocale(lang), { hour: "2-digit", minute: "2-digit" });
 }

@@ -1,21 +1,23 @@
 /** Клавиши доски. Подсказка «?» читает этот список, другие места его не копируют. */
 
+import type { MessageKey } from "@/lib/i18n";
+
 export interface HotkeyItem {
   keys: string;
-  action: string;
-  scope: "Этап" | "Таблица";
+  action: MessageKey;
+  scope: "stage" | "board";
 }
 
 export const HOTKEYS: HotkeyItem[] = [
-  { keys: "Enter", action: "Отправить агенту, когда курсор в поле «Рекомендация». Shift+Enter — новая строка", scope: "Этап" },
-  { keys: "Ctrl+Shift+Enter", action: "Запустить", scope: "Этап" },
-  { keys: "A", action: "Утвердить выбранные в output", scope: "Этап" },
-  { keys: "← →", action: "Листать картинки в просмотре", scope: "Этап" },
-  { keys: "Esc", action: "Закрыть просмотр или меню", scope: "Этап" },
-  { keys: "?", action: "Показать этот список", scope: "Этап" },
-  { keys: "` / ё", action: "Назад к таблице, к этому кадру", scope: "Этап" },
-  { keys: "← → ↑ ↓", action: "Выбрать клетку", scope: "Таблица" },
-  { keys: "Enter", action: "Открыть этап выбранной клетки", scope: "Таблица" },
+  { keys: "Enter", action: "hotkey.stage.enter", scope: "stage" },
+  { keys: "Ctrl+Shift+Enter", action: "hotkey.stage.run", scope: "stage" },
+  { keys: "A", action: "hotkey.stage.approve", scope: "stage" },
+  { keys: "← →", action: "hotkey.stage.arrows", scope: "stage" },
+  { keys: "Esc", action: "hotkey.stage.esc", scope: "stage" },
+  { keys: "?", action: "hotkey.stage.help", scope: "stage" },
+  { keys: "` / ё", action: "hotkey.stage.back", scope: "stage" },
+  { keys: "← → ↑ ↓", action: "hotkey.board.arrows", scope: "board" },
+  { keys: "Enter", action: "hotkey.board.enter", scope: "board" },
 ];
 
 /** Фокус в поле ввода: клавиши этапа молчат, кроме Enter в рекомендации. */

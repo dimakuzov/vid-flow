@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/components/language";
+import { graphInputLabel } from "@/lib/i18n";
 import type { MediaFile, StageInput } from "@/lib/series/types";
 import { CharacterImagePicker } from "./character-image-picker";
 import { MediaCard } from "./media-card";
@@ -30,20 +32,21 @@ export function StageInputs({
   };
   onPickCharacter?: (name: string, file: MediaFile) => void;
 }) {
+  const t = useT();
   if (!inputs.length) return null;
   return (
     <div className="space-y-3 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
       <div className="text-xs font-medium text-stone-600">
-        Что уйдёт в граф{" "}
+        {t("graph.title")}{" "}
         <span className="font-normal text-stone-400">
-          {boardRuns ? "по умолчанию, при выбранном воркфлоу" : "агент берёт эти файлы по плейбуку"}
-          {" · «Убрать» не удаляет файл, а только не отдаёт его в граф"}
+          {boardRuns ? t("graph.board") : t("graph.agent")}
+          {t("graph.excludeNote")}
         </span>
       </div>
       {inputs.map((input) => (
         <div key={`${input.label}-${input.source}`} className="space-y-1.5">
           <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-            <span className="text-stone-700">{input.label}</span>
+            <span className="text-stone-700">{graphInputLabel(t, input.label)}</span>
             <span className={input.files.length ? "text-stone-400" : "text-amber-700"}>
               {input.source}
             </span>

@@ -1,8 +1,13 @@
-import { STATUS_LABELS, type StageStatus } from "@/lib/series/constants";
+"use client";
+
+import { useT } from "@/components/language";
+import { statusName } from "@/lib/i18n";
+import type { StageStatus } from "@/lib/series/constants";
 import { statusTone } from "@/lib/series/labels";
 import { cn } from "@/lib/utils";
 
 export function StatusPill({ status }: { status: StageStatus }) {
+  const t = useT();
   return (
     <span
       className={cn(
@@ -10,7 +15,7 @@ export function StatusPill({ status }: { status: StageStatus }) {
         statusTone(status),
       )}
     >
-      {STATUS_LABELS[status]}
+      {statusName(t, status)}
     </span>
   );
 }

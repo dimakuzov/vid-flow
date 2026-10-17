@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { BootstrapPreview, BootstrapShotDraft } from "@/lib/series/types";
@@ -38,6 +39,7 @@ export function BootstrapPanel({
   formatRequestStatus,
   onImported,
 }: BootstrapPanelProps) {
+  const t = useT();
   const tableKey = tableShots.map((shot) => shot.id).join(",");
   const [raw, setRaw] = useState(initialRawScenario);
   const [scenario, setScenario] = useState(initialScenario);
@@ -85,7 +87,7 @@ export function BootstrapPanel({
 
   async function sendRawToAgent() {
     if (!initialEpisodeId) {
-      setMessage("Сначала выбери или добавь серию в заголовке");
+      setMessage(t("import.needSeries"));
       return;
     }
     setBusy(true);
@@ -98,11 +100,11 @@ export function BootstrapPanel({
         cache: "no-store",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось записать сценарий");
+      if (!res.ok) throw new Error(data.error || t("import.writeFailed"));
       setMessage(data.message);
       onImported();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -119,15 +121,15 @@ export function BootstrapPanel({
         cache: "no-store",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось разобрать сценарий");
+      if (!res.ok) throw new Error(data.error || t("import.parseFailed"));
       setPreview(data.preview);
       setMessage(
         data.preview.shots.length
-          ? `Кадров в тексте: ${data.preview.shots.length}. Галка показывает кадр в таблице, снятая только прячет.`
-          : "В этом тексте нет кадров «## s01». Сырой сценарий отправь на разметку.",
+          ? t("import.parsed", { n: data.preview.shots.length })
+          : t("import.noBlocks"),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -136,7 +138,7 @@ export function BootstrapPanel({
   async function toggleShot(id: string) {
     const removing = selected.includes(id);
     if (!initialEpisodeId) {
-      setMessage("Сначала выбери или добавь серию в заголовке");
+      setMessage(t("import.needSeries"));
       return;
     }
     setBusy(true);
@@ -162,16 +164,12 @@ export function BootstrapPanel({
               cache: "no-store",
             });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось изменить кадр");
+      if (!res.ok) throw new Error(data.error || t("import.toggleFailed"));
       setSelected((prev) => (removing ? prev.filter((item) => item !== id) : [...prev, id]));
-      setMessage(
-        removing
-          ? `${id} скрыт из таблицы. Файлы кадра на месте.`
-          : `${id} снова в таблице`,
-      );
+      setMessage(removing ? t("import.hidden", { id }) : t("import.shown", { id }));
       onImported();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -182,14 +180,12 @@ export function BootstrapPanel({
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-stone-900">
-            Импорт сценария
+            {t("import.title")}
           </h2>
-          <p className="mt-1 max-w-3xl text-sm text-stone-600">
-            Галка показывает кадр в таблице. Снятая галка только прячет его: ничего не удаляется, включишь галку — кадр вернётся как был.
-          </p>
+          <p className="mt-1 max-w-3xl text-sm text-stone-600">{t("import.lead")}</p>
         </div>
         <Button type="button" variant="outline" disabled={busy} onClick={previewScenario}>
-          Предпросмотр
+          {t("import.preview")}
         </Button>
       </div>
 
@@ -214,8 +210,8 @@ export function BootstrapPanel({
                     {shot.id} · {shot.title}
                   </span>
                   <span className="mt-1 block text-xs text-stone-500">
-                    {shot.characters.join(", ") || "без персонажей"} ·{" "}
-                    {shot.location || "локация не задана"}
+                    {shot.characters.join(", ") || t("import.noCharacters")} ·{" "}
+                    {shot.location || t("board.noLocation")}
                   </span>
                 </span>
               </label>
@@ -224,38 +220,32 @@ export function BootstrapPanel({
         </div>
       ) : (
         <p className="mb-4 text-sm text-stone-500">
-          Нажми «Предпросмотр», чтобы разобрать кадры из текста ниже.
+          {t("import.noCards")}
         </p>
       )}
 
-      <h3 className="text-sm font-medium text-stone-800">Размеченный сценарий</h3>
+      <h3 className="text-sm font-medium text-stone-800">{t("import.marked")}</h3>
       <Textarea
         value={scenario}
         onChange={(event) => setScenario(event.target.value)}
         className="mt-2 min-h-48 font-mono text-xs"
-        placeholder={`# Ночная смена\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.`}
+        placeholder={t("import.placeholder")}
       />
 
       <div className="mt-6">
-        <h3 className="text-sm font-medium text-stone-800">Сырой сценарий</h3>
-        <p className="mt-1 max-w-3xl text-sm text-stone-600">
-          Текст как есть. Кнопка только записывает файл. Агент сам не стартует: после
-          неё попроси Cursor в этой папке разобрать входящие серии.
-        </p>
+        <h3 className="text-sm font-medium text-stone-800">{t("import.raw")}</h3>
+        <p className="mt-1 max-w-3xl text-sm text-stone-600">{t("import.rawLead")}</p>
         <Textarea
           value={raw}
           onChange={(event) => setRaw(event.target.value)}
           className="mt-3 min-h-36 font-mono text-xs"
-          placeholder="Вставь сценарий без разметки кадров."
+          placeholder={t("import.rawPlaceholder")}
         />
         <Button type="button" className="mt-3" variant="secondary" disabled={busy} onClick={sendRawToAgent}>
-          Отправить на разметку
+          {t("import.send")}
         </Button>
         {formatRequestStatus === "pending" ? (
-          <p className="mt-2 text-sm text-stone-600">
-            Разметка ждёт агента. В локальном Cursor напиши: разбери agent_inbox текущей
-            серии и отформатируй scenario_raw.md в scenario.md. Папки шотов не создавай.
-          </p>
+          <p className="mt-2 text-sm text-stone-600">{t("import.pending")}</p>
         ) : null}
       </div>
 

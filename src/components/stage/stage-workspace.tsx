@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusPill } from "@/components/board/status-pill";
 import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
+import { LanguageSwitch, useT } from "@/components/language";
+import { stageName } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import type { EditWorkflow } from "@/lib/comfy/edit";
 import type { ImageEditRecord } from "@/lib/series/mutations";
@@ -30,15 +32,12 @@ import { StageStatusBar } from "./stage-status-bar";
 import { useStageDetail, type DocField } from "./use-stage-detail";
 import { SuggestedWorkflow, WorkflowMenu } from "./workflow-menu";
 
-const PROMPT_PLACEHOLDER = "Текст для модели, на английском. Пусто — отправьте рекомендацию агенту.";
-
-const SPEECH_PLACEHOLDER = "Что персонаж говорит вслух, дословно. Одна реплика на строку: «Катя: Мама, я дома.» Молчат — оставьте пустым.";
-
 type PictureFolder = "output" | "approve" | "refs";
 
 type Viewer = { files: MediaFile[]; index: number; runContext: boolean; folder: PictureFolder };
 
 export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }) {
+  const t = useT();
   const stage = useStageDetail(initialDetail);
   const { detail, fields, docs, stageApi } = stage;
   const { episodeId, shotId, stageId } = detail;
@@ -105,16 +104,16 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
 
   const loadEdits = useCallback(async () => {
     const data = await requestJson<{ edits: ImageEditRecord[]; workflows: EditWorkflow[] }>(`${stageApi}/edit`, {
-      fallbackError: "Не удалось прочитать правки",
+      fallbackError: t("page.editsFailed"),
     });
     setEdits(data.edits);
     setEditWorkflows(data.workflows);
-  }, [stageApi]);
+  }, [stageApi, t]);
 
   useEffect(() => {
     let stopped = false;
     requestJson<{ edits: ImageEditRecord[]; workflows: EditWorkflow[] }>(`${stageApi}/edit`, {
-      fallbackError: "Не удалось прочитать правки",
+      fallbackError: t("page.editsFailed"),
     })
       .then((data) => {
         if (stopped) return;
@@ -125,7 +124,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     return () => {
       stopped = true;
     };
-  }, [stageApi, detail.output, detail.approve]);
+  }, [stageApi, detail.output, detail.approve, t]);
 
   const closeHelp = useCallback(() => setHelpOpen(false), []);
 
@@ -140,7 +139,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     const saved = await requestJson<StageDetail>(stageApi, {
       method: "PATCH",
       body: docs,
-      fallbackError: "Не удалось сохранить",
+      fallbackError: t("page.saveFailed"),
     });
     stage.reset(saved);
     return saved;
@@ -165,7 +164,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
             ...(stageId !== "final_render" ? { takes } : {}),
           },
-          fallbackError: "Не отправлено",
+          fallbackError: t("page.sendFailed"),
         },
       );
       setAllowCloud(false);
@@ -184,7 +183,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
           ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
         },
-        fallbackError: "Не запущено",
+        fallbackError: t("page.runFailed"),
       });
       // Разрешение — на один запуск.
       setAllowCloud(false);
@@ -198,7 +197,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
         body: { runWorkflow: workflowId },
-        fallbackError: "Не удалось выбрать воркфлоу",
+        fallbackError: t("page.workflowFailed"),
       });
       stage.merge(data);
     });
@@ -208,7 +207,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
         body: { runDuration: seconds },
-        fallbackError: "Не удалось выбрать длительность",
+        fallbackError: t("page.durationFailed"),
       });
       stage.merge(data);
     });
@@ -217,7 +216,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     act(async () => {
       const data = await requestJson<{ message: string; stage?: StageDetail }>(
         `${stageApi}/cancel`,
-        { method: "POST", fallbackError: "Не удалось отменить" },
+        { method: "POST", fallbackError: t("page.cancelFailed") },
       );
       if (data.stage) stage.merge(data.stage);
       return data.message;
@@ -228,10 +227,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<StageDetail>(`${stageApi}/prompt-history`, {
         method: "POST",
         body: { versionId },
-        fallbackError: "Не удалось вернуть промпт",
+        fallbackError: t("page.restoreFailed"),
       });
       stage.reset(data);
-      return "Промпт возвращён. Текущий текст сохранён в списке версий.";
+      return t("page.restored");
     });
 
   function upload(target: "refs" | "output", approveAfter = false) {
@@ -249,9 +248,9 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         if (target === "refs" && editingCharacter) form.set("character", editingCharacter);
         const res = await fetch(`${stageApi}/upload`, { method: "POST", body: form });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+        if (!res.ok) throw new Error(data.error || t("page.uploadFailed"));
         await stage.reload();
-        return `Файл сохранён в проект: ${data.savedAs}`;
+        return t("page.uploaded", { name: data.savedAs });
       });
     };
     input.click();
@@ -262,25 +261,25 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<{ stage?: StageDetail }>(`${stageApi}/approve`, {
         method: "DELETE",
         body: { filename },
-        fallbackError: "Не удалось убрать",
+        fallbackError: t("page.removeFailed"),
       });
       if (data.stage) stage.merge(data.stage);
       else await stage.reload();
-      return `${filename} убран из approve`;
+      return t("page.removedApprove", { name: filename });
     });
 
   /** Удалить файл из output/ насовсем, после подтверждения. Ответ маршрута — StageDetail. */
   const deleteFile = (folder: "output", filename: string) => {
-    if (!window.confirm(`Удалить файл ${filename} навсегда?`)) return;
+    if (!window.confirm(t("page.confirmDelete", { name: filename }))) return;
     void act(async () => {
       const data = await requestJson<StageDetail>(`${stageApi}/files`, {
         method: "DELETE",
         body: { folder, filename },
-        fallbackError: "Не удалось удалить файл",
+        fallbackError: t("page.deleteFailed"),
       });
       stage.merge(data);
       setSelectedOutput((prev) => prev.filter((item) => item !== filename));
-      return `${filename} удалён из ${folder}/`;
+      return t("page.deleted", { name: filename, folder });
     });
   };
 
@@ -290,31 +289,29 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
         body: { exclude: { path: file.relativePath, excluded: exclude } },
-        fallbackError: "Не удалось изменить входы",
+        fallbackError: t("page.inputsFailed"),
       });
       stage.merge(data);
-      return exclude
-        ? `${file.name} убран из графа. Файл остался на диске, «Вернуть» отдаст его снова.`
-        : `${file.name} снова уходит в граф.`;
+      return exclude ? t("page.excluded", { name: file.name }) : t("page.included", { name: file.name });
     });
   const excludeToggle = stageBusy || busy ? undefined : toggleExclude;
 
   const approveSelected = (names = selectedOutput) => {
     if (!names.length) {
-      setMessage("Выберите файлы в output");
+      setMessage(t("page.pickOutput"));
       return;
     }
     void act(async () => {
       const data = await requestJson<{ approved: string[]; stage?: StageDetail }>(
         `${stageApi}/approve`,
-        { method: "POST", body: { filenames: names, from: "output" }, fallbackError: "Не утверждено" },
+        { method: "POST", body: { filenames: names, from: "output" }, fallbackError: t("page.approveFailed") },
       );
       setSelectedOutput([]);
       await stage.reload();
       const approved = data.approved.join(", ");
       return stageId === "characters" && data.stage?.status !== "approved"
-        ? `В approve: ${approved}. Этап станет утверждённым, когда файл будет у каждого персонажа.`
-        : `Утверждено: ${approved}`;
+        ? t("page.approvedPartial", { names: approved })
+        : t("page.approved", { names: approved });
     });
   };
 
@@ -368,18 +365,18 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
 
   const saveAction = (text: string) =>
     act(async () => {
-      await requestJson(`${shotApi}/action`, { method: "PUT", body: { text }, fallbackError: "Не удалось сохранить действие" });
+      await requestJson(`${shotApi}/action`, { method: "PUT", body: { text }, fallbackError: t("page.actionFailed") });
       await stage.reload();
       return text.trim()
-        ? "Действие кадра сохранено. Агент возьмёт вашу версию."
-        : "Действие кадра убрано. Агент напишет его заново при отправке.";
+        ? t("page.actionSaved")
+        : t("page.actionCleared");
     });
 
   const deleteNote = (id: string) =>
     act(async () => {
-      await requestJson(`${shotApi}/notes`, { method: "DELETE", body: { id }, fallbackError: "Не удалось убрать замечание" });
+      await requestJson(`${shotApi}/notes`, { method: "DELETE", body: { id }, fallbackError: t("page.noteFailed") });
       await stage.reload();
-      return "Замечание убрано. Агент его больше не увидит.";
+      return t("page.noteRemoved");
     });
 
   const setWatch = (stopped: boolean) =>
@@ -387,14 +384,14 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       const data = await requestJson<StageDetail["watch"]>(`${shotApi}/watch`, {
         method: "POST",
         body: { stopped },
-        fallbackError: "Не удалось закрыть кадр",
+        fallbackError: t("page.watchFailed"),
       });
       await stage.reload();
       return data.videoDone
-        ? "У кадра уже есть утверждённое видео. Агент его не берёт."
+        ? t("page.watchVideo")
         : stopped
-          ? "Кадр закрыт. Агент больше не принимает рекомендации по нему."
-          : "Агент снова смотрит этот кадр.";
+          ? t("page.watchStopped")
+          : t("page.watchOn");
     });
 
   function toggleOutput(name: string) {
@@ -422,10 +419,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href={episodePagePath(episodeId, shotId)} className="text-sm text-teal-800 hover:underline">
-            ← Таблица {episodeId}
+            {t("page.back", { id: episodeId })}
           </Link>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-stone-950">
-            {shotId} · {detail.stageLabel}
+            {shotId} · {stageName(t, stageId)}
           </h1>
           <p className="mt-1 text-sm text-stone-600">{detail.shotTitle}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -434,19 +431,20 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               {detail.relativeDir}
             </code>
             <button type="button" className="text-sm text-teal-800 underline" onClick={() => setHelpOpen(true)}>
-              Клавиши ?
+              {t("hotkey.button")}
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <LanguageSwitch />
           <Button variant="outline" disabled={busy} onClick={() => upload("refs")}>
-            Загрузить ref
+            {t("page.uploadRef")}
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => upload("output")}>
-            Загрузить output
+            {t("page.uploadOutput")}
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => upload("output", true)}>
-            Загрузить и утвердить
+            {t("page.uploadApprove")}
           </Button>
           <Button
             variant="outline"
@@ -454,13 +452,13 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             onClick={() => setWatch(!detail.watch.stopped)}
           >
             {detail.watch.videoDone
-              ? "Видео готово"
+              ? t("page.videoDone")
               : detail.watch.stopped
-                ? "Снова следить"
-                : "Закончить кадр"}
+                ? t("page.watchAgain")
+                : t("page.finish")}
           </Button>
           <Button variant="secondary" disabled={busy} onClick={() => approveSelected()}>
-            Утвердить выбранные
+            {t("page.approveSelected")}
           </Button>
         </div>
       </div>
@@ -482,7 +480,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           </div>
           {!stageBusy ? (
             <Button disabled={busy || (Boolean(cloudCost) && !allowCloud)} onClick={runStage}>
-              Запустить
+              {t("page.run")}
             </Button>
           ) : null}
           {cloudCost && !stageBusy ? (
@@ -495,9 +493,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                 onChange={(event) => setAllowCloud(event.target.checked)}
               />
               <span>
-                Разрешить платную отправку в Comfy Cloud — на один запуск. Около {cloudCost.credits} кредитов за{" "}
-                {cloudCost.perSeconds} с видео. Действует и для «Отправить агенту»: облако запустится после
-                его ответа.
+                {t("page.cloud", { credits: cloudCost.credits, seconds: cloudCost.perSeconds })}
               </span>
             </label>
           ) : null}
@@ -529,12 +525,12 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             />
             <details className="text-xs text-stone-500">
               <summary className="cursor-pointer text-sm font-medium text-stone-800">
-                Промпт <span className="font-normal text-stone-500">этот текст уходит в модель</span>
+                {t("page.prompt")} <span className="font-normal text-stone-500">{t("page.promptNote")}</span>
               </summary>
               <div className="mt-2">
                 {docField("prompt", {
                   readOnly: stageBusy,
-                  placeholder: PROMPT_PLACEHOLDER,
+                  placeholder: t("page.promptPlaceholder"),
                   className: "min-h-28",
                 })}
               </div>
@@ -547,31 +543,31 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             {detail.hasSpeech ? (
               <details className="text-xs text-stone-500">
                 <summary className="cursor-pointer text-sm font-medium text-stone-800">
-                  Реплики <span className="font-normal text-stone-500">дословно · пусто — молчат</span>
+                  {t("page.speech")} <span className="font-normal text-stone-500">{t("page.speechNote")}</span>
                 </summary>
                 <div className="mt-2">
                   {docField("speech", {
                     readOnly: stageBusy,
-                    placeholder: SPEECH_PLACEHOLDER,
+                    placeholder: t("page.speechPlaceholder"),
                     className: "min-h-16",
                   })}
                 </div>
               </details>
             ) : null}
-            <DocFieldLabel htmlFor="doc-llmNotes" note="для агента · поле очищается после отправки, агент помнит все замечания кадра">
-              Рекомендация
+            <DocFieldLabel htmlFor="doc-llmNotes" note={t("page.recommendationNote")}>
+              {t("page.recommendation")}
             </DocFieldLabel>
             {docField("llmNotes", {
               readOnly: stageBusy,
-              placeholder: "Что изменить в текущем промпте.",
+              placeholder: t("page.recommendationPlaceholder"),
               className: "min-h-24",
             })}
             {stage.dirty ? (
               <Button variant="outline" disabled={busy} onClick={() => act(async () => {
                 await saveDocs();
-                return "Сохранено.";
+                return t("page.saved");
               })}>
-                Сохранить поля
+                {t("page.saveFields")}
               </Button>
             ) : null}
             <AgentPanel
@@ -592,7 +588,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             />
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
-                <summary className="cursor-pointer">Журнал прогона</summary>
+                <summary className="cursor-pointer">{t("page.runLog")}</summary>
                 <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-stone-50 p-3 text-xs text-stone-600">
                   {detail.docs.runLog}
                 </pre>
@@ -621,18 +617,18 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                         const data = await requestJson<StageDetail>(stageApi, {
                           method: "PATCH",
                           body: { characterImage: { name, path: file.relativePath } },
-                          fallbackError: "Не удалось поставить персонажа в граф",
+                          fallbackError: t("page.characterFailed"),
                         });
                         stage.merge(data);
-                        return `${name}: в граф пойдёт ${file.name}`;
+                        return t("page.characterPicked", { name, file: file.name });
                       });
                     }
                   : undefined
               }
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <DocFieldLabel note={editingCharacter ? `файлы ${editingCharacter}_ из refs/` : "файлы из refs/"}>
-                Референсы{editingCharacter ? `: ${editingCharacter}` : ""}
+              <DocFieldLabel note={editingCharacter ? t("page.refsNoteOne", { name: editingCharacter }) : t("page.refsNote")}>
+                {t("page.refs")}{editingCharacter ? `: ${editingCharacter}` : ""}
               </DocFieldLabel>
               <div className="flex flex-wrap gap-2">
                 {stageId === "location" || stageId === "characters" ? (
@@ -693,13 +689,13 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onToggleExclude={excludeToggle}
             />
             <details className="text-xs text-stone-500">
-              <summary className="cursor-pointer">Заметка refs.md</summary>
+              <summary className="cursor-pointer">{t("page.refsNoteFile")}</summary>
               <div className="mt-2">
                 {docField("refs", { className: "min-h-24 font-mono text-xs" })}
               </div>
             </details>
             <details className="text-xs text-stone-500">
-              <summary className="cursor-pointer">Заметка workflow.md (на этот кадр)</summary>
+              <summary className="cursor-pointer">{t("page.workflowNote")}</summary>
               <div className="mt-2">
                 {docField("workflow", { className: "min-h-24 font-mono text-xs" })}
               </div>
@@ -715,7 +711,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                     const data = await requestJson<StageDetail>(stageApi, {
                       method: "PATCH",
                       body: { characters: names },
-                      fallbackError: "Не удалось изменить персонажей",
+                      fallbackError: t("page.rosterFailed"),
                     });
                     stage.merge(data);
                     const added = data.expectedCharacters.find(
@@ -726,8 +722,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                     );
                     setActiveCharacter(added ?? still ?? data.expectedCharacters[0] ?? null);
                     return data.expectedCharacters.length
-                      ? `Персонажи кадра: ${data.expectedCharacters.join(", ")}`
-                      : "В кадре никого";
+                      ? t("page.roster", { names: data.expectedCharacters.join(", ") })
+                      : t("page.nobody");
                   });
                 }}
               />
@@ -747,8 +743,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
             </div>
           ) : (
             <p className="mt-6 text-xs text-stone-500">
-              Глобальные playbooks пока не добавлены — положишь их в /playbooks, и они появятся
-              здесь.
+              {t("page.playbooksEmpty")}
             </p>
           )}
         </section>
@@ -790,7 +785,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                         className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
                         onClick={() => setEditing({ file, folder })}
                       >
-                        Править
+                        {t("page.edit")}
                       </button>
                       {folder === "output" ? (
                         <button
@@ -801,7 +796,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
                             approveSelected([file.name]);
                           }}
                         >
-                          Аппрув
+                          {t("page.approve")}
                         </button>
                       ) : null}
                     </>

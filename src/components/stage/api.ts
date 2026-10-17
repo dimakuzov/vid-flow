@@ -1,3 +1,5 @@
+import { readLang, t } from "@/lib/i18n";
+
 /** Пути API и запросы, общие для страницы этапа и меню клетки. */
 
 export function shotApiPath(episodeId: string, shotId: string): string {
@@ -38,12 +40,12 @@ export async function requestJson<T>(
     const text =
       data && typeof data === "object" && "error" in data && typeof data.error === "string"
         ? data.error
-        : init.fallbackError || `Ошибка ${res.status}`;
+        : init.fallbackError || t(readLang(), "common.httpError", { status: res.status });
     throw new Error(text);
   }
   return data as T;
 }
 
 export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "Ошибка";
+  return error instanceof Error ? error.message : t(readLang(), "common.error");
 }

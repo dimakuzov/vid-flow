@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { StageDetail } from "@/lib/series/types";
 
@@ -12,20 +13,18 @@ export function PromptHistory({
   disabled: boolean;
   onRestore: (versionId: string) => void;
 }) {
+  const t = useT();
   if (!versions.length) {
     return (
       <details className="text-xs text-stone-500">
-        <summary className="cursor-pointer">Прошлые версии промпта</summary>
-        <p className="mt-2">
-          Это текущий промпт. Следующая сохранённая правка оставит его в списке, и его можно будет
-          вернуть.
-        </p>
+        <summary className="cursor-pointer">{t("history.title")}</summary>
+        <p className="mt-2">{t("history.current")}</p>
       </details>
     );
   }
   return (
     <details className="text-xs text-stone-500">
-      <summary className="cursor-pointer">Прошлые версии промпта ({versions.length})</summary>
+      <summary className="cursor-pointer">{t("history.count", { n: versions.length })}</summary>
       <ul className="mt-2 space-y-2">
         {versions.map((version) => (
           <li
@@ -37,11 +36,11 @@ export function PromptHistory({
                 {version.savedAt.slice(0, 16).replace("T", " ")}
               </div>
               <div className="truncate text-xs text-stone-600">
-                {version.prompt.trim().split("\n")[0] || "(пустой промпт)"}
+                {version.prompt.trim().split("\n")[0] || t("history.empty")}
               </div>
             </div>
             <Button variant="outline" disabled={disabled} onClick={() => onRestore(version.id)}>
-              Вернуть
+              {t("history.restore")}
             </Button>
           </li>
         ))}

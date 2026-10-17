@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer } from "react";
+import { useT } from "@/components/language";
 import type { StageDetail } from "@/lib/series/types";
 import { requestJson, stageApiPath } from "./api";
 
@@ -105,16 +106,17 @@ export function useStageDetail(initialDetail: StageDetail) {
     detail,
     fields: cleanFields(detail),
   }));
+  const t = useT();
   const { episodeId, shotId, stageId } = initialDetail;
   const stageApi = stageApiPath(episodeId, shotId, stageId);
 
   const reload = useCallback(async () => {
     const data = await requestJson<StageDetail>(stageApi, {
-      fallbackError: "Не удалось открыть этап",
+      fallbackError: t("page.openFailed"),
     });
     dispatch({ type: "merge", detail: data });
     return data;
-  }, [stageApi]);
+  }, [stageApi, t]);
 
   useEffect(() => {
     let stopped = false;

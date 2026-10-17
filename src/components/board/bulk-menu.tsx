@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/language";
 import { ProviderSelect, useAgentProviders } from "@/components/stage/agent-provider";
 import { errorText, requestJson } from "@/components/stage/api";
-import { STAGE_LABELS, type StageId } from "@/lib/series/constants";
+import { stageName, type Translate } from "@/lib/i18n";
+import type { StageId } from "@/lib/series/constants";
 import { useFloatingMenu } from "./floating-menu";
 
 interface BulkItem {
@@ -24,19 +26,15 @@ export interface BulkResult {
  */
 export type BulkTarget = { kind: "assign" } | { kind: "stage"; stageId: StageId };
 
-function title(target: BulkTarget): string {
-  if (target.kind === "assign") return "Агенты по кадрам";
-  return `${STAGE_LABELS[target.stageId]}: все кадры`;
+function title(target: BulkTarget, tr: Translate): string {
+  if (target.kind === "assign") return tr("bulk.assign");
+  return tr("bulk.all", { stage: stageName(tr, target.stageId) });
 }
 
-function description(target: BulkTarget): string {
-  if (target.kind === "assign") {
-    return "Назначает агента кадрам без агента. Ничего не запускает: этап начнётся, только когда вы нажмёте «Отправить агенту», «▶ Все кадры» над этапом или «Запустить следующий этап» в меню кадра.";
-  }
-  if (target.stageId === "characters") {
-    return "На каждом кадре агент кадра сам делает персонажей в ComfyUI. Нужен Claude Code или агент в чате.";
-  }
-  return "На каждом кадре агент кадра готовит промпт этого этапа, затем доска ставит прогон в ComfyUI. Пройденные этапы не переделываются.";
+function description(target: BulkTarget, tr: Translate): string {
+  if (target.kind === "assign") return tr("bulk.assignLead");
+  if (target.stageId === "characters") return tr("bulk.charactersLead");
+  return tr("bulk.stageLead");
 }
 
 function endpoint(episodeId: string, target: BulkTarget): string {
@@ -47,18 +45,17 @@ function endpoint(episodeId: string, target: BulkTarget): string {
 
 /** Итог запуска по кадрам: кому назначен агент, что запущено, что пропущено и почему. */
 export function BulkResultView({ result, withStage }: { result: BulkResult; withStage: boolean }) {
+  const t = useT();
   return (
     <div className="space-y-1">
       {result.assigned.length ? (
-        <p>
-          Агент назначен: {result.assigned.length} ({result.assigned.join(", ")})
-        </p>
+        <p>{t("bulk.assigned", { n: result.assigned.length, ids: result.assigned.join(", ") })}</p>
       ) : null}
       <p className="font-medium text-stone-900">
-        Запущено: {result.started.length}
+        {t("bulk.started", { n: result.started.length })}
         {result.started.length
           ? ` (${result.started
-              .map((item) => (withStage && item.stageId ? `${item.shotId} · ${STAGE_LABELS[item.stageId]}` : item.shotId))
+              .map((item) => (withStage && item.stageId ? `${item.shotId} · ${stageName(t, item.stageId)}` : item.shotId))
               .join(", ")})`
           : ""}
       </p>
@@ -94,6 +91,7 @@ export function BulkMenu({
   withoutAgent: number;
   onDone: () => void;
 }) {
+  const t = useT();
   const { anchor, open, menuRef, toggle, close } = useFloatingMenu(288);
   const [busy, setBusy] = useState(false);
   const [redo, setRedo] = useState(false);
@@ -116,7 +114,7 @@ export function BulkMenu({
           model: askAgent ? (agent.model ?? undefined) : undefined,
           redo: target.kind === "stage" ? redo : undefined,
         },
-        fallbackError: "Не удалось запустить",
+        fallbackError: t("bulk.runFailed"),
       });
       setResult(data);
       onDone();
@@ -136,7 +134,7 @@ export function BulkMenu({
         aria-expanded={open}
         className="rounded-md border border-teal-800/30 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-900 hover:bg-teal-100 disabled:opacity-50"
       >
-        {target.kind === "assign" ? "▶ Агенты по кадрам" : "▶ Все кадры"}
+        {target.kind === "assign" ? t("bulk.assignButton") : t("bulk.allButton")}
       </button>
       {anchor ? (
         <div
@@ -145,17 +143,17 @@ export function BulkMenu({
           className="fixed z-30 w-72 space-y-3 overflow-y-auto rounded-xl border border-stone-300 bg-white p-3 text-left text-xs font-normal text-stone-700 shadow-lg"
         >
           <div>
-            <div className="text-sm font-semibold text-stone-900">{title(target)}</div>
-            <p className="mt-1 leading-snug">{description(target)}</p>
+            <div className="text-sm font-semibold text-stone-900">{title(target, t)}</div>
+            <p className="mt-1 leading-snug">{description(target, t)}</p>
           </div>
           {!askAgent ? (
-            <p className="text-stone-500">У всех кадров свой агент.</p>
+            <p className="text-stone-500">{t("bulk.allHave")}</p>
           ) : agent.providers ? (
             <div className="space-y-1">
               <p className="font-medium text-stone-900">
                 {withoutAgent === shotCount
-                  ? "Агент для всех кадров (станет агентом каждого кадра):"
-                  : `Для ${withoutAgent} кадров без агента (станет их агентом):`}
+                  ? t("bulk.forAll")
+                  : t("bulk.forSome", { n: withoutAgent })}
               </p>
               <ProviderSelect
                 id={`bulk-provider-${target.kind === "stage" ? target.stageId : "assign"}`}
@@ -169,7 +167,7 @@ export function BulkMenu({
               />
             </div>
           ) : (
-            <p className="text-stone-500">Кадрам без агента — агент доски по умолчанию.</p>
+            <p className="text-stone-500">{t("bulk.defaultAgent")}</p>
           )}
           {target.kind === "stage" ? (
             <label className="flex items-start gap-2">
@@ -180,7 +178,7 @@ export function BulkMenu({
                 disabled={busy}
                 onChange={(event) => setRedo(event.target.checked)}
               />
-              Переделать и там, где этап уже пройден (утверждён или есть результат)
+              {t("bulk.redo")}
             </label>
           ) : null}
           <div className="flex gap-2">
@@ -192,26 +190,26 @@ export function BulkMenu({
             >
               {target.kind === "assign"
                 ? busy
-                  ? "Назначение…"
-                  : `Назначить ${withoutAgent} кадрам`
+                  ? t("bulk.assigning")
+                  : t("bulk.assignN", { n: withoutAgent })
                 : busy
-                  ? "Запуск…"
-                  : `Запустить на ${shotCount} кадрах`}
+                  ? t("bulk.starting")
+                  : t("bulk.runN", { n: shotCount })}
             </button>
             <button
               type="button"
               onClick={close}
               className="h-8 rounded-lg border border-stone-300 px-3 text-sm text-stone-700"
             >
-              Закрыть
+              {t("common.close")}
             </button>
           </div>
           {error ? <p className="text-red-800">{error}</p> : null}
           {result && target.kind === "assign" ? (
             <p>
               {result.assigned.length
-                ? `Агент назначен: ${result.assigned.join(", ")}. Ничего не запущено.`
-                : "Назначать некому: у всех кадров свой агент."}
+                ? t("bulk.assignedOnly", { ids: result.assigned.join(", ") })
+                : t("bulk.nobody")}
             </p>
           ) : result ? (
             <BulkResultView result={result} withStage={false} />

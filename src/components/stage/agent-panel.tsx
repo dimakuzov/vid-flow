@@ -1,23 +1,25 @@
 "use client";
 
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { AgentMode, AgentProviderInfo } from "@/lib/contracts/agent-request";
+import { providerName, type Translate } from "@/lib/i18n";
 import type { StageDetail } from "@/lib/series/types";
-import { agentLabel, PROVIDER_LABELS, ProviderSelect } from "./agent-provider";
+import { agentLabel, ProviderSelect } from "./agent-provider";
 
-function requestStatusText(request: NonNullable<StageDetail["agentRequest"]>): string {
-  const provider = PROVIDER_LABELS[request.provider ?? "manual"];
+function requestStatusText(request: NonNullable<StageDetail["agentRequest"]>, tr: Translate): string {
+  const provider = providerName(tr, request.provider ?? "manual");
   switch (request.status) {
     case "pending":
-      return `Последний запрос ждёт исполнителя (${provider}).`;
+      return tr("agent.pending", { provider });
     case "running":
-      return `Последний запрос выполняется (${provider}).`;
+      return tr("agent.running", { provider });
     case "done":
-      return `Последний запрос выполнен (${provider}).`;
+      return tr("agent.done", { provider });
     case "cancelled":
-      return "Последний запрос отменён.";
+      return tr("agent.cancelled");
     case "error":
-      return `Последний запрос упал (${provider}).`;
+      return tr("agent.failed", { provider });
   }
 }
 
@@ -56,8 +58,9 @@ export function AgentPanel({
   takes: number | null;
   onTakes: (count: number) => void;
 }) {
+  const t = useT();
   const request = detail.agentRequest;
-  const shotAgent = detail.shotAgent ? agentLabel(providers, detail.shotAgent) : null;
+  const shotAgent = detail.shotAgent ? agentLabel(providers, detail.shotAgent, t) : null;
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-2">
@@ -76,14 +79,14 @@ export function AgentPanel({
           </div>
         ) : null}
         <Button disabled={disabled || detail.state.busy} onClick={onSend}>
-          Отправить агенту
+          {t("agent.send")}
         </Button>
         {takes != null ? (
           <label className="text-xs text-stone-600">
-            Рендеров
+            {t("agent.takes")}
             <select
-              aria-label="Сколько рендеров"
-              title="Сколько файлов с тем же промптом и разным seed. При следующем заходе снова 1."
+              aria-label={t("agent.takesLabel")}
+              title={t("agent.takesTitle")}
               value={takes}
               disabled={disabled || detail.state.busy}
               onChange={(event) => onTakes(Number(event.target.value))}
@@ -100,7 +103,7 @@ export function AgentPanel({
       </div>
       {providers?.length ? (
         <div className="space-y-1 text-xs text-stone-600">
-          <p>Агент кадра: {shotAgent ?? "не назначен"}.</p>
+          <p>{t("agent.shot", { name: shotAgent ?? t("agent.unassigned") })}</p>
           {provider && !isShotAgent ? (
             <label className="flex items-start gap-2">
               <input
@@ -110,28 +113,21 @@ export function AgentPanel({
                 disabled={disabled || detail.state.busy}
                 onChange={(event) => onRememberForShot(event.target.checked)}
               />
-              {shotAgent ? "Запомнить этот выбор агентом кадра (иначе — только на этот раз)" : "Запомнить агентом кадра"}
+              {shotAgent ? t("agent.rememberOther") : t("agent.remember")}
             </label>
           ) : null}
         </div>
       ) : null}
       <p className="text-xs leading-5 text-stone-500">
-        Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле. Пока
-        агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап в Comfy:
-        столько заданий, сколько выбрано в «Рендеров», с разными seed.
-        {detail.stageId === "characters"
-          ? " На персонажах — по прогону на каждого, у кого в prompt.md есть текст в разделе ## имя."
-          : ""}{" "}
-        «Закончить кадр» останавливает проверку входящих. Она также
-        останавливается, когда в final_render есть утверждённое видео.
+        {t("agent.help")}
+        {detail.stageId === "characters" ? t("agent.helpCharacters") : ""}
+        {t("agent.helpWatch")}
       </p>
       {request ? (
         <div className="text-xs leading-5 text-stone-500">
           <p>
-            {requestStatusText(request)}{" "}
-            {request.refsChangedByUser
-              ? "Референсы менялись вручную."
-              : "Референсы вручную не менялись."}
+            {requestStatusText(request, t)}{" "}
+            {request.refsChangedByUser ? t("agent.refsChanged") : t("agent.refsSame")}
           </p>
           {request.status === "error" && request.error ? (
             <p className="mt-1 whitespace-pre-wrap break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-900">

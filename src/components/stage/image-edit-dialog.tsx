@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
+import type { MessageKey } from "@/lib/i18n";
 import type { EditWorkflow } from "@/lib/comfy/edit";
 import type { MediaFile } from "@/lib/series/types";
 import { errorText } from "./api";
@@ -16,12 +18,12 @@ interface Fraction {
   h: number;
 }
 
-const ASPECTS: { id: Aspect; label: string }[] = [
-  { id: "free", label: "Свободно" },
-  { id: "9:16", label: "9:16" },
-  { id: "16:9", label: "16:9" },
-  { id: "1:1", label: "1:1" },
-  { id: "source", label: "Как у исходника" },
+const ASPECTS: { id: Aspect; label: MessageKey | null }[] = [
+  { id: "free", label: "edit.free" },
+  { id: "9:16", label: null },
+  { id: "16:9", label: null },
+  { id: "1:1", label: null },
+  { id: "source", label: "edit.source" },
 ];
 
 function pixelRatio(aspect: Aspect, natural: { w: number; h: number }): number | null {
@@ -85,6 +87,7 @@ export function ImageEditDialog({
     workflows[0]?.megapixels != null ? String(workflows[0].megapixels) : "",
   );
   const [text, setText] = useState("");
+  const t = useT();
   const [pending, setPending] = useState<"crop" | "edit" | null>(null);
   const [error, setError] = useState("");
   const drag = useRef<{ mode: "move" | "resize"; x: number; y: number; origin: Fraction } | null>(null);
@@ -160,14 +163,14 @@ export function ImageEditDialog({
   /** Байты текущей рамки уходят новым PNG. Исходник остаётся. */
   async function uploadCrop(): Promise<{ savedAs: string; message?: string }> {
     const img = imgRef.current;
-    if (!img || !natural) throw new Error("Картинка ещё не загрузилась");
+    if (!img || !natural) throw new Error(t("edit.notLoaded"));
     const canvas = document.createElement("canvas");
     const width = Math.max(1, Math.round(rect.w * natural.w));
     const height = Math.max(1, Math.round(rect.h * natural.h));
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Браузер не отдал холст");
+    if (!context) throw new Error(t("edit.noCanvas"));
     context.drawImage(
       img,
       Math.round(rect.x * natural.w),
@@ -180,7 +183,7 @@ export function ImageEditDialog({
       height,
     );
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((value) => (value ? resolve(value) : reject(new Error("Пустая обрезка"))), "image/png");
+      canvas.toBlob((value) => (value ? resolve(value) : reject(new Error(t("edit.emptyCrop")))), "image/png");
     });
     const form = new FormData();
     form.set("file", blob, "crop.png");
@@ -188,7 +191,7 @@ export function ImageEditDialog({
     form.set("folder", folder);
     const res = await fetch(`${stageApi}/crop`, { method: "POST", body: form });
     const data = (await res.json()) as { error?: string; message?: string; savedAs?: string };
-    if (!res.ok || !data.savedAs) throw new Error(data.error || "Не удалось сохранить обрезку");
+    if (!res.ok || !data.savedAs) throw new Error(data.error || t("edit.cropFailed"));
     return { savedAs: data.savedAs, message: data.message };
   }
 
@@ -197,7 +200,7 @@ export function ImageEditDialog({
     setError("");
     try {
       const saved = await uploadCrop();
-      onCropped(saved.message || "Обрезка сохранена.");
+      onCropped(saved.message || t("edit.cropSaved"));
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -210,7 +213,7 @@ export function ImageEditDialog({
     const raw = megapixels.trim();
     const parsed = raw === "" ? undefined : Number(raw);
     if (parsed !== undefined && (!Number.isFinite(parsed) || parsed < 0.1 || parsed > 16)) {
-      setError("Мегапиксели: число от 0.1 до 16");
+      setError(t("edit.mpRange"));
       return;
     }
     setPending("edit");
@@ -236,8 +239,8 @@ export function ImageEditDialog({
         }),
       });
       const data = (await res.json()) as { error?: string; message?: string };
-      if (!res.ok) throw new Error(data.error || "Не удалось поставить правку");
-      onEditQueued(data.message || "Правка в очереди.");
+      if (!res.ok) throw new Error(data.error || t("edit.queueFailed"));
+      onEditQueued(data.message || t("edit.queued"));
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -250,12 +253,12 @@ export function ImageEditDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Править ${file.name}`}
+        aria-label={t("edit.title", { name: file.name })}
         className="my-4 w-full max-w-3xl rounded-xl bg-white p-4 shadow-lg"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="text-sm font-semibold text-stone-900">Править · {file.name}</h2>
-        <p className="mt-1 text-xs text-stone-500">Исходник не меняется. Новый файл появится в output/.</p>
+        <h2 className="text-sm font-semibold text-stone-900">{t("edit.title", { name: file.name })}</h2>
+        <p className="mt-1 text-xs text-stone-500">{t("edit.lead")}</p>
 
         <div className="mt-3 flex flex-wrap gap-1">
           {ASPECTS.map((item) => (
@@ -268,7 +271,7 @@ export function ImageEditDialog({
               }`}
               onClick={() => chooseAspect(item.id)}
             >
-              {item.label}
+              {item.label ? t(item.label) : item.id}
             </button>
           ))}
         </div>
@@ -303,7 +306,7 @@ export function ImageEditDialog({
               >
                 <button
                   type="button"
-                  aria-label="Потянуть угол рамки"
+                  aria-label={t("edit.corner")}
                   className="absolute right-0 bottom-0 size-3 translate-x-1/2 translate-y-1/2 cursor-nwse-resize rounded-sm bg-white"
                   onPointerDown={(event) => onPointerDown(event, "resize")}
                   onPointerMove={onPointerMove}
@@ -314,28 +317,23 @@ export function ImageEditDialog({
           </div>
         </div>
         <Button type="button" className="mt-3" disabled={pending !== null || !natural} onClick={() => void saveCrop()}>
-          {pending === "crop" ? "Сохраняю…" : "Сохранить обрезку"}
+          {pending === "crop" ? t("edit.saving") : t("edit.saveCrop")}
         </Button>
 
         <div className="mt-6 space-y-2 border-t border-stone-200 pt-4">
-          <h3 className="text-sm font-medium text-stone-900">Улучшение</h3>
-          <p className="text-xs text-stone-500">
-            Пустое поле — только текстуры и мелкие детали, объекты, свет и камера как есть.
-            Если написать просьбу, Haiku соберёт промпт: сначала она, потом всё остальное.
-            Камеру не двигаем. Картинку Haiku не смотрит.
-            Если рамка не на весь кадр, обрезка сохраняется сама, и улучшение идёт по ней.
-          </p>
+          <h3 className="text-sm font-medium text-stone-900">{t("edit.enhance")}</h3>
+          <p className="text-xs text-stone-500">{t("edit.enhanceLead")}</p>
           <label className="block text-xs text-stone-600">
-            Что изменить
+            {t("edit.what")}
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Пусто — улучшить как есть. Или: убрать чашку, сделать ночь, добавить дождь"
+              placeholder={t("edit.placeholder")}
               className="mt-1 min-h-20 w-full rounded-lg border border-stone-300 px-2 py-2 text-sm text-stone-900"
             />
           </label>
           <label className="block text-xs text-stone-600">
-            Мегапиксели нового файла
+            {t("edit.mp")}
             <input
               type="number"
               min={0.1}
@@ -347,10 +345,10 @@ export function ImageEditDialog({
             />
           </label>
           <p className="text-xs text-stone-500">
-            В графе {workflows.find((item) => item.id === workflow)?.megapixels ?? "—"}. Пустое поле оставляет это число.
+            {t("edit.mpHint", { n: workflows.find((item) => item.id === workflow)?.megapixels ?? "—" })}
           </p>
           <label className="block text-xs text-stone-600">
-            Воркфлоу
+            {t("edit.workflow")}
             <select
               value={workflow}
               onChange={(event) => {
@@ -361,7 +359,7 @@ export function ImageEditDialog({
               }}
               className="mt-1 h-9 w-full rounded-lg border border-stone-300 bg-white px-2 text-sm"
             >
-              {workflows.length ? null : <option value="">Нет воркфлоу правки</option>}
+              {workflows.length ? null : <option value="">{t("edit.noWorkflow")}</option>}
               {workflows.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label}
@@ -377,13 +375,13 @@ export function ImageEditDialog({
             disabled={pending !== null || !workflow || !natural}
             onClick={() => void sendEdit()}
           >
-            {pending === "edit" ? "Ставлю в очередь…" : "Применить улучшение"}
+            {pending === "edit" ? t("edit.queueing") : t("edit.apply")}
           </Button>
         </div>
 
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
         <button type="button" className="mt-4 text-sm text-stone-500 underline" onClick={onClose}>
-          Закрыть
+          {t("common.close")}
         </button>
       </div>
     </div>

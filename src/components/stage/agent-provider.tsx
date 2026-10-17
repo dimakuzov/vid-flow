@@ -1,17 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import type {
   AgentMode,
-  AgentProviderId,
   AgentProviderInfo,
 } from "@/lib/contracts/agent-request";
-
-export const PROVIDER_LABELS: Record<AgentProviderId, string> = {
-  manual: "Агент в чате",
-  ollama: "Ollama",
-  claude: "Claude",
-};
+import { providerName, providerReason, type Translate } from "@/lib/i18n";
 
 const STORAGE_KEY = "frameboard.agentProvider";
 
@@ -103,9 +98,10 @@ export function useProviderList(): AgentProviderInfo[] | null {
 export function agentLabel(
   providers: AgentProviderInfo[] | null,
   agent: { provider: string; model: string | null },
+  tr: Translate,
 ): string {
   const provider = providers?.find((item) => item.id === agent.provider);
-  const name = provider?.label || PROVIDER_LABELS[agent.provider as AgentProviderId] || agent.provider;
+  const name = providerName(tr, agent.provider, provider?.label);
   const modelId = agent.model ?? provider?.defaultModel ?? null;
   if (!modelId) return name;
   const model = provider?.models?.find((item) => item.id === modelId)?.label ?? modelId;
@@ -221,10 +217,11 @@ export function ProviderSelect({
   model?: string | null;
   onChooseModel?: (id: string) => void;
 }) {
+  const t = useT();
   const models = providers.find((item) => item.id === selected)?.models ?? [];
   return (
     <div className="grid min-w-0 gap-1 text-xs text-stone-600">
-      <label htmlFor={id}>Кто выполняет</label>
+      <label htmlFor={id}>{t("provider.who")}</label>
       <select
         id={id}
         value={selected ?? ""}
@@ -233,16 +230,17 @@ export function ProviderSelect({
         className="h-9 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 text-sm text-stone-900 disabled:opacity-60"
       >
         {providers.map((provider) => {
-          const reason = !provider.available
+          const raw = !provider.available
             ? provider.reason || "недоступен"
             : !supports(provider, mode)
               ? mode === "agent"
                 ? "не умеет работать с файлами этого этапа"
                 : "не умеет этот режим"
               : "";
+          const reason = raw ? providerReason(t, raw) : "";
           return (
             <option key={provider.id} value={provider.id} disabled={Boolean(reason)}>
-              {provider.label || PROVIDER_LABELS[provider.id] || provider.id}
+              {providerName(t, provider.id, provider.label)}
               {reason ? ` — ${reason}` : ""}
             </option>
           );
@@ -250,7 +248,7 @@ export function ProviderSelect({
       </select>
       {onChooseModel && models.length ? (
         <>
-          <label htmlFor={`${id}-model`}>Модель</label>
+          <label htmlFor={`${id}-model`}>{t("provider.model")}</label>
           <select
             id={`${id}-model`}
             value={model ?? ""}

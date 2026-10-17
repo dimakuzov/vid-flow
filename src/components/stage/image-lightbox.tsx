@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useT } from "@/components/language";
 import type { MediaFile } from "@/lib/series/types";
 import { comfyRunContext, readPngTextChunks, type ComfyRunContext } from "./png-metadata";
 
@@ -11,6 +12,7 @@ type MetaState =
 
 /** Промпт и seed из PNG, который сохранил ComfyUI. Читается по кнопке, в браузере. */
 function RunContextPanel({ file }: { file: MediaFile }) {
+  const t = useT();
   const [meta, setMeta] = useState<MetaState | null>(null);
   const current = meta && meta.url === file.url ? meta : null;
 
@@ -34,14 +36,14 @@ function RunContextPanel({ file }: { file: MediaFile }) {
         className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
         onClick={load}
       >
-        Промпт и seed
+        {t("light.prompt")}
       </button>
     );
   }
-  if (current.status === "loading") return <p className="text-sm text-white/70">Читаю файл…</p>;
-  if (current.status === "error") return <p className="text-sm text-red-200">Файл не прочитан.</p>;
+  if (current.status === "loading") return <p className="text-sm text-white/70">{t("light.reading")}</p>;
+  if (current.status === "error") return <p className="text-sm text-red-200">{t("light.unread")}</p>;
   if (!current.context) {
-    return <p className="text-sm text-white/70">В файле нет графа ComfyUI.</p>;
+    return <p className="text-sm text-white/70">{t("light.noGraph")}</p>;
   }
   const { texts, seeds } = current.context;
   return (
@@ -51,20 +53,20 @@ function RunContextPanel({ file }: { file: MediaFile }) {
           {texts.map((item) => (
             <div key={`${item.node}.${item.field}`}>
               <div className="text-xs text-white/60">
-                {item.classType || "нода"} #{item.node} · {item.field}
+                {item.classType || t("light.node")} #{item.node} · {item.field}
               </div>
               <p className="whitespace-pre-wrap break-words">{item.text}</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-white/70">Текстов промпта в графе нет.</p>
+        <p className="text-white/70">{t("light.noText")}</p>
       )}
       {seeds.length ? (
         <ul className="space-y-0.5 text-xs text-white/80">
           {seeds.map((item) => (
             <li key={`${item.node}.${item.field}`}>
-              {item.field} {item.value} · {item.classType || "нода"} #{item.node}
+              {item.field} {item.value} · {item.classType || t("light.node")} #{item.node}
             </li>
           ))}
         </ul>
@@ -90,6 +92,7 @@ export function ImageLightbox({
   /** Кнопки для текущего файла в нижней панели. */
   actions?: (file: MediaFile) => ReactNode;
 }) {
+  const t = useT();
   const file = files[index];
 
   useEffect(() => {
@@ -149,7 +152,7 @@ export function ImageLightbox({
         className="absolute top-4 right-4 rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white"
         onClick={onClose}
       >
-        Закрыть
+        {t("light.close")}
       </button>
     </div>
   );

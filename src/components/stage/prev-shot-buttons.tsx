@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { EarlierApprove } from "@/lib/series/prev-shot";
 import type { StageDetail } from "@/lib/series/types";
@@ -21,6 +22,7 @@ export function PrevShotRefButton({
   onDone: (stage: StageDetail, message: string) => void;
   onError: (message: string) => void;
 }) {
+  const t = useT();
   const [pending, setPending] = useState(false);
 
   async function add() {
@@ -28,7 +30,7 @@ export function PrevShotRefButton({
     try {
       const data = await requestJson<{ message: string; stage: StageDetail }>(`${stageApi}/prev-ref`, {
         method: "POST",
-        fallbackError: "Не удалось добавить из предыдущего кадра",
+        fallbackError: t("prev.refFailed"),
       });
       onDone(data.stage, data.message);
     } catch (err) {
@@ -40,7 +42,7 @@ export function PrevShotRefButton({
 
   return (
     <Button type="button" variant="outline" size="xs" disabled={disabled || pending} onClick={() => void add()}>
-      {pending ? "Копирую…" : "Добавить из предыдущего кадра"}
+      {pending ? t("common.copying") : t("prev.ref")}
     </Button>
   );
 }
@@ -57,6 +59,7 @@ export function CharacterApproveTools({
   disabled?: boolean;
   onDone: (stage: StageDetail | null, message: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<EarlierApprove[] | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
@@ -67,7 +70,7 @@ export function CharacterApproveTools({
     if (!open) return;
     let stopped = false;
     requestJson<{ files: EarlierApprove[] }>(`${stageApi}/prev-approve`, {
-      fallbackError: "Не удалось прочитать прошлые кадры",
+      fallbackError: t("prev.readFailed"),
     })
       .then((data) => {
         if (!stopped) setFiles(data.files);
@@ -86,7 +89,7 @@ export function CharacterApproveTools({
       stopped = true;
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open, stageApi]);
+  }, [open, stageApi, t]);
 
   async function fromPrevious() {
     setPending(true);
@@ -95,7 +98,7 @@ export function CharacterApproveTools({
       const data = await requestJson<{ message: string; stage: StageDetail }>(`${stageApi}/prev-approve`, {
         method: "POST",
         body: { mode: "previous" },
-        fallbackError: "Не удалось добавить из предыдущего кадра",
+        fallbackError: t("prev.refFailed"),
       });
       onDone(data.stage, data.message);
     } catch (err) {
@@ -112,7 +115,7 @@ export function CharacterApproveTools({
       const data = await requestJson<{ message: string; stage: StageDetail }>(`${stageApi}/prev-approve`, {
         method: "POST",
         body: { mode: "pick", paths: picked },
-        fallbackError: "Не удалось добавить из кадров",
+        fallbackError: t("prev.addFailed"),
       });
       setOpen(false);
       onDone(data.stage, data.message);
@@ -127,7 +130,7 @@ export function CharacterApproveTools({
     <>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="xs" disabled={disabled || pending} onClick={() => void fromPrevious()}>
-          Добавить из предыдущего кадра
+          {t("prev.ref")}
         </Button>
         <Button
           type="button"
@@ -141,7 +144,7 @@ export function CharacterApproveTools({
             setOpen(true);
           }}
         >
-          Добавить из кадров
+          {t("prev.shots")}
         </Button>
       </div>
       {error && !open ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
@@ -150,16 +153,14 @@ export function CharacterApproveTools({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Добавить из кадров"
+            aria-label={t("prev.shotsLabel")}
             className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-4 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-sm font-semibold text-stone-900">Добавить из кадров</h2>
-            <p className="mt-1 text-xs text-stone-500">
-              Утверждённые картинки персонажей из предыдущих кадров. Файл копируется в approve/ этого кадра.
-            </p>
-            {files === null && !error ? <p className="mt-3 text-sm text-stone-500">Загрузка…</p> : null}
-            {files && !files.length ? <p className="mt-3 text-sm text-stone-500">В предыдущих кадрах нет утверждённых картинок.</p> : null}
+            <h2 className="text-sm font-semibold text-stone-900">{t("prev.shots")}</h2>
+            <p className="mt-1 text-xs text-stone-500">{t("prev.lead")}</p>
+            {files === null && !error ? <p className="mt-3 text-sm text-stone-500">{t("common.loading")}</p> : null}
+            {files && !files.length ? <p className="mt-3 text-sm text-stone-500">{t("prev.empty")}</p> : null}
             {files?.length ? (
               <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {files.map((file) => {
@@ -178,7 +179,7 @@ export function CharacterApproveTools({
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- миниатюра чужого approve */}
                         <img src={`/api/media/${file.path}`} alt="" className="mb-1 aspect-[3/4] w-full rounded bg-stone-100 object-contain" />
-                        {on ? "Выбрано · " : ""}
+                        {on ? t("common.selected") : ""}
                         {file.label}
                       </button>
                     </li>
@@ -189,10 +190,10 @@ export function CharacterApproveTools({
             {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
             <div className="mt-4 flex gap-2">
               <Button type="button" disabled={pending || !picked.length} onClick={() => void addPicked()}>
-                {pending ? "Копирую…" : `Добавить выбранные${picked.length ? ` (${picked.length})` : ""}`}
+                {pending ? t("common.copying") : picked.length ? t("source.addN", { n: picked.length }) : t("source.add")}
               </Button>
               <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>
-                Закрыть
+                {t("common.close")}
               </Button>
             </div>
           </div>

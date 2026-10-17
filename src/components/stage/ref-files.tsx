@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/components/language";
+import type { Translate } from "@/lib/i18n";
 import type { MediaFile } from "@/lib/series/types";
 import { MediaCard } from "./media-card";
 
@@ -11,12 +13,12 @@ function subjectKey(filename: string, shotId: string): string {
   return cut === -1 ? base : base.slice(0, cut);
 }
 
-function refRole(filename: string): string {
+function refRole(filename: string, tr: Translate): string {
   const base = filename.replace(/\.[^.]+$/, "");
-  if (base.endsWith("_outfit")) return "образ";
-  if (base.endsWith("_pose")) return "поза";
-  if (base.endsWith("_face")) return "лицо";
-  return "файл";
+  if (base.endsWith("_outfit")) return tr("refs.role.outfit");
+  if (base.endsWith("_pose")) return tr("refs.role.pose");
+  if (base.endsWith("_face")) return tr("refs.role.face");
+  return tr("refs.role.file");
 }
 
 /** refs/, относящиеся к выбранным (или всем) вариантам в output/: по имени персонажа. */
@@ -54,22 +56,23 @@ export function RefFiles({
   /** Убрать из графа (true) или вернуть (false). Нет — этап занят. */
   onToggleExclude?: (file: MediaFile, exclude: boolean) => void;
 }) {
+  const t = useT();
   const removed = new Set(excluded);
   const selected = files.find((file) => file.name === selectedName) ?? null;
   const used = new Set(usedNames);
 
   if (!files.length) {
-    return <p className="text-sm text-stone-500">В refs/ пока нет файлов.</p>;
+    return <p className="text-sm text-stone-500">{t("refs.empty")}</p>;
   }
 
   return (
     <div className="space-y-3">
       <p className="text-xs leading-5 text-stone-500">
         {selected
-          ? `${refRole(selected.name)} · ${selected.name}. Картинка открывается на весь экран.`
+          ? t("refs.openOne", { role: refRole(selected.name, t), name: selected.name })
           : usedNames.length
-            ? `Использованы: ${usedNames.join(", ")}.`
-            : "Имя под картинкой выделяет файл. Сама картинка открывается на весь экран."}
+            ? t("refs.usedList", { names: usedNames.join(", ") })
+            : t("refs.hint")}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {files.map((file) => (
@@ -83,7 +86,7 @@ export function RefFiles({
             onToggleExclude={
               onToggleExclude ? () => onToggleExclude(file, !removed.has(file.relativePath)) : undefined
             }
-            caption={`${refRole(file.name)}${used.has(file.name) ? " · использован" : ""}`}
+            caption={`${refRole(file.name, t)}${used.has(file.name) ? t("refs.used") : ""}`}
           />
         ))}
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { MediaFile } from "@/lib/series/types";
 
@@ -21,6 +22,7 @@ export function CharacterImagePicker({
   disabled?: boolean;
   onPick: (file: MediaFile) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState<"output" | "refs" | "previous" | null>(null);
   const images = (files: MediaFile[]) => files.filter((file) => file.kind === "image");
   const lists = {
@@ -34,20 +36,20 @@ export function CharacterImagePicker({
     <div className="space-y-1">
       <div className="flex flex-wrap gap-1">
         <Button type="button" variant="outline" size="xs" disabled={disabled} onClick={() => setOpen(open === "output" ? null : "output")}>
-          Из output
+          {t("pick.output")}
         </Button>
         <Button type="button" variant="outline" size="xs" disabled={disabled} onClick={() => setOpen(open === "refs" ? null : "refs")}>
-          Из референса
+          {t("pick.ref")}
         </Button>
         <Button
           type="button"
           variant="outline"
           size="xs"
           disabled={disabled || !previous}
-          title={previous ? `Кадр ${previous.id}` : "Это первый кадр"}
+          title={previous ? t("pick.shot", { id: previous.id }) : t("pick.first")}
           onClick={() => setOpen(open === "previous" ? null : "previous")}
         >
-          Из предыдущего кадра
+          {t("pick.prev")}
         </Button>
       </div>
       {open ? (
@@ -76,10 +78,10 @@ export function CharacterImagePicker({
           ) : (
             <p className="text-xs text-stone-500">
               {open === "output"
-                ? "В output/ этого кадра нет картинок."
+                ? t("pick.noOutput")
                 : open === "refs"
-                  ? "В refs/ нет картинок."
-                  : `В кадре ${previous?.id ?? ""} нет картинок персонажей.`}
+                  ? t("pick.noRefs")
+                  : t("pick.noPrev", { id: previous?.id ?? "" })}
             </p>
           )}
         </div>

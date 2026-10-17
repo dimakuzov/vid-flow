@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { LibraryLocation } from "@/lib/series/library";
 import type { StageDetail } from "@/lib/series/types";
@@ -21,6 +22,7 @@ export function LocationChoice({
   disabled?: boolean;
   onChanged: (stage: StageDetail, message: string) => void;
 }) {
+  const t = useT();
   const [locations, setLocations] = useState<LibraryLocation[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState("");
@@ -30,7 +32,7 @@ export function LocationChoice({
   useEffect(() => {
     let stopped = false;
     requestJson<{ locations: LibraryLocation[] }>("/api/library/locations", {
-      fallbackError: "Не удалось прочитать локации",
+      fallbackError: t("loc.readListFailed"),
     })
       .then((data) => {
         if (!stopped) setLocations(data.locations);
@@ -41,7 +43,7 @@ export function LocationChoice({
     return () => {
       stopped = true;
     };
-  }, []);
+  }, [t]);
 
   const busy = Boolean(disabled) || pending;
   const known = locations?.some((item) => item.id === location) ?? false;
@@ -55,9 +57,9 @@ export function LocationChoice({
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
         body: { location: id },
-        fallbackError: "Не удалось сменить локацию",
+        fallbackError: t("loc.changeFailed"),
       });
-      onChanged(data, `Локация кадра: ${data.location}`);
+      onChanged(data, t("loc.changed", { name: data.location }));
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -74,17 +76,17 @@ export function LocationChoice({
       const created = await requestJson<{ id: string; locations: LibraryLocation[] }>("/api/library/locations", {
         method: "POST",
         body: { name },
-        fallbackError: "Не удалось создать локацию",
+        fallbackError: t("loc.createFailed"),
       });
       setLocations(created.locations);
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
         body: { location: created.id },
-        fallbackError: "Папка создана, но кадр не переключён",
+        fallbackError: t("loc.switchFailed"),
       });
       setCreating(false);
       setDraft("");
-      onChanged(data, `Локация ${created.id} создана и записана в кадр`);
+      onChanged(data, t("loc.created", { name: created.id }));
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -95,14 +97,12 @@ export function LocationChoice({
   return (
     <div className="space-y-2 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
       <div className="text-xs font-medium text-stone-600">
-        Локация кадра{" "}
-        <span className="font-normal text-stone-400">
-          имя папки в data/locations/. Выбор меняет только строку в shot.md.
-        </span>
+        {t("loc.shot")}{" "}
+        <span className="font-normal text-stone-400">{t("loc.shotNote")}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <select
-          aria-label="Локация из библиотеки"
+          aria-label={t("loc.pickLabel")}
           className="h-8 min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2 text-sm"
           value={known ? location : ""}
           disabled={busy || !locations}
@@ -111,7 +111,7 @@ export function LocationChoice({
           }}
         >
           {!known ? (
-            <option value="">{locations ? (current ? `${current} — нет такой папки` : "не задана") : "Загрузка…"}</option>
+            <option value="">{locations ? (current ? t("loc.missingFolder", { id: current }) : t("loc.unset")) : t("common.loading")}</option>
           ) : null}
           {(locations ?? []).map((item) => (
             <option key={item.id} value={item.id}>
@@ -120,11 +120,11 @@ export function LocationChoice({
           ))}
         </select>
         <Button type="button" variant="outline" disabled={busy} onClick={() => setCreating((open) => !open)}>
-          Создать локацию
+          {t("loc.create")}
         </Button>
       </div>
       {locations && !locations.length ? (
-        <p className="text-xs text-stone-500">В data/locations/ нет локаций.</p>
+        <p className="text-xs text-stone-500">{t("loc.noLocations")}</p>
       ) : null}
       {creating ? (
         <form
@@ -135,7 +135,7 @@ export function LocationChoice({
           }}
         >
           <input
-            aria-label="Имя новой локации"
+            aria-label={t("loc.newName")}
             className="h-8 min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2 text-sm"
             placeholder="kitchen"
             value={draft}
@@ -143,12 +143,12 @@ export function LocationChoice({
             onChange={(event) => setDraft(event.target.value)}
           />
           <Button type="submit" disabled={busy || !draft.trim()}>
-            Создать
+            {t("loc.createDo")}
           </Button>
         </form>
       ) : null}
       {creating ? (
-        <p className="text-xs text-stone-500">Пустая папка. Имя — латиница, цифры, _ и -. Картинку положите в неё сами.</p>
+        <p className="text-xs text-stone-500">{t("loc.createHint")}</p>
       ) : null}
       {error ? <p className="text-xs text-red-800">{error}</p> : null}
     </div>

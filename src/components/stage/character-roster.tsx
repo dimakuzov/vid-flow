@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import { errorText, requestJson } from "./api";
 
@@ -28,6 +29,7 @@ export function CharacterRoster({
   onSelect: (name: string) => void;
   onChange: (names: string[]) => void;
 }) {
+  const t = useT();
   const [picking, setPicking] = useState(false);
   const [options, setOptions] = useState<string[] | null>(null);
   const [error, setError] = useState("");
@@ -35,10 +37,8 @@ export function CharacterRoster({
   return (
     <div className="space-y-2 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
       <div className="text-xs font-medium text-stone-600">
-        Персонажи кадра{" "}
-        <span className="font-normal text-stone-400">
-          нажмите имя — референсы выше станут его. Снять галку — убрать из кадра, файлы на диске остаются.
-        </span>
+        {t("roster.title")}{" "}
+        <span className="font-normal text-stone-400">{t("roster.note")}</span>
       </div>
       {names.length ? (
         <ul className="space-y-1">
@@ -54,10 +54,10 @@ export function CharacterRoster({
                   <input
                     type="checkbox"
                     checked
-                    aria-label={`Убрать ${name}`}
+                    aria-label={t("roster.remove", { name })}
                     disabled={disabled}
                     onChange={() => {
-                      if (!window.confirm(`Убрать ${name} из кадра? Файлы в refs/ останутся.`)) return;
+                      if (!window.confirm(t("roster.confirm", { name }))) return;
                       onChange(names.filter((item) => item !== name));
                     }}
                   />
@@ -69,14 +69,14 @@ export function CharacterRoster({
                   >
                     {name}
                   </button>
-                  {selected ? <span className="text-xs text-stone-400">редактируется</span> : null}
+                  {selected ? <span className="text-xs text-stone-400">{t("roster.editing")}</span> : null}
                 </div>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="text-xs text-stone-500">В кадре никого. Добавьте имя из библиотеки.</p>
+        <p className="text-xs text-stone-500">{t("roster.empty")}</p>
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -89,17 +89,17 @@ export function CharacterRoster({
             setError("");
             if (!next || options) return;
             requestJson<{ characters: string[] }>("/api/library/characters", {
-              fallbackError: "Не удалось прочитать персонажей",
+              fallbackError: t("roster.readFailed"),
             })
               .then((data) => setOptions(data.characters))
               .catch((err) => setError(errorText(err)));
           }}
         >
-          Добавить
+          {t("roster.add")}
         </Button>
         {picking ? (
           <select
-            aria-label="Имя из библиотеки"
+            aria-label={t("roster.pick")}
             defaultValue=""
             disabled={disabled || !options}
             className="h-8 min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-2 text-sm"
@@ -110,7 +110,7 @@ export function CharacterRoster({
               setPicking(false);
             }}
           >
-            <option value="">{options ? "Выберите имя" : "Загрузка…"}</option>
+            <option value="">{options ? t("roster.choose") : t("common.loading")}</option>
             {(options ?? [])
               .filter((name) => !names.some((item) => item.toLowerCase() === name.toLowerCase()))
               .map((name) => (
@@ -122,14 +122,12 @@ export function CharacterRoster({
         ) : null}
       </div>
       {picking && options && !options.length ? (
-        <p className="text-xs text-stone-500">В data/characters/ нет персонажей.</p>
+        <p className="text-xs text-stone-500">{t("roster.noLibrary")}</p>
       ) : null}
       {error ? <p className="text-xs text-red-800">{error}</p> : null}
       {active ? (
         <p className="text-xs text-stone-500">
-          Картинку этого персонажа выбирают выше, в «Что уйдёт в граф». Одежда — файл{" "}
-          <span className="font-mono">{active}_clothes</span>. Промпт — раздел{" "}
-          <span className="font-mono">## {active}</span>.
+          {t("roster.hint", { name: active })}
         </p>
       ) : null}
     </div>

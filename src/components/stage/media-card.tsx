@@ -2,16 +2,18 @@
 
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
+import { useT } from "@/components/language";
 import type { MediaFile } from "@/lib/series/types";
 
 function DeleteButton({ name, onDelete }: { name: string; onDelete: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
       onClick={onDelete}
       className="shrink-0 rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-700"
-      aria-label={`Удалить ${name} навсегда`}
-      title="Удалить файл навсегда"
+      aria-label={t("media.delete", { name })}
+      title={t("media.deleteTitle")}
     >
       <Trash2Icon className="size-3.5" />
     </button>
@@ -20,14 +22,15 @@ function DeleteButton({ name, onDelete }: { name: string; onDelete: () => void }
 
 /** «Убрать из графа» / «Вернуть»: файл остаётся на диске. */
 function ExcludeButton({ excluded, onToggle }: { excluded: boolean; onToggle: () => void }) {
+  const t = useT();
   return (
     <button
       type="button"
       onClick={onToggle}
       className="shrink-0 text-stone-500 underline hover:text-stone-800"
-      title={excluded ? "Снова отдавать этот файл в граф" : "Не отдавать файл в граф. С диска он не удаляется"}
+      title={excluded ? t("media.restoreTitle") : t("media.excludeTitle")}
     >
-      {excluded ? "Вернуть" : "Убрать"}
+      {excluded ? t("media.restore") : t("media.remove")}
     </button>
   );
 }
@@ -67,11 +70,12 @@ export function MediaCard({
   /** Убрать из графа / вернуть. Нет — переключателя нет (этап занят). */
   onToggleExclude?: () => void;
 }) {
-  const shownCaption = [excluded ? "убран из графа" : "", caption ?? ""].filter(Boolean).join(" · ");
+  const t = useT();
+  const shownCaption = [excluded ? t("media.excluded") : "", caption ?? ""].filter(Boolean).join(" · ");
   const editButton =
     onEdit && file.kind === "image" ? (
       <button type="button" onClick={onEdit} className="shrink-0 text-stone-500 underline hover:text-stone-800">
-        Править
+        {t("media.edit")}
       </button>
     ) : null;
   return (
@@ -85,7 +89,7 @@ export function MediaCard({
           type="button"
           onClick={onOpen}
           className="block w-full cursor-zoom-in"
-          aria-label={`Открыть ${file.name} на весь экран`}
+          aria-label={t("media.open", { name: file.name })}
         >
           <Image
             src={file.url}
@@ -116,7 +120,7 @@ export function MediaCard({
             title={captionTitle}
             className="min-w-0 flex-1 truncate text-left text-xs text-stone-600"
           >
-            {selected ? "Выбрано · " : ""}
+            {selected ? t("common.selected") : ""}
             {shownCaption ? `${shownCaption} · ` : ""}
             {file.name}
           </button>
@@ -134,7 +138,7 @@ export function MediaCard({
           {onToggleExclude ? <ExcludeButton excluded={Boolean(excluded)} onToggle={onToggleExclude} /> : null}
           {onRemove ? (
             <button type="button" onClick={onRemove} className="shrink-0 text-stone-500 underline">
-              Убрать
+              {t("media.remove")}
             </button>
           ) : null}
           {onDelete ? <DeleteButton name={file.name} onDelete={onDelete} /> : null}
@@ -146,7 +150,7 @@ export function MediaCard({
           onClick={onApprove}
           className="mt-2 rounded-lg bg-teal-800 px-2 py-1 text-xs text-white"
         >
-          Утвердить этот вариант
+          {t("media.approveOne")}
         </button>
       ) : null}
     </div>

@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
+import { stageName, type Translate } from "@/lib/i18n";
 import type { RefSourceGroup } from "@/lib/series/ref-sources";
 import type { StageDetail } from "@/lib/series/types";
 import { errorText, requestJson } from "./api";
+
+function groupTitle(group: RefSourceGroup, tr: Translate): string {
+  if (group.id === "characters-shot") return tr("source.group.charactersShot");
+  if (group.id === "characters-rest") return tr("source.group.charactersRest");
+  if (group.id === "locations") return tr("source.group.locations");
+  if (group.id === "references") return tr("source.group.shared");
+  if (group.id === "other-shots") return tr("source.group.other");
+  if (group.id.startsWith("stage-")) return tr("source.group.stage", { stage: stageName(tr, group.id.slice("stage-".length)) });
+  return group.title;
+}
 
 /**
  * «Добавить референс из…»: сетка источников, несколько файлов копируются в refs/.
@@ -18,6 +30,7 @@ export function RefSourcePicker({
   disabled?: boolean;
   onPicked: (stage: StageDetail, message: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<RefSourceGroup[] | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
@@ -28,7 +41,7 @@ export function RefSourcePicker({
     if (!open) return;
     let stopped = false;
     requestJson<{ groups: RefSourceGroup[] }>(`${stageApi}/ref-sources`, {
-      fallbackError: "Не удалось прочитать источники",
+      fallbackError: t("source.readFailed"),
     })
       .then((data) => {
         if (!stopped) setGroups(data.groups);
@@ -47,7 +60,7 @@ export function RefSourcePicker({
       stopped = true;
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open, stageApi]);
+  }, [open, stageApi, t]);
 
   function toggle(filePath: string) {
     setPicked((current) =>
@@ -63,7 +76,7 @@ export function RefSourcePicker({
       const data = await requestJson<{ message: string; stage: StageDetail }>(`${stageApi}/ref-sources`, {
         method: "POST",
         body: { paths },
-        fallbackError: "Не удалось добавить референс",
+        fallbackError: t("source.addFailed"),
       });
       setOpen(false);
       onPicked(data.stage, data.message);
@@ -90,27 +103,25 @@ export function RefSourcePicker({
           setOpen((value) => !value);
         }}
       >
-        Добавить референс из…
+        {t("source.button")}
       </Button>
       {open ? (
         <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/40 p-4 sm:items-center" onClick={() => setOpen(false)}>
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Добавить референс"
+            aria-label={t("source.label")}
             className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-4 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-sm font-semibold text-stone-900">Добавить референс из…</h2>
-            <p className="mt-1 text-xs text-stone-500">
-              Файл копируется в refs/. Исходник остаётся на месте. Двойной щелчок добавляет сразу, несколько — галками и кнопкой внизу.
-            </p>
-            {groups === null && !error ? <p className="mt-3 text-sm text-stone-500">Загрузка…</p> : null}
-            {groups?.length === 0 ? <p className="mt-3 text-sm text-stone-500">Нечего добавить.</p> : null}
+            <h2 className="text-sm font-semibold text-stone-900">{t("source.button")}</h2>
+            <p className="mt-1 text-xs text-stone-500">{t("source.lead")}</p>
+            {groups === null && !error ? <p className="mt-3 text-sm text-stone-500">{t("common.loading")}</p> : null}
+            {groups?.length === 0 ? <p className="mt-3 text-sm text-stone-500">{t("source.empty")}</p> : null}
             <div className="mt-3 space-y-4">
               {groups?.map((group) => (
                 <section key={group.id}>
-                  <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-stone-500">{group.title}</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-stone-500">{groupTitle(group, t)}</h3>
                   <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
                     {group.files.map((file) => {
                       const on = picked.includes(file.path);
@@ -132,7 +143,7 @@ export function RefSourcePicker({
                               className="aspect-square w-full rounded object-cover"
                             />
                             <span className="truncate" title={file.label}>
-                              {on ? "Выбрано · " : ""}
+                              {on ? t("common.selected") : ""}
                               {file.label}
                             </span>
                           </button>
@@ -146,10 +157,10 @@ export function RefSourcePicker({
             {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" disabled={pending || picked.length === 0} onClick={() => void add()}>
-                {pending ? "Копирую…" : `Добавить выбранные${picked.length ? ` (${picked.length})` : ""}`}
+                {pending ? t("common.copying") : picked.length ? t("source.addN", { n: picked.length }) : t("source.add")}
               </Button>
               <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>
-                Закрыть
+                {t("common.close")}
               </Button>
             </div>
           </div>

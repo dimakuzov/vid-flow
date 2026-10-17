@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { clockLocale, type Lang, type Translate } from "@/lib/i18n";
 
 // Одни часы на страницу: тик раз в секунду, пока есть подписчики.
 let now = Date.now();
@@ -34,21 +35,21 @@ export function useNow(): number | null {
   );
 }
 
-export function formatClock(iso: string | null | undefined): string {
+export function formatClock(iso: string | null | undefined, lang: Lang): string {
   if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(clockLocale(lang), { hour: "2-digit", minute: "2-digit" });
 }
 
-/** «3 мин 05 с», «1 ч 12 мин». */
-export function formatElapsed(fromIso: string | null | undefined, nowMs: number | null): string {
+/** «3 мин 05 с», «1 ч 12 мин» — на языке интерфейса. */
+export function formatElapsed(fromIso: string | null | undefined, nowMs: number | null, tr: Translate): string {
   if (!fromIso || nowMs === null) return "";
   const from = new Date(fromIso).getTime();
   if (Number.isNaN(from)) return "";
   const seconds = Math.max(0, Math.floor((nowMs - from) / 1000));
-  if (seconds < 60) return `${seconds} с`;
+  if (seconds < 60) return tr("time.sec", { n: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} мин ${String(seconds % 60).padStart(2, "0")} с`;
-  return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+  if (minutes < 60) return tr("time.minSec", { m: minutes, s: String(seconds % 60).padStart(2, "0") });
+  return tr("time.hourMin", { h: Math.floor(minutes / 60), m: minutes % 60 });
 }

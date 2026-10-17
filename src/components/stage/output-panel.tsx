@@ -1,16 +1,20 @@
 "use client";
 
+import { useT } from "@/components/language";
+import type { Translate } from "@/lib/i18n";
 import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
 import { MediaCard } from "./media-card";
 import { CharacterApproveTools } from "./prev-shot-buttons";
 
 /** Подпись «из чего сделан» для файла в output/. */
-function madeFrom(name: string, edits: ImageEditRecord[]): { caption?: string; title?: string } {
+function madeFrom(name: string, edits: ImageEditRecord[], tr: Translate): { caption?: string; title?: string } {
   const found = [...edits].reverse().find((item) => item.file === name);
   if (!found) return {};
-  const kind = found.kind === "crop" ? "обрезка" : "правка";
-  return { caption: `${kind} из ${found.from}`, title: found.prompt };
+  return {
+    caption: tr(found.kind === "crop" ? "output.crop" : "output.edit", { from: found.from }),
+    title: found.prompt,
+  };
 }
 
 export function OutputPanel({
@@ -41,6 +45,7 @@ export function OutputPanel({
   stageApi: string;
   onStage: (stage: StageDetail | null, message: string) => void;
 }) {
+  const t = useT();
   return (
     <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">Output</h2>
@@ -61,20 +66,19 @@ export function OutputPanel({
               />
             ))
           ) : (
-            <p className="text-sm text-stone-500">Ещё ничего не утверждено</p>
+            <p className="text-sm text-stone-500">{t("output.noneApproved")}</p>
           )}
         </div>
       </div>
       <div className="mt-6">
         <h3 className="text-sm font-medium text-stone-800">output/</h3>
         <p className="mt-1 text-xs text-stone-500">
-          Имя файла выделяет вариант. Слева остаются референсы этого персонажа. Картинка открывается
-          на весь экран, там же — промпт и seed, с которыми её сделал ComfyUI.
+          {t("output.hint")}
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {detail.output.length ? (
             detail.output.map((file) => {
-              const origin = madeFrom(file.name, edits);
+              const origin = madeFrom(file.name, edits, t);
               return (
               <MediaCard
                 key={file.relativePath}
@@ -91,21 +95,18 @@ export function OutputPanel({
               );
             })
           ) : (
-            <p className="text-sm text-stone-500">Вариантов пока нет</p>
+            <p className="text-sm text-stone-500">{t("output.empty")}</p>
           )}
         </div>
       </div>
       {detail.stageId === "characters" ? (
         <p className="mt-4 text-xs text-stone-500">
-          Отметьте имя файла в output и нажмите «Утвердить выбранные». Для персонажа файл встанет
-          как <code>{"{character}_" + detail.shotId + ".png"}</code>
-          {detail.expectedCharacters.length
-            ? ` · ожидаются: ${detail.expectedCharacters.join(", ")}`
-            : ""}
+          {t("output.characters", { pattern: `{character}_${detail.shotId}.png` })}
+          {detail.expectedCharacters.length ? t("output.expected", { names: detail.expectedCharacters.join(", ") }) : ""}
         </p>
       ) : (
         <p className="mt-4 text-xs text-stone-500">
-          В approve для этого этапа хранится один выбранный файл.
+          {t("output.one")}
         </p>
       )}
     </section>

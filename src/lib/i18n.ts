@@ -1,0 +1,888 @@
+/**
+ * Один словарь интерфейса. Язык по умолчанию — английский, в том числе до клика.
+ * Выбор живёт в localStorage браузера. Сервер, файлы эпизода и API его не читают.
+ * Тексты сценария, промпты, плейбуки и ответы моделей сюда не входят.
+ */
+import type { StageId, StageStatus } from "./series/constants";
+
+export const DEFAULT_LANG = "en" as const;
+export const LANGS = ["en", "ru"] as const;
+export type Lang = (typeof LANGS)[number];
+
+export const LANG_STORAGE_KEY = "frameboard.lang";
+export const LANG_EVENT = "frameboard-lang";
+
+export function isLang(value: unknown): value is Lang {
+  return value === "en" || value === "ru";
+}
+
+/** Текущий язык. На сервере и без хранилища — английский. */
+export function readLang(): Lang {
+  if (typeof window === "undefined") return DEFAULT_LANG;
+  try {
+    const value = window.localStorage.getItem(LANG_STORAGE_KEY);
+    return isLang(value) ? value : DEFAULT_LANG;
+  } catch {
+    return DEFAULT_LANG;
+  }
+}
+
+type Entry = { en: string; ru: string };
+
+const messages = {
+  "lang.label": { en: "Language", ru: "Язык" },
+
+  "common.close": { en: "Close", ru: "Закрыть" },
+  "common.cancel": { en: "Cancel", ru: "Отмена" },
+  "common.save": { en: "Save", ru: "Сохранить" },
+  "common.error": { en: "Error", ru: "Ошибка" },
+  "common.httpError": { en: "Error {status}", ru: "Ошибка {status}" },
+  "common.loading": { en: "Loading…", ru: "Загрузка…" },
+  "common.copying": { en: "Copying…", ru: "Копирую…" },
+  "common.selected": { en: "Selected · ", ru: "Выбрано · " },
+  "common.refresh": { en: "Refresh", ru: "Обновить" },
+  "common.refreshing": { en: "Refreshing…", ru: "Обновление…" },
+  "common.add": { en: "Add", ru: "Добавить" },
+
+  "stage.characters": { en: "Characters", ru: "Персонажи" },
+  "stage.location": { en: "Location", ru: "Локация" },
+  "stage.first_frame": { en: "First frame", ru: "Первый кадр" },
+  "stage.video_preview": { en: "Video (preview)", ru: "Видео (превью)" },
+  "stage.final_render": { en: "Final render", ru: "Финальный рендер" },
+
+  "status.empty": { en: "Empty", ru: "Пусто" },
+  "status.prep": { en: "Preparing", ru: "Подготовка" },
+  "status.agent": { en: "Agent is working", ru: "Агент обрабатывает" },
+  "status.queued": { en: "Waiting in queue", ru: "Ожидает очереди" },
+  "status.running": { en: "Generating in ComfyUI", ru: "Генерация в ComfyUI" },
+  "status.error": { en: "Error", ru: "Ошибка" },
+  "status.review": { en: "In review", ru: "На проверке" },
+  "status.approved": { en: "Approved", ru: "Утверждено" },
+
+  "provider.manual": { en: "Manual (chat reads the files)", ru: "Вручную (чат читает файлы)" },
+  "provider.ollama": { en: "Local agent (Ollama)", ru: "Локальный агент (Ollama)" },
+  "provider.claude": { en: "Claude Code", ru: "Claude Code" },
+  "provider.who": { en: "Who runs it", ru: "Кто выполняет" },
+  "provider.model": { en: "Model", ru: "Модель" },
+  "provider.unavailable": { en: "unavailable", ru: "недоступен" },
+  "provider.noFiles": { en: "cannot work with this stage's files", ru: "не умеет работать с файлами этого этапа" },
+  "provider.noMode": { en: "does not support this mode", ru: "не умеет этот режим" },
+  "provider.ollamaEmpty": { en: "Ollama has no models", ru: "В Ollama нет ни одной модели" },
+  "provider.checkFailed": { en: "Check failed", ru: "Проверка упала" },
+  "provider.ollamaNoModel": { en: "No model selected for Ollama", ru: "Для Ollama не выбрана модель" },
+  "provider.ollamaDown": { en: "Ollama is not responding: {url}", ru: "Ollama не отвечает: {url}" },
+  "provider.ollamaStatus": { en: "Ollama responded {status}", ru: "Ollama ответил {status}" },
+  "provider.claudeMissing": {
+    en: "{bin} was not found. Set the CLI path with FRAMEBOARD_CLAUDE_BIN",
+    ru: "Не найден {bin}. Путь к CLI задаётся FRAMEBOARD_CLAUDE_BIN",
+  },
+  "provider.listFailed": { en: "The agent list did not load.", ru: "Список агентов не загрузился." },
+
+  "header.noSeries": { en: "No series selected", ru: "Серия не выбрана" },
+  "header.series": { en: "Series", ru: "Серия" },
+  "header.pickSeries": { en: "Choose a series", ru: "Выбери серию" },
+  "header.add": { en: "Add", ru: "Добавить" },
+  "header.openFailed": { en: "Could not open the series", ru: "Не удалось открыть серию" },
+  "header.loadFailed": { en: "Could not load the series", ru: "Не удалось загрузить серию" },
+  "header.stale": { en: "The board did not refresh. The series was not reset.", ru: "Доска не обновилась. Серия не сброшена." },
+
+  "board.title": { en: "Shot table", ru: "Таблица кадров" },
+  "board.shot": { en: "Shot", ru: "Кадр" },
+  "board.noShots": { en: "No shots yet. Tick them in the scenario import below.", ru: "Кадров пока нет. Отметь их галкой в импорте сценария ниже." },
+  "board.noEpisodes": {
+    en: "No episodes yet. Press Add in the header: pick a scenario and a model, and the table builds itself.",
+    ru: "Эпизодов пока нет. Нажми «Добавить» в шапке: выбери сценарий и модель, таблица соберётся сама.",
+  },
+  "board.formatError": { en: "Scenario markup failed: {error}", ru: "Разметка сценария не удалась: {error}" },
+  "board.formatErrorWord": { en: "error", ru: "ошибка" },
+  "board.formatRunning": {
+    en: "The model is marking up the scenario ({model}). The table will appear on its own.",
+    ru: "Модель размечает сценарий ({model}). Таблица появится сама.",
+  },
+  "board.noLocation": { en: "no location set", ru: "локация не задана" },
+  "board.renameTitle": { en: "Click to rename", ru: "Нажмите, чтобы переименовать" },
+  "board.shotName": { en: "Shot title {id}", ru: "Название кадра {id}" },
+  "board.emptyTitle": { en: "The title cannot be empty", ru: "Название не может быть пустым" },
+  "board.renameFailed": { en: "Could not rename the shot", ru: "Не удалось переименовать кадр" },
+
+  "time.sec": { en: "{n} s", ru: "{n} с" },
+  "time.minSec": { en: "{m} min {s} s", ru: "{m} мин {s} с" },
+  "time.hourMin": { en: "{h} h {m} min", ru: "{h} ч {m} мин" },
+  "time.since": { en: "since {clock}", ru: "с {clock}" },
+
+  "hotkey.title": { en: "Keys", ru: "Клавиши" },
+  "hotkey.close": { en: "Close", ru: "Закрыть" },
+  "hotkey.scope.stage": { en: "Stage", ru: "Этап" },
+  "hotkey.scope.board": { en: "Table", ru: "Таблица" },
+  "hotkey.stage.enter": {
+    en: "Send to the agent when the cursor is in Recommendation. Shift+Enter — new line",
+    ru: "Отправить агенту, когда курсор в поле «Рекомендация». Shift+Enter — новая строка",
+  },
+  "hotkey.stage.run": { en: "Run", ru: "Запустить" },
+  "hotkey.stage.approve": { en: "Approve the files selected in output", ru: "Утвердить выбранные в output" },
+  "hotkey.stage.arrows": { en: "Step through pictures in the viewer", ru: "Листать картинки в просмотре" },
+  "hotkey.stage.esc": { en: "Close the viewer or a menu", ru: "Закрыть просмотр или меню" },
+  "hotkey.stage.help": { en: "Show this list", ru: "Показать этот список" },
+  "hotkey.stage.back": { en: "Back to the table, to this shot", ru: "Назад к таблице, к этому кадру" },
+  "hotkey.board.arrows": { en: "Select a cell", ru: "Выбрать клетку" },
+  "hotkey.board.enter": { en: "Open the stage of the selected cell", ru: "Открыть этап выбранной клетки" },
+  "hotkey.button": { en: "Keys ?", ru: "Клавиши ?" },
+
+  "new.title": { en: "New series", ru: "Новая серия" },
+  "new.lead": {
+    en: "Pick a scenario and a model. The model marks it up into shots, and the board builds the table.",
+    ru: "Выберите сценарий и модель. Модель разметит его на кадры, доска сама соберёт таблицу.",
+  },
+  "new.id": { en: "Series name (latin letters, digits, _ and -)", ru: "Имя серии (латиница, цифры, _ и -)" },
+  "new.library": { en: "Scenario from the library (data/scenarios/)", ru: "Сценарий из библиотеки (data/scenarios/)" },
+  "new.none": { en: "— not selected —", ru: "— не выбран —" },
+  "new.emptyLibrary": { en: "— library is empty —", ru: "— в библиотеке пусто —" },
+  "new.orText": { en: "Or scenario text (paste or open a .md / .txt file)", ru: "Или текст сценария (вставить или открыть файл .md / .txt)" },
+  "new.placeholder": { en: "Raw scenario without shot markup.", ru: "Сырой сценарий без разметки кадров." },
+  "new.manual": {
+    en: "Chat agent: the markup goes to the episode inbox. Build the table with Create selected in the import.",
+    ru: "Агент в чате: разметка попадёт во входящие эпизода, таблицу соберёте кнопкой «Создать выбранные» в импорте.",
+  },
+  "new.submit": { en: "Mark up and build the table", ru: "Разметить и собрать таблицу" },
+  "new.creating": { en: "Creating…", ru: "Создание…" },
+  "new.failed": { en: "Could not create the series", ru: "Не удалось создать серию" },
+
+  "import.title": { en: "Scenario import", ru: "Импорт сценария" },
+  "import.lead": {
+    en: "A tick shows the shot in the table. Unticking only hides it: nothing is deleted, and ticking again brings the shot back as it was.",
+    ru: "Галка показывает кадр в таблице. Снятая галка только прячет его: ничего не удаляется, включишь галку — кадр вернётся как был.",
+  },
+  "import.preview": { en: "Preview", ru: "Предпросмотр" },
+  "import.noCharacters": { en: "no characters", ru: "без персонажей" },
+  "import.noCards": { en: "Press Preview to parse shots from the text below.", ru: "Нажми «Предпросмотр», чтобы разобрать кадры из текста ниже." },
+  "import.marked": { en: "Marked-up scenario", ru: "Размеченный сценарий" },
+  "import.placeholder": {
+    en: "# Night shift\n\n## s01 Entering the cafe\n- characters: lena, mark\n- location: night_cafe\nLena walks in, Mark turns around.",
+    ru: "# Ночная смена\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.",
+  },
+  "import.raw": { en: "Raw scenario", ru: "Сырой сценарий" },
+  "import.rawLead": {
+    en: "The text as it is. The button only writes the file. The agent does not start on its own: afterwards, ask Cursor in this folder to read the series inbox.",
+    ru: "Текст как есть. Кнопка только записывает файл. Агент сам не стартует: после неё попроси Cursor в этой папке разобрать входящие серии.",
+  },
+  "import.rawPlaceholder": { en: "Paste a scenario without shot markup.", ru: "Вставь сценарий без разметки кадров." },
+  "import.send": { en: "Send for markup", ru: "Отправить на разметку" },
+  "import.pending": {
+    en: "Markup is waiting for an agent. In local Cursor write: read the current series agent_inbox and format scenario_raw.md into scenario.md. Do not create shot folders.",
+    ru: "Разметка ждёт агента. В локальном Cursor напиши: разбери agent_inbox текущей серии и отформатируй scenario_raw.md в scenario.md. Папки шотов не создавай.",
+  },
+  "import.needSeries": { en: "First choose or add a series in the header", ru: "Сначала выбери или добавь серию в заголовке" },
+  "import.writeFailed": { en: "Could not write the scenario", ru: "Не удалось записать сценарий" },
+  "import.parseFailed": { en: "Could not parse the scenario", ru: "Не удалось разобрать сценарий" },
+  "import.parsed": {
+    en: "Shots in the text: {n}. A tick shows the shot in the table, unticking only hides it.",
+    ru: "Кадров в тексте: {n}. Галка показывает кадр в таблице, снятая только прячет.",
+  },
+  "import.noBlocks": {
+    en: "This text has no shots like «## s01». Send the raw scenario for markup.",
+    ru: "В этом тексте нет кадров «## s01». Сырой сценарий отправь на разметку.",
+  },
+  "import.toggleFailed": { en: "Could not change the shot", ru: "Не удалось изменить кадр" },
+  "import.hidden": { en: "{id} is hidden from the table. The shot files are still there.", ru: "{id} скрыт из таблицы. Файлы кадра на месте." },
+  "import.shown": { en: "{id} is back in the table", ru: "{id} снова в таблице" },
+
+  "bulk.assign": { en: "Agents by shot", ru: "Агенты по кадрам" },
+  "bulk.all": { en: "{stage}: every shot", ru: "{stage}: все кадры" },
+  "bulk.assignButton": { en: "▶ Agents by shot", ru: "▶ Агенты по кадрам" },
+  "bulk.allButton": { en: "▶ Every shot", ru: "▶ Все кадры" },
+  "bulk.assignLead": {
+    en: "Assigns an agent to shots that do not have one. It starts nothing: a stage begins only when you press Send to agent, ▶ Every shot above a stage, or Run the next stage in the shot menu.",
+    ru: "Назначает агента кадрам без агента. Ничего не запускает: этап начнётся, только когда вы нажмёте «Отправить агенту», «▶ Все кадры» над этапом или «Запустить следующий этап» в меню кадра.",
+  },
+  "bulk.charactersLead": {
+    en: "On each shot, that shot's agent builds the characters in ComfyUI. Needs Claude Code or the chat agent.",
+    ru: "На каждом кадре агент кадра сам делает персонажей в ComfyUI. Нужен Claude Code или агент в чате.",
+  },
+  "bulk.stageLead": {
+    en: "On each shot, that shot's agent prepares this stage's prompt, then the board queues a ComfyUI run. Finished stages are not redone.",
+    ru: "На каждом кадре агент кадра готовит промпт этого этапа, затем доска ставит прогон в ComfyUI. Пройденные этапы не переделываются.",
+  },
+  "bulk.assigned": { en: "Agent assigned: {n} ({ids})", ru: "Агент назначен: {n} ({ids})" },
+  "bulk.started": { en: "Started: {n}", ru: "Запущено: {n}" },
+  "bulk.allHave": { en: "Every shot has its own agent.", ru: "У всех кадров свой агент." },
+  "bulk.forAll": { en: "Agent for every shot (becomes each shot's agent):", ru: "Агент для всех кадров (станет агентом каждого кадра):" },
+  "bulk.forSome": { en: "For {n} shots without an agent (becomes their agent):", ru: "Для {n} кадров без агента (станет их агентом):" },
+  "bulk.defaultAgent": { en: "Shots without an agent get the board's default agent.", ru: "Кадрам без агента — агент доски по умолчанию." },
+  "bulk.redo": { en: "Redo even where the stage is already done (approved or has a result)", ru: "Переделать и там, где этап уже пройден (утверждён или есть результат)" },
+  "bulk.assigning": { en: "Assigning…", ru: "Назначение…" },
+  "bulk.assignN": { en: "Assign to {n} shots", ru: "Назначить {n} кадрам" },
+  "bulk.starting": { en: "Starting…", ru: "Запуск…" },
+  "bulk.runN": { en: "Run on {n} shots", ru: "Запустить на {n} кадрах" },
+  "bulk.assignedOnly": { en: "Agent assigned: {ids}. Nothing was started.", ru: "Агент назначен: {ids}. Ничего не запущено." },
+  "bulk.nobody": { en: "Nothing to assign: every shot has its own agent.", ru: "Назначать некому: у всех кадров свой агент." },
+  "bulk.runFailed": { en: "Could not start", ru: "Не удалось запустить" },
+
+  "shot.agentButton": { en: "▶ Agent", ru: "▶ Агент" },
+  "shot.agentTitle": { en: "Shot agent {id}", ru: "Агент кадра {id}" },
+  "shot.agentLead": { en: "Every run of this shot uses it. Now: {activity}.", ru: "Им идут все запуски этого кадра. Сейчас: {activity}." },
+  "shot.next": { en: "Next stage — {stage}.", ru: "Следующий этап — {stage}." },
+  "shot.allApproved": { en: "Every stage is approved.", ru: "Все этапы утверждены." },
+  "shot.save": { en: "Save", ru: "Сохранить" },
+  "shot.runNext": { en: "Run the next stage", ru: "Запустить следующий этап" },
+  "shot.stop": { en: "Stop", ru: "Остановить" },
+  "shot.saved": { en: "Saved: shot agent.", ru: "Сохранено: агент кадра." },
+  "shot.saveFailed": { en: "Could not save", ru: "Не сохранилось" },
+  "shot.stopFailed": { en: "Could not stop", ru: "Не удалось остановить" },
+  "shot.stopped": { en: "Stopped: {n}.", ru: "Остановлено: {n}." },
+  "shot.notRunning": { en: "The board agent on this shot is not working and is not waiting.", ru: "Агент доски на кадре не работает и не ждёт." },
+  "shot.noAgent": { en: "no agent", ru: "нет агента" },
+  "shot.free": { en: "idle", ru: "свободен" },
+  "shot.running": { en: "working: {stage}, since {time}", ru: "работает: {stage}, с {time}" },
+  "shot.waitingChat": { en: "waiting for the chat agent: {stage}", ru: "ждёт агента в чате: {stage}" },
+  "shot.waitingQueue": { en: "waiting in the queue: {stage}", ru: "ждёт очереди: {stage}" },
+
+  "cell.hint": { en: "Left click opens it, right click opens the action menu", ru: "Левая кнопка — открыть, правая — меню действий" },
+  "cell.since": { en: "since {time}", ru: "с {time}" },
+  "cell.outputCount": { en: "{n} in output", ru: "{n} в output" },
+  "cell.noMedia": { en: "No files", ru: "Нет материалов" },
+  "cell.action": { en: "{shot} · action", ru: "{shot} · действие" },
+  "cell.actionLead": {
+    en: "Choose what to do with the stage. The stage page also opens with a left click on the cell.",
+    ru: "Выберите, что сделать с этапом. Страница этапа открывается и левой кнопкой по клетке.",
+  },
+  "cell.upload": { en: "Upload a variant", ru: "Загрузить вариант" },
+  "cell.uploadApprove": { en: "Upload and approve", ru: "Загрузить и утвердить" },
+  "cell.edit": { en: "Edit", ru: "Редактировать" },
+  "cell.busy": { en: "{status}. Run and send-to-agent stay closed until the operation finishes.", ru: "{status}. Запуск и отправка агенту закрыты до конца операции." },
+  "cell.agentOnly": {
+    en: "The board does not run this stage: the agent queues the run (Edit → Send to agent).",
+    ru: "Этот этап доска не запускает: прогон ставит агент («Редактировать» → «Отправить агенту»).",
+  },
+  "cell.run": { en: "Run", ru: "Запустить" },
+  "cell.reset": { en: "Clear the error", ru: "Сбросить ошибку" },
+  "cell.cancel": { en: "Cancel", ru: "Отменить" },
+  "cell.approve": { en: "Approve", ru: "Утвердить" },
+  "cell.approveFailed": { en: "Could not approve", ru: "Не удалось утвердить" },
+  "cell.workflowFailed": { en: "Could not choose the workflow", ru: "Не удалось выбрать воркфлоу" },
+  "cell.durationFailed": { en: "Could not choose the duration", ru: "Не удалось выбрать длительность" },
+  "cell.runFailed": { en: "Could not start", ru: "Не удалось запустить" },
+  "cell.started": { en: "Started", ru: "Запущено" },
+  "cell.cancelFailed": { en: "Could not cancel", ru: "Не удалось отменить" },
+  "cell.cancelled": { en: "Cancelled", ru: "Отменено" },
+  "cell.uploadFailed": { en: "Could not upload", ru: "Не удалось загрузить" },
+  "cell.uploadedApproved": { en: "Uploaded and approved: {name}", ru: "Загружено и утверждено: {name}" },
+  "cell.uploaded": { en: "Uploaded to output: {name}", ru: "Загружено в output: {name}" },
+  "cell.pickInEdit": {
+    en: "There is a new variant in output. Open Edit, tick the file name, and press Approve selected.",
+    ru: "Новый вариант в output. Откройте «Редактировать», отметьте имя файла и нажмите «Утвердить выбранные».",
+  },
+  "cell.nothingToApprove": { en: "Nothing to approve. Upload a variant first.", ru: "Нет файлов для утверждения. Сначала загрузите вариант." },
+  "cell.approvedPartial": {
+    en: "In approve: {names}. The stage becomes approved when every character has a file.",
+    ru: "В approve: {names}. Этап станет утверждённым, когда файл будет у каждого персонажа.",
+  },
+  "cell.approved": { en: "Approved: {names}", ru: "Утверждено: {names}" },
+  "cell.emptyOutput": { en: "output is empty", ru: "output пуст" },
+
+  "workflow.label": { en: "Workflow", ru: "Воркфлоу" },
+  "workflow.default": { en: "Default: {label}", ru: "По умолчанию: {label}" },
+  "workflow.missing": { en: " — missing: {what}", ru: " — нет: {what}" },
+  "workflow.lacks": { en: " Missing: {what}.", ru: " Не хватает: {what}." },
+  "workflow.suggest": { en: "The agent suggests: ", ru: "Агент предлагает: " },
+  "workflow.suggestMissing": { en: " (missing: {what})", ru: " (нет: {what})" },
+  "workflow.switch": { en: "Switch", ru: "Переключить" },
+  "duration.label": { en: "Clip length", ru: "Длительность клипа" },
+  "duration.default": { en: "Default ({n} s)", ru: "По умолчанию ({n} с)" },
+  "duration.seconds": { en: "{n} s", ru: "{n} с" },
+
+  "job.unwritten": { en: "The job is not in the queue yet.", ru: "Задание ещё не записано в очередь." },
+  "job.place": { en: "In the ComfyUI queue: place {n}.", ru: "В очереди ComfyUI: {n}-е место." },
+  "job.notAccepted": {
+    en: "ComfyUI has not accepted the job yet. If it is off, the job will go out when it starts.",
+    ru: "ComfyUI ещё не принял задание. Если он выключен, задание уйдёт, когда он запустится.",
+  },
+  "job.generating": { en: "ComfyUI is generating. Files will appear in output/.", ru: "ComfyUI генерирует. Файлы появятся в output/." },
+  "job.accepted": { en: "Accepted by ComfyUI, queue place: {n}.", ru: "Принято ComfyUI, место в очереди: {n}." },
+  "job.recorded": { en: "Request recorded.", ru: "Запрос записан." },
+  "job.agentWorking": { en: "{provider} is working on the request.", ru: "{provider} работает над запросом." },
+  "job.agentDone": { en: "The agent finished. The board is putting the run in the queue.", ru: "Агент закончил. Доска ставит прогон в очередь." },
+  "job.waitChat": {
+    en: "Waiting for the chat agent: it reads llm_task.md and sets status: done in agent_request.json.",
+    ru: "Ждём агента в чате: он читает llm_task.md и ставит status: done в agent_request.json.",
+  },
+  "job.waitRunner": { en: "The request is waiting for a runner ({provider}).", ru: "Запрос ждёт исполнителя ({provider})." },
+  "job.result.done": { en: "done", ru: "готово" },
+  "job.result.error": { en: "error", ru: "ошибка" },
+  "job.result.cancelled": { en: "cancelled", ru: "отменён" },
+  "job.result.pending": { en: "not sent", ru: "не отправлен" },
+  "job.result.running": { en: "not finished", ru: "не завершён" },
+  "job.last": { en: "Last run: {status}", ru: "Последний прогон: {status}" },
+  "job.files": { en: " · files: {n} ({names})", ru: " · файлов: {n} ({names})" },
+  "job.workflow": { en: " Workflow: {name}.", ru: " Воркфлоу: {name}." },
+  "job.failed": { en: "The operation failed.", ru: "Операция завершилась ошибкой." },
+  "job.node": { en: "node {id}", ru: "нода {id}" },
+  "job.queuedAt": { en: " · queued {time}", ru: " · поставлено {time}" },
+  "job.acceptedAt": { en: " · accepted {time}", ru: " · принято {time}" },
+  "job.reset": { en: "Clear the error", ru: "Сбросить ошибку" },
+  "job.cancel": { en: "Cancel", ru: "Отменить" },
+
+  "agent.send": { en: "Send to agent", ru: "Отправить агенту" },
+  "agent.takes": { en: "Renders", ru: "Рендеров" },
+  "agent.takesLabel": { en: "How many renders", ru: "Сколько рендеров" },
+  "agent.takesTitle": {
+    en: "How many files with the same prompt and a different seed. The next visit starts at 1 again.",
+    ru: "Сколько файлов с тем же промптом и разным seed. При следующем заходе снова 1.",
+  },
+  "agent.shot": { en: "Shot agent: {name}.", ru: "Агент кадра: {name}." },
+  "agent.unassigned": { en: "not assigned", ru: "не назначен" },
+  "agent.rememberOther": {
+    en: "Remember this choice as the shot agent (otherwise only this once)",
+    ru: "Запомнить этот выбор агентом кадра (иначе — только на этот раз)",
+  },
+  "agent.remember": { en: "Remember as the shot agent", ru: "Запомнить агентом кадра" },
+  "agent.help": {
+    en: "The button saves prompt, refs and workflow, hands the recommendation to the agent, and clears the field. While the agent works, the stage is closed. When it rewrites the prompt, the board queues the stage in Comfy: as many jobs as Renders, with different seeds.",
+    ru: "Кнопка сохраняет prompt, refs и workflow, отдаёт рекомендацию агенту и очищает поле. Пока агент работает, этап закрыт. Когда он перепишет промпт, доска сама ставит этап в Comfy: столько заданий, сколько выбрано в «Рендеров», с разными seed.",
+  },
+  "agent.helpCharacters": {
+    en: " On characters — one run per character who has text under ## name in prompt.md.",
+    ru: " На персонажах — по прогону на каждого, у кого в prompt.md есть текст в разделе ## имя.",
+  },
+  "agent.helpWatch": {
+    en: " Finish shot stops inbox checks. They also stop when final_render has an approved video.",
+    ru: " «Закончить кадр» останавливает проверку входящих. Она также останавливается, когда в final_render есть утверждённое видео.",
+  },
+  "agent.pending": { en: "The last request is waiting for a runner ({provider}).", ru: "Последний запрос ждёт исполнителя ({provider})." },
+  "agent.running": { en: "The last request is running ({provider}).", ru: "Последний запрос выполняется ({provider})." },
+  "agent.done": { en: "The last request is done ({provider}).", ru: "Последний запрос выполнен ({provider})." },
+  "agent.cancelled": { en: "The last request was cancelled.", ru: "Последний запрос отменён." },
+  "agent.failed": { en: "The last request failed ({provider}).", ru: "Последний запрос упал ({provider})." },
+  "agent.refsChanged": { en: "References were changed by hand.", ru: "Референсы менялись вручную." },
+  "agent.refsSame": { en: "References were not changed by hand.", ru: "Референсы вручную не менялись." },
+
+  "page.back": { en: "← Table {id}", ru: "← Таблица {id}" },
+  "page.uploadRef": { en: "Upload ref", ru: "Загрузить ref" },
+  "page.uploadOutput": { en: "Upload output", ru: "Загрузить output" },
+  "page.uploadApprove": { en: "Upload and approve", ru: "Загрузить и утвердить" },
+  "page.videoDone": { en: "Video is ready", ru: "Видео готово" },
+  "page.watchAgain": { en: "Watch again", ru: "Снова следить" },
+  "page.finish": { en: "Finish shot", ru: "Закончить кадр" },
+  "page.approveSelected": { en: "Approve selected", ru: "Утвердить выбранные" },
+  "page.run": { en: "Run", ru: "Запустить" },
+  "page.cloud": {
+    en: "Allow a paid send to Comfy Cloud — for one run. About {credits} credits per {seconds} s of video. This also covers Send to agent: the cloud starts after its reply.",
+    ru: "Разрешить платную отправку в Comfy Cloud — на один запуск. Около {credits} кредитов за {seconds} с видео. Действует и для «Отправить агенту»: облако запустится после его ответа.",
+  },
+  "page.input": { en: "Input", ru: "Input" },
+  "page.prompt": { en: "Prompt", ru: "Промпт" },
+  "page.promptNote": { en: "this text goes to the model", ru: "этот текст уходит в модель" },
+  "page.promptPlaceholder": {
+    en: "Text for the model, in English. Empty — send a recommendation to the agent.",
+    ru: "Текст для модели, на английском. Пусто — отправьте рекомендацию агенту.",
+  },
+  "page.speech": { en: "Lines", ru: "Реплики" },
+  "page.speechNote": { en: "verbatim · empty — they are silent", ru: "дословно · пусто — молчат" },
+  "page.speechPlaceholder": {
+    en: "What the character says aloud, verbatim. One line per row: “Katya: Mom, I'm home.” If they are silent, leave it empty.",
+    ru: "Что персонаж говорит вслух, дословно. Одна реплика на строку: «Катя: Мама, я дома.» Молчат — оставьте пустым.",
+  },
+  "page.recommendation": { en: "Recommendation", ru: "Рекомендация" },
+  "page.recommendationNote": {
+    en: "for the agent · the field clears after sending, the agent remembers every note on the shot",
+    ru: "для агента · поле очищается после отправки, агент помнит все замечания кадра",
+  },
+  "page.recommendationPlaceholder": { en: "What to change in the current prompt.", ru: "Что изменить в текущем промпте." },
+  "page.saved": { en: "Saved.", ru: "Сохранено." },
+  "page.saveFields": { en: "Save fields", ru: "Сохранить поля" },
+  "page.runLog": { en: "Run log", ru: "Журнал прогона" },
+  "page.refs": { en: "References", ru: "Референсы" },
+  "page.refsNote": { en: "files from refs/", ru: "файлы из refs/" },
+  "page.refsNoteOne": { en: "files {name}_ from refs/", ru: "файлы {name}_ из refs/" },
+  "page.refsNoteFile": { en: "Note refs.md", ru: "Заметка refs.md" },
+  "page.workflowNote": { en: "Note workflow.md (for this shot)", ru: "Заметка workflow.md (на этот кадр)" },
+  "page.playbooksEmpty": {
+    en: "No global playbooks yet — put them in /playbooks and they will show up here.",
+    ru: "Глобальные playbooks пока не добавлены — положишь их в /playbooks, и они появятся здесь.",
+  },
+  "page.edit": { en: "Edit", ru: "Править" },
+  "page.approve": { en: "Approve", ru: "Аппрув" },
+  "page.openFailed": { en: "Could not open the stage", ru: "Не удалось открыть этап" },
+  "page.editsFailed": { en: "Could not read the edits", ru: "Не удалось прочитать правки" },
+  "page.saveFailed": { en: "Could not save", ru: "Не удалось сохранить" },
+  "page.sendFailed": { en: "Not sent", ru: "Не отправлено" },
+  "page.runFailed": { en: "Not started", ru: "Не запущено" },
+  "page.workflowFailed": { en: "Could not choose the workflow", ru: "Не удалось выбрать воркфлоу" },
+  "page.durationFailed": { en: "Could not choose the duration", ru: "Не удалось выбрать длительность" },
+  "page.cancelFailed": { en: "Could not cancel", ru: "Не удалось отменить" },
+  "page.restoreFailed": { en: "Could not restore the prompt", ru: "Не удалось вернуть промпт" },
+  "page.restored": { en: "Prompt restored. The current text is kept in the version list.", ru: "Промпт возвращён. Текущий текст сохранён в списке версий." },
+  "page.uploadFailed": { en: "Upload error", ru: "Ошибка загрузки" },
+  "page.uploaded": { en: "File saved into the project: {name}", ru: "Файл сохранён в проект: {name}" },
+  "page.removeFailed": { en: "Could not remove", ru: "Не удалось убрать" },
+  "page.removedApprove": { en: "{name} removed from approve", ru: "{name} убран из approve" },
+  "page.confirmDelete": { en: "Delete {name} forever?", ru: "Удалить файл {name} навсегда?" },
+  "page.deleteFailed": { en: "Could not delete the file", ru: "Не удалось удалить файл" },
+  "page.deleted": { en: "{name} deleted from {folder}/", ru: "{name} удалён из {folder}/" },
+  "page.inputsFailed": { en: "Could not change the inputs", ru: "Не удалось изменить входы" },
+  "page.excluded": {
+    en: "{name} is out of the graph. The file stays on disk; Restore puts it back.",
+    ru: "{name} убран из графа. Файл остался на диске, «Вернуть» отдаст его снова.",
+  },
+  "page.included": { en: "{name} goes into the graph again.", ru: "{name} снова уходит в граф." },
+  "page.pickOutput": { en: "Select files in output", ru: "Выберите файлы в output" },
+  "page.approveFailed": { en: "Not approved", ru: "Не утверждено" },
+  "page.approvedPartial": {
+    en: "In approve: {names}. The stage becomes approved when every character has a file.",
+    ru: "В approve: {names}. Этап станет утверждённым, когда файл будет у каждого персонажа.",
+  },
+  "page.approved": { en: "Approved: {names}", ru: "Утверждено: {names}" },
+  "page.actionFailed": { en: "Could not save the action", ru: "Не удалось сохранить действие" },
+  "page.actionSaved": { en: "Shot action saved. The agent will use your version.", ru: "Действие кадра сохранено. Агент возьмёт вашу версию." },
+  "page.actionCleared": { en: "Shot action removed. The agent will write it again on the next send.", ru: "Действие кадра убрано. Агент напишет его заново при отправке." },
+  "page.noteFailed": { en: "Could not remove the note", ru: "Не удалось убрать замечание" },
+  "page.noteRemoved": { en: "Note removed. The agent will not see it anymore.", ru: "Замечание убрано. Агент его больше не увидит." },
+  "page.watchFailed": { en: "Could not close the shot", ru: "Не удалось закрыть кадр" },
+  "page.watchVideo": { en: "This shot already has an approved video. The agent does not take it.", ru: "У кадра уже есть утверждённое видео. Агент его не берёт." },
+  "page.watchStopped": { en: "Shot closed. The agent no longer accepts recommendations for it.", ru: "Кадр закрыт. Агент больше не принимает рекомендации по нему." },
+  "page.watchOn": { en: "The agent is watching this shot again.", ru: "Агент снова смотрит этот кадр." },
+  "page.characterFailed": { en: "Could not put the character into the graph", ru: "Не удалось поставить персонажа в граф" },
+  "page.characterPicked": { en: "{name}: the graph will use {file}", ru: "{name}: в граф пойдёт {file}" },
+  "page.rosterFailed": { en: "Could not change the characters", ru: "Не удалось изменить персонажей" },
+  "page.roster": { en: "Shot characters: {names}", ru: "Персонажи кадра: {names}" },
+  "page.nobody": { en: "Nobody in the shot", ru: "В кадре никого" },
+
+  "context.action": { en: "Shot action", ru: "Действие кадра" },
+  "context.edited": { en: " · your edit", ru: " · ваша правка" },
+  "context.stale": { en: " · updates on the next send to the agent", ru: " · обновится при следующей отправке агенту" },
+  "context.change": { en: "Edit", ru: "Изменить" },
+  "context.write": { en: "Write", ru: "Написать" },
+  "context.yours": { en: "Your version wins over the model. Empty text — the agent writes the action again.", ru: "Ваша версия важнее модели. Пустой текст — агент напишет действие заново." },
+  "context.empty": {
+    en: "The agent will write it on send: it checks the scenario against the approved location and characters.",
+    ru: "Агент напишет его при отправке: сверит сценарий с утверждёнными локацией и персонажами.",
+  },
+  "context.scenario": { en: "From the scenario", ru: "Описание из сценария" },
+  "context.writeOwn": { en: "Write your own", ru: "Написать своё" },
+  "context.notes": { en: "Notes on the shot ({n}) · the agent remembers all of them", ru: "Замечания к кадру ({n}) · агент помнит их все" },
+  "context.removeNote": { en: "Remove the note: the agent will not see it anymore", ru: "Убрать замечание: агент его больше не увидит" },
+  "context.notesRank": { en: "A later note outweighs an earlier one. Notes outweigh the scenario.", ru: "Более позднее замечание важнее раннего. Замечания важнее сценария." },
+  "context.images": { en: "What is in the approved pictures ({done} of {total} described)", ru: "Что на утверждённых картинках ({done} из {total} описано)" },
+  "context.kind.location": { en: "Location", ru: "Локация" },
+  "context.kind.character": { en: "Character", ru: "Персонаж" },
+  "context.kind.first_frame": { en: "First frame", ru: "Первый кадр" },
+  "context.describing": { en: "The model is looking at the picture…", ru: "Модель смотрит картинку…" },
+  "context.undescribed": {
+    en: "Not described yet: it describes itself within a minute, or when you send to the agent.",
+    ru: "Ещё не описано: опишется само в течение минуты или при отправке агенту.",
+  },
+
+  "graph.title": { en: "What goes into the graph", ru: "Что уйдёт в граф" },
+  "graph.board": { en: "by default, for the selected workflow", ru: "по умолчанию, при выбранном воркфлоу" },
+  "graph.agent": { en: "the agent takes these files from the playbook", ru: "агент берёт эти файлы по плейбуку" },
+  "graph.excludeNote": { en: " · Remove does not delete the file, it only keeps it out of the graph", ru: " · «Убрать» не удаляет файл, а только не отдаёт его в граф" },
+  "graph.character": { en: "Character {name}", ru: "Персонаж {name}" },
+  "graph.clothes": { en: "Clothes {name}", ru: "Одежда {name}" },
+
+  "refs.empty": { en: "refs/ has no files yet.", ru: "В refs/ пока нет файлов." },
+  "refs.role.outfit": { en: "outfit", ru: "образ" },
+  "refs.role.pose": { en: "pose", ru: "поза" },
+  "refs.role.face": { en: "face", ru: "лицо" },
+  "refs.role.file": { en: "file", ru: "файл" },
+  "refs.used": { en: " · used", ru: " · использован" },
+  "refs.openOne": { en: "{role} · {name}. The picture opens full screen.", ru: "{role} · {name}. Картинка открывается на весь экран." },
+  "refs.usedList": { en: "Used: {names}.", ru: "Использованы: {names}." },
+  "refs.hint": { en: "The name under the picture selects the file. The picture itself opens full screen.", ru: "Имя под картинкой выделяет файл. Сама картинка открывается на весь экран." },
+
+  "history.title": { en: "Previous prompt versions", ru: "Прошлые версии промпта" },
+  "history.count": { en: "Previous prompt versions ({n})", ru: "Прошлые версии промпта ({n})" },
+  "history.current": { en: "This is the current prompt. The next saved edit leaves it in the list, and you can restore it.", ru: "Это текущий промпт. Следующая сохранённая правка оставит его в списке, и его можно будет вернуть." },
+  "history.empty": { en: "(empty prompt)", ru: "(пустой промпт)" },
+  "history.restore": { en: "Restore", ru: "Вернуть" },
+
+  "source.button": { en: "Add a reference from…", ru: "Добавить референс из…" },
+  "source.label": { en: "Add a reference", ru: "Добавить референс" },
+  "source.lead": {
+    en: "The file is copied into refs/. The original stays where it is. A double click adds it at once; several — tick them and use the button below.",
+    ru: "Файл копируется в refs/. Исходник остаётся на месте. Двойной щелчок добавляет сразу, несколько — галками и кнопкой внизу.",
+  },
+  "source.empty": { en: "Nothing to add.", ru: "Нечего добавить." },
+  "source.add": { en: "Add selected", ru: "Добавить выбранные" },
+  "source.addN": { en: "Add selected ({n})", ru: "Добавить выбранные ({n})" },
+  "source.readFailed": { en: "Could not read the sources", ru: "Не удалось прочитать источники" },
+  "source.addFailed": { en: "Could not add the reference", ru: "Не удалось добавить референс" },
+  "source.group.charactersShot": { en: "Characters in the shot", ru: "Персонажи кадра" },
+  "source.group.charactersRest": { en: "Other characters", ru: "Остальные персонажи" },
+  "source.group.locations": { en: "Locations", ru: "Локации" },
+  "source.group.shared": { en: "Shared pictures", ru: "Общие картинки" },
+  "source.group.other": { en: "Same stage, other shots", ru: "Тот же этап, другие кадры" },
+  "source.group.stage": { en: "{stage} of this shot", ru: "{stage} этого кадра" },
+
+  "prev.ref": { en: "Add from the previous shot", ru: "Добавить из предыдущего кадра" },
+  "prev.refFailed": { en: "Could not add from the previous shot", ru: "Не удалось добавить из предыдущего кадра" },
+  "prev.shots": { en: "Add from shots", ru: "Добавить из кадров" },
+  "prev.shotsLabel": { en: "Add from shots", ru: "Добавить из кадров" },
+  "prev.lead": {
+    en: "Approved character pictures from previous shots. The file is copied into this shot's approve/.",
+    ru: "Утверждённые картинки персонажей из предыдущих кадров. Файл копируется в approve/ этого кадра.",
+  },
+  "prev.empty": { en: "Previous shots have no approved pictures.", ru: "В предыдущих кадрах нет утверждённых картинок." },
+  "prev.readFailed": { en: "Could not read previous shots", ru: "Не удалось прочитать прошлые кадры" },
+  "prev.addFailed": { en: "Could not add from the shots", ru: "Не удалось добавить из кадров" },
+
+  "media.delete": { en: "Delete {name} forever", ru: "Удалить {name} навсегда" },
+  "media.deleteTitle": { en: "Delete the file forever", ru: "Удалить файл навсегда" },
+  "media.restoreTitle": { en: "Send this file into the graph again", ru: "Снова отдавать этот файл в граф" },
+  "media.excludeTitle": { en: "Keep this file out of the graph. It is not deleted from disk", ru: "Не отдавать файл в граф. С диска он не удаляется" },
+  "media.restore": { en: "Restore", ru: "Вернуть" },
+  "media.remove": { en: "Remove", ru: "Убрать" },
+  "media.excluded": { en: "out of the graph", ru: "убран из графа" },
+  "media.edit": { en: "Edit", ru: "Править" },
+  "media.open": { en: "Open {name} full screen", ru: "Открыть {name} на весь экран" },
+  "media.approveOne": { en: "Approve this variant", ru: "Утвердить этот вариант" },
+
+  "output.noneApproved": { en: "Nothing approved yet", ru: "Ещё ничего не утверждено" },
+  "output.hint": {
+    en: "The file name selects a variant. References for this character stay on the left. The picture opens full screen, with the prompt and seed ComfyUI used.",
+    ru: "Имя файла выделяет вариант. Слева остаются референсы этого персонажа. Картинка открывается на весь экран, там же — промпт и seed, с которыми её сделал ComfyUI.",
+  },
+  "output.empty": { en: "No variants yet", ru: "Вариантов пока нет" },
+  "output.characters": {
+    en: "Tick a file name in output and press Approve selected. For a character the file is saved as {pattern}",
+    ru: "Отметьте имя файла в output и нажмите «Утвердить выбранные». Для персонажа файл встанет как {pattern}",
+  },
+  "output.expected": { en: " · expected: {names}", ru: " · ожидаются: {names}" },
+  "output.one": { en: "approve for this stage keeps one chosen file.", ru: "В approve для этого этапа хранится один выбранный файл." },
+  "output.crop": { en: "crop of {from}", ru: "обрезка из {from}" },
+  "output.edit": { en: "edit of {from}", ru: "правка из {from}" },
+
+  "loc.library": { en: "From the library", ru: "Из библиотеки" },
+  "loc.libraryLabel": { en: "Locations from the library", ru: "Локации из библиотеки" },
+  "loc.libraryLead": { en: "data/locations/ — the shared view goes into refs/ and becomes a graph input.", ru: "data/locations/ — общий вид ляжет в refs/ и станет входом графа." },
+  "loc.libraryEmpty": { en: "data/locations/ has no folders.", ru: "В data/locations/ нет папок." },
+  "loc.noImage": { en: "{id}: no picture", ru: "{id}: нет картинки" },
+  "loc.none": { en: "none", ru: "нет" },
+  "loc.writeShot": { en: "Write into the shot (location in shot.md)", ru: "Записать в кадр (location в shot.md)" },
+  "loc.readFailed": { en: "Could not read the library", ru: "Не удалось прочитать библиотеку" },
+  "loc.takeFailed": { en: "Could not take the location", ru: "Не удалось взять локацию" },
+  "loc.shot": { en: "Shot location", ru: "Локация кадра" },
+  "loc.shotNote": { en: "folder name in data/locations/. The choice only changes the line in shot.md.", ru: "имя папки в data/locations/. Выбор меняет только строку в shot.md." },
+  "loc.pickLabel": { en: "Location from the library", ru: "Локация из библиотеки" },
+  "loc.missingFolder": { en: "{id} — no such folder", ru: "{id} — нет такой папки" },
+  "loc.unset": { en: "not set", ru: "не задана" },
+  "loc.create": { en: "Create a location", ru: "Создать локацию" },
+  "loc.noLocations": { en: "data/locations/ has no locations.", ru: "В data/locations/ нет локаций." },
+  "loc.newName": { en: "Name of the new location", ru: "Имя новой локации" },
+  "loc.createDo": { en: "Create", ru: "Создать" },
+  "loc.createHint": { en: "An empty folder. The name is latin letters, digits, _ and -. Put the picture in yourself.", ru: "Пустая папка. Имя — латиница, цифры, _ и -. Картинку положите в неё сами." },
+  "loc.readListFailed": { en: "Could not read locations", ru: "Не удалось прочитать локации" },
+  "loc.changeFailed": { en: "Could not change the location", ru: "Не удалось сменить локацию" },
+  "loc.changed": { en: "Shot location: {name}", ru: "Локация кадра: {name}" },
+  "loc.createFailed": { en: "Could not create the location", ru: "Не удалось создать локацию" },
+  "loc.switchFailed": { en: "The folder was created, but the shot was not switched", ru: "Папка создана, но кадр не переключён" },
+  "loc.created": { en: "Location {name} was created and written into the shot", ru: "Локация {name} создана и записана в кадр" },
+
+  "edit.title": { en: "Edit · {name}", ru: "Править · {name}" },
+  "edit.lead": { en: "The original does not change. A new file appears in output/.", ru: "Исходник не меняется. Новый файл появится в output/." },
+  "edit.free": { en: "Free", ru: "Свободно" },
+  "edit.source": { en: "Match the source", ru: "Как у исходника" },
+  "edit.corner": { en: "Drag a corner of the frame", ru: "Потянуть угол рамки" },
+  "edit.saving": { en: "Saving…", ru: "Сохраняю…" },
+  "edit.saveCrop": { en: "Save crop", ru: "Сохранить обрезку" },
+  "edit.enhance": { en: "Enhance", ru: "Улучшение" },
+  "edit.enhanceLead": {
+    en: "An empty field only touches texture and small detail; objects, light and camera stay as they are. If you write a request, Haiku builds the prompt: that request first, then everything else. The camera does not move. Haiku does not look at the picture. If the frame is not the whole picture, the crop is saved first and the enhance runs on it.",
+    ru: "Пустое поле — только текстуры и мелкие детали, объекты, свет и камера как есть. Если написать просьбу, Haiku соберёт промпт: сначала она, потом всё остальное. Камеру не двигаем. Картинку Haiku не смотрит. Если рамка не на весь кадр, обрезка сохраняется сама, и улучшение идёт по ней.",
+  },
+  "edit.what": { en: "What to change", ru: "Что изменить" },
+  "edit.placeholder": {
+    en: "Empty — enhance as it is. Or: remove the cup, make it night, add rain",
+    ru: "Пусто — улучшить как есть. Или: убрать чашку, сделать ночь, добавить дождь",
+  },
+  "edit.mp": { en: "Megapixels of the new file", ru: "Мегапиксели нового файла" },
+  "edit.mpHint": { en: "The graph uses {n}. An empty field keeps that number.", ru: "В графе {n}. Пустое поле оставляет это число." },
+  "edit.workflow": { en: "Workflow", ru: "Воркфлоу" },
+  "edit.noWorkflow": { en: "No edit workflow", ru: "Нет воркфлоу правки" },
+  "edit.queueing": { en: "Queuing…", ru: "Ставлю в очередь…" },
+  "edit.apply": { en: "Apply enhance", ru: "Применить улучшение" },
+  "edit.notLoaded": { en: "The picture has not loaded yet", ru: "Картинка ещё не загрузилась" },
+  "edit.noCanvas": { en: "The browser did not provide a canvas", ru: "Браузер не отдал холст" },
+  "edit.emptyCrop": { en: "Empty crop", ru: "Пустая обрезка" },
+  "edit.cropFailed": { en: "Could not save the crop", ru: "Не удалось сохранить обрезку" },
+  "edit.cropSaved": { en: "Crop saved.", ru: "Обрезка сохранена." },
+  "edit.mpRange": { en: "Megapixels: a number from 0.1 to 16", ru: "Мегапиксели: число от 0.1 до 16" },
+  "edit.queueFailed": { en: "Could not queue the edit", ru: "Не удалось поставить правку" },
+  "edit.queued": { en: "Edit queued.", ru: "Правка в очереди." },
+
+  "light.prompt": { en: "Prompt and seed", ru: "Промпт и seed" },
+  "light.reading": { en: "Reading the file…", ru: "Читаю файл…" },
+  "light.unread": { en: "The file could not be read.", ru: "Файл не прочитан." },
+  "light.noGraph": { en: "The file has no ComfyUI graph.", ru: "В файле нет графа ComfyUI." },
+  "light.node": { en: "node", ru: "нода" },
+  "light.noText": { en: "The graph has no prompt text.", ru: "Текстов промпта в графе нет." },
+  "light.close": { en: "Close", ru: "Закрыть" },
+
+  "doc.optional": { en: "optional", ru: "необязательно" },
+  "doc.conflict": { en: "The file changed on disk — pull it in?", ru: "Файл изменился на диске — подтянуть?" },
+  "doc.pull": { en: "Pull", ru: "Подтянуть" },
+  "doc.keep": { en: "Keep mine", ru: "Оставить моё" },
+  "doc.dirty": { en: "Changed, not saved.", ru: "Изменено, не сохранено." },
+
+  "pick.output": { en: "From output", ru: "Из output" },
+  "pick.ref": { en: "From a reference", ru: "Из референса" },
+  "pick.prev": { en: "From the previous shot", ru: "Из предыдущего кадра" },
+  "pick.first": { en: "This is the first shot", ru: "Это первый кадр" },
+  "pick.shot": { en: "Shot {id}", ru: "Кадр {id}" },
+  "pick.noOutput": { en: "output/ of this shot has no pictures.", ru: "В output/ этого кадра нет картинок." },
+  "pick.noRefs": { en: "refs/ has no pictures.", ru: "В refs/ нет картинок." },
+  "pick.noPrev": { en: "Shot {id} has no character pictures.", ru: "В кадре {id} нет картинок персонажей." },
+
+  "roster.title": { en: "Characters in the shot", ru: "Персонажи кадра" },
+  "roster.note": {
+    en: "click a name — the references above become theirs. Untick to take them out of the shot; files stay on disk.",
+    ru: "нажмите имя — референсы выше станут его. Снять галку — убрать из кадра, файлы на диске остаются.",
+  },
+  "roster.remove": { en: "Remove {name}", ru: "Убрать {name}" },
+  "roster.confirm": { en: "Remove {name} from the shot? Files in refs/ stay.", ru: "Убрать {name} из кадра? Файлы в refs/ останутся." },
+  "roster.editing": { en: "editing", ru: "редактируется" },
+  "roster.empty": { en: "Nobody in the shot. Add a name from the library.", ru: "В кадре никого. Добавьте имя из библиотеки." },
+  "roster.add": { en: "Add", ru: "Добавить" },
+  "roster.pick": { en: "Name from the library", ru: "Имя из библиотеки" },
+  "roster.choose": { en: "Choose a name", ru: "Выберите имя" },
+  "roster.noLibrary": { en: "data/characters/ has no characters.", ru: "В data/characters/ нет персонажей." },
+  "roster.hint": {
+    en: "This character's picture is chosen above, in What goes into the graph. Clothes — the file {name}_clothes. Prompt — the section ## {name}.",
+    ru: "Картинку этого персонажа выбирают выше, в «Что уйдёт в граф». Одежда — файл {name}_clothes. Промпт — раздел ## {name}.",
+  },
+  "roster.readFailed": { en: "Could not read the characters", ru: "Не удалось прочитать персонажей" },
+
+  "post.title": { en: "Post", ru: "Пост" },
+  "post.voiceTitle": { en: "Voice and the DaVinci project", ru: "Озвучка и проект DaVinci" },
+  "post.voiceLead": {
+    en: "Lines come from the Lines of each shot (speech.md). One voice file per character holds all of their lines — the voice does not change between phrases. On the timeline each line is a slice of that file, and the clip edge in Resolve can be dragged.",
+    ru: "Реплики берутся из «Реплик» кадров (speech.md). Один файл озвучки на персонажа со всеми его репликами — голос не меняется между фразами. В таймлайне каждая реплика — отрезок этого файла, край клипа в Resolve можно потянуть.",
+  },
+  "post.voices": { en: "Voices", ru: "Голоса" },
+  "post.noLines": { en: "No lines: fill in Lines on the preview or final stages of the shots.", ru: "Реплик нет: заполните «Реплики» на этапах превью или финала кадров." },
+  "post.lineCount": { en: "lines: {n}", ru: "реплик: {n}" },
+  "post.noVoiceFile": { en: "no voice.json", ru: "нет voice.json" },
+  "post.version": { en: "voice v{n}", ru: "озвучка v{n}" },
+  "post.pending": { en: ", without a current voice: {n}", ru: ", без актуальной озвучки: {n}" },
+  "post.unvoiced": { en: "not voiced", ru: "не озвучен" },
+  "post.isolated": { en: "cleaned", ru: "очищен" },
+  "post.isolateFailed": { en: "cleaning failed", ru: "очистка не удалась" },
+  "post.notIsolated": { en: "not cleaned", ru: "не очищен" },
+  "post.versionTitle": { en: "Which voice version goes on the timeline", ru: "Какая версия озвучки идёт в таймлайн" },
+  "post.chars": { en: "{n} ch.", ru: "{n} симв." },
+  "post.voice": { en: "Voice", ru: "Голос" },
+  "post.setVoice": { en: "Set voice", ru: "Задать голос" },
+  "post.voiceSaved": { en: "Voice {name} saved", ru: "Голос {name} сохранён" },
+  "post.allowPaid": { en: "Allow a paid send to ElevenLabs", ru: "Разрешить платную отправку в ElevenLabs" },
+  "post.chosen": { en: "{names}: {chars} characters{extra}", ru: "{names}: {chars} символов{extra}" },
+  "post.chosenExtra": { en: " + ≈{n} credits for cleaning", ru: " + ≈{n} кредитов на очистку" },
+  "post.pickCharacters": { en: "Tick the characters", ru: "Отметьте персонажей" },
+  "post.regenerate": { en: "Regenerate", ru: "Перегенерировать" },
+  "post.speak": { en: "Voice", ru: "Озвучить" },
+  "post.cleanTitle": { en: "Voice Isolator on the current voice: {names}, ≈{n} credits", ru: "Voice Isolator по текущей озвучке: {names}, ≈{n} кредитов" },
+  "post.clean": { en: "Clean voice (≈{n})", ru: "Очистить голос (≈{n})" },
+  "post.noKey": { en: "No ELEVENLABS_API_KEY in .env.local — add the key and restart the board.", ru: "Нет ELEVENLABS_API_KEY в .env.local — впишите ключ и перезапустите доску." },
+  "post.speechTitle": { en: "Speech in the shots — for the lips", ru: "Речь в кадрах — под губы" },
+  "post.speechLead": {
+    en: "Build project first recognizes (Whisper, local ComfyUI, free) where each line is spoken in the shot's final. The voice is placed there and sped up or slowed to the speech in the video (from {range}, pitch stays). Shots already recognized are not recognized again until the final is replaced.",
+    ru: "«Собрать проект» сначала распознаёт (Whisper, локальный ComfyUI, бесплатно), где в финале кадра звучит каждая реплика. Озвучка ставится на это место и ускоряется или замедляется до длины речи в видео (от {range}, тон не меняется). Уже распознанные кадры повторно не распознаются, пока не заменён финал.",
+  },
+  "post.speedRange": { en: "0.8× to 1.35×", ru: "0.8× до 1.35×" },
+  "post.again": { en: "again", ru: "заново" },
+  "speech.none": { en: "not recognized", ru: "не распознан" },
+  "speech.queued": { en: "in the queue", ru: "в очереди" },
+  "speech.running": { en: "recognizing", ru: "распознаётся" },
+  "speech.done": { en: "done", ru: "готово" },
+  "speech.error": { en: "error", ru: "ошибка" },
+  "speech.stale": { en: "final replaced", ru: "финал заменён" },
+  "voice.no": { en: "no voice", ru: "нет озвучки" },
+  "voice.stale": { en: "the text changed — generate again", ru: "текст изменился — перегенерировать" },
+  "voice.noName": { en: "no name in speech.md", ru: "нет имени в speech.md" },
+  "post.lines": { en: "Lines", ru: "Реплики" },
+  "post.linesLead": {
+    en: "Place is the second from the start of the shot where speech begins: by the lips (if speech was recognized), otherwise by pauses or in order. Lips is where the line is spoken in the video. Speed is how many times faster the clip plays (auto — to the lips). Start and End shift the slice edges, in seconds (minus — earlier). Edits survive regeneration until the line text changes.",
+    ru: "«Место» — секунда от начала кадра, где начинается речь: по губам (если речь распознана), иначе по паузам или подряд. «Губы» — где реплику произносят в видео. «Скорость» — во сколько раз быстрее звучит клип (авто — под губы). «Начало» и «Конец» — сдвиг границ отрезка, секунды (минус — раньше). Правки переживают перегенерацию, пока текст реплики не изменился.",
+  },
+  "post.col.n": { en: "#", ru: "№" },
+  "post.col.shot": { en: "Shot", ru: "Кадр" },
+  "post.col.character": { en: "Character", ru: "Персонаж" },
+  "post.col.text": { en: "Text", ru: "Текст" },
+  "post.col.at": { en: "Place", ru: "Место" },
+  "post.col.lips": { en: "Lips", ru: "Губы" },
+  "post.col.speed": { en: "Speed", ru: "Скорость" },
+  "post.col.in": { en: "Start", ru: "Начало" },
+  "post.col.out": { en: "End", ru: "Конец" },
+  "post.col.audio": { en: "Audio", ru: "Звук" },
+  "post.atTitle": { en: "Seconds from the start of the shot", ru: "Секунды от начала кадра" },
+  "post.autoAt": { en: "Restore the automatic place", ru: "Вернуть авто-место" },
+  "post.auto": { en: "auto", ru: "авто" },
+  "post.speedTitle": { en: "How many times faster (1 — as recorded)", ru: "Во сколько раз быстрее (1 — как есть)" },
+  "post.autoSpeed": { en: "Restore the automatic speed", ru: "Вернуть авто-скорость" },
+  "post.clamped": { en: "Needs {n}× — hit the limit", ru: "Нужно {n}× — упёрлось в предел" },
+  "post.fit": { en: "Fitted to the lips", ru: "Подогнано под губы" },
+  "post.needs": { en: "needs {n}×", ru: "нужно {n}×" },
+  "post.lips": { en: "lips", ru: "губы" },
+  "post.trimIn": { en: "Shift the start of the slice, seconds", ru: "Сдвиг начала отрезка, секунды" },
+  "post.trimOut": { en: "Shift the end of the slice, seconds", ru: "Сдвиг конца отрезка, секунды" },
+  "post.play": { en: "▶ {n} s", ru: "▶ {n} с" },
+  "post.kdenlive": { en: "Kdenlive project", ru: "Проект Kdenlive" },
+  "post.frame": { en: "Frame", ru: "Кадр" },
+  "post.buildingSpeech": { en: "Recognizing speech…", ru: "Распознаю речь…" },
+  "post.building": { en: "Building…", ru: "Собираю…" },
+  "post.build": { en: "Build project", ru: "Собрать проект" },
+  "post.openKdenlive": { en: "Open in Kdenlive", ru: "Открыть в Kdenlive" },
+  "post.download": { en: "Download {name}", ru: "Скачать {name}" },
+  "post.fcpxml": { en: "FCPXML for Resolve", ru: "FCPXML для Resolve" },
+  "post.openPath": { en: "Open this file in Kdenlive: File → Open", ru: "Откройте этот файл в Kdenlive: File → Open" },
+  "post.kdenliveHelp": {
+    en: "Kdenlive: File → Open, choose the .kdenlive (better via the path above — voice and shot files are taken from there). Tracks: Shots — finals in order; a track per character; at the bottom Final audio (off) to check against the lips. Free, local.",
+    ru: "Kdenlive: File → Open, выбрать .kdenlive (лучше по пути выше — файлы озвучки и кадров берутся оттуда). Дорожки: «Кадры» — финалы подряд; дорожка на персонажа; внизу «Звук финалов (выкл.)» для сверки с губами. Бесплатно, локально.",
+  },
+  "post.older": { en: " Older versions: {names}.", ru: " Прошлые версии: {names}." },
+  "post.musicOn": {
+    en: "Music: {files} — goes on the Music track when you Add subtitles: looping to the end, quieter where speech plays in the edited project (Volume, edited in Kdenlive).",
+    ru: "Музыка: {files} — ляжет в дорожку «Музыка» при «Добавить субтитры»: по кругу до конца, тише там, где в отредактированном проекте звучит речь (эффект Volume, правится в Kdenlive).",
+  },
+  "post.musicOff": {
+    en: "Music: put a file (mp3, wav, flac, m4a, ogg) in {dir} — Add subtitles puts it on the project's Music track.",
+    ru: "Музыка: положите файл (mp3, wav, flac, m4a, ogg) в {dir} — «Добавить субтитры» положит её в дорожку «Музыка» проекта.",
+  },
+  "post.skip": { en: "{id}: not on the timeline — {reason}", ru: "{id}: не в таймлайне — {reason}" },
+  "post.subs": { en: "Subtitles and render", ru: "Субтитры и рендер" },
+  "post.subsLead": {
+    en: "Takes the latest Kdenlive project (as you edited it), pulls the audio out, Whisper finds each word, subtitles are one word at a time, text from the lines, style from {style}. Subtitles are inserted into the project (a copy from before the edit is kept beside it), then a render: 720×1280, 24 fps, H.264 1.6 Mbit/s. Free, local.",
+    ru: "Берёт последний проект Kdenlive (как вы его отредактировали), достаёт из него звук, Whisper находит каждое слово, субтитры — по одному слову, текст из реплик, стиль из {style}. Субтитры вставляются в проект (копия до правки сохраняется рядом), потом рендер: 720×1280, 24 fps, H.264 1.6 Мбит/с. Бесплатно, локально.",
+  },
+  "post.subsWarn": {
+    en: "Before you start, save the project in Kdenlive and close it — otherwise the next save in Kdenlive will overwrite the subtitles.",
+    ru: "Перед запуском сохраните проект в Kdenlive и закройте его — иначе Kdenlive при следующем сохранении затрёт субтитры.",
+  },
+  "post.project": { en: "Project: {name}", ru: "Проект: {name}" },
+  "post.noStyle": { en: "No style file — subtitles will be plain white.", ru: "Нет файла стиля — субтитры будут простым белым шрифтом." },
+  "post.subbing": { en: "Making subtitles…", ru: "Делаю субтитры…" },
+  "post.addSubs": { en: "Add subtitles", ru: "Добавить субтитры" },
+  "post.subFailed": { en: "Did not work: {error}", ru: "Не получилось: {error}" },
+  "post.subErrorWord": { en: "error", ru: "ошибка" },
+  "post.subDone": { en: "Done: {n} words in the subtitles", ru: "Готово: {n} слов в субтитрах" },
+  "post.subMissing": { en: " (Whisper did not hear: {words} — the time was placed between the neighbors)", ru: " (Whisper не услышал: {words} — время поставлено между соседями)" },
+  "post.subMusic": { en: ", music: {names}", ru: ", музыка: {names}" },
+  "post.subMusicNote": { en: ". Music was not added: {note}", ru: ". Музыка не добавлена: {note}" },
+  "post.subReopen": { en: ". The project was updated — open it in Kdenlive again. Copy from before the edit: {backup}.", ru: ". Проект обновлён — откройте его в Kdenlive заново. Копия до правки: {backup}." },
+  "post.subRunning": { en: "Working: {progress}", ru: "Идёт: {progress}" },
+  "post.subStart": { en: "start", ru: "начало" },
+  "post.opening": { en: "Opening in Kdenlive: {project}", ru: "Открываю в Kdenlive: {project}" },
+  "post.built": { en: "Built {name}: {n} lines", ru: "Собран {name}: реплик {n}" },
+
+  "post.job.isolate": { en: "Voice cleaning", ru: "Очистка голоса" },
+  "post.job.voice": { en: "Voice", ru: "Озвучка" },
+  "post.job.queued": { en: "{what} queued…", ru: "{what} поставлена…" },
+  "post.job.running": { en: "{what} in progress: {progress}", ru: "{what} идёт: {progress}" },
+  "post.job.eleven": { en: "requests to ElevenLabs", ru: "запросы в ElevenLabs" },
+  "post.job.failed": { en: "{what} failed: {error}", ru: "{what} не удалась: {error}" },
+  "post.job.errorWord": { en: "error", ru: "ошибка" },
+  "post.job.isolateCost": { en: "≈{n} credits", ru: "≈{n} кредитов" },
+  "post.job.voiceCost": { en: "{chars} characters{extra}", ru: "{chars} символов{extra}" },
+  "post.job.voiceCostExtra": { en: " + ≈{n} for cleaning", ru: " + ≈{n} за очистку" },
+  "post.job.isolated": { en: "Cleaned: {versions} ({cost})", ru: "Очищено: {versions} ({cost})" },
+  "post.job.voiced": { en: "Voiced: {versions} ({cost})", ru: "Озвучено: {versions} ({cost})" },
+  "post.job.isolateMiss": {
+    en: "{done}. Cleaning failed for {who} — the project keeps the original audio",
+    ru: "{done}. Очистка не удалась у {who} — в проекте исходный звук",
+  },
+
+  "voice.voiceId": { en: "voice_id (from ElevenLabs → Voices)", ru: "voice_id (из ElevenLabs → Voices)" },
+  "voice.prefix": {
+    en: "Tag before each phrase (v3 audio tag; it does not go into the line text or the subtitles; empty — no tag)",
+    ru: "Тег перед каждой фразой (аудиотег v3; в текст реплик и субтитры не попадает; пусто — без тега)",
+  },
+  "voice.isolate": {
+    en: "Clean the voice with Voice Isolator after voicing (removes noise and crackle; ≈1000 credits per minute of audio)",
+    ru: "Очищать голос через Voice Isolator после озвучки (убирает шум и треск; ≈1000 кредитов за минуту звука)",
+  },
+  "voice.seed": { en: "seed (the same voice on a repeat)", ru: "seed (тот же голос при повторе)" },
+  "voice.save": { en: "Save voice", ru: "Сохранить голос" },
+  "voice.savedTo": { en: "Written to data/characters/{name}/voice.json, shared by every episode.", ru: "Пишется в data/characters/{name}/voice.json, общий для всех эпизодов." },
+} satisfies Record<string, Entry>;
+
+export type MessageKey = keyof typeof messages;
+export type Vars = Record<string, string | number>;
+export type Translate = (key: MessageKey, vars?: Vars) => string;
+
+export function t(lang: Lang, key: MessageKey, vars?: Vars): string {
+  const entry = messages[key];
+  const text = entry[lang] || entry[DEFAULT_LANG];
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (token, name: string) => {
+    const value = vars[name];
+    return value === undefined ? token : String(value);
+  });
+}
+
+const STAGE_KEY: Record<StageId, MessageKey> = {
+  characters: "stage.characters",
+  location: "stage.location",
+  first_frame: "stage.first_frame",
+  video_preview: "stage.video_preview",
+  final_render: "stage.final_render",
+};
+
+const STATUS_KEY: Record<StageStatus, MessageKey> = {
+  empty: "status.empty",
+  prep: "status.prep",
+  agent: "status.agent",
+  queued: "status.queued",
+  running: "status.running",
+  error: "status.error",
+  review: "status.review",
+  approved: "status.approved",
+};
+
+export function stageName(tr: Translate, id: string): string {
+  const key = STAGE_KEY[id as StageId];
+  return key ? tr(key) : id;
+}
+
+export function statusName(tr: Translate, id: string): string {
+  const key = STATUS_KEY[id as StageStatus];
+  return key ? tr(key) : id;
+}
+
+export function providerName(tr: Translate, id: string, fallback?: string | null): string {
+  if (id === "manual") return tr("provider.manual");
+  if (id === "ollama") return tr("provider.ollama");
+  if (id === "claude") return tr("provider.claude");
+  return fallback || id;
+}
+
+const REASON_KEY: Record<string, MessageKey> = {
+  недоступен: "provider.unavailable",
+  "не умеет работать с файлами этого этапа": "provider.noFiles",
+  "не умеет этот режим": "provider.noMode",
+  "В Ollama нет ни одной модели": "provider.ollamaEmpty",
+  "Проверка упала": "provider.checkFailed",
+  "Для Ollama не выбрана модель": "provider.ollamaNoModel",
+};
+
+/** Известные причины из списка агентов. Неизвестный текст сервера остаётся как есть. */
+export function providerReason(tr: Translate, reason: string): string {
+  const key = REASON_KEY[reason];
+  if (key) return tr(key);
+  const down = /^Ollama не отвечает: (.+)$/.exec(reason);
+  if (down) return tr("provider.ollamaDown", { url: down[1] });
+  const status = /^Ollama ответил (\d+)$/.exec(reason);
+  if (status) return tr("provider.ollamaStatus", { status: status[1] });
+  const missing = /^Не найден (.+)\. Путь к CLI задаётся FRAMEBOARD_CLAUDE_BIN$/.exec(reason);
+  if (missing) return tr("provider.claudeMissing", { bin: missing[1] });
+  return reason;
+}
+
+/** Подписи «Персонаж / Одежда», которые доска собирает сама. Остальные подписи входов — как пришли. */
+export function graphInputLabel(tr: Translate, label: string): string {
+  const character = /^Персонаж (.+)$/.exec(label);
+  if (character) return tr("graph.character", { name: character[1] });
+  const clothes = /^Одежда (.+)$/.exec(label);
+  if (clothes) return tr("graph.clothes", { name: clothes[1] });
+  return label;
+}
+
+export function clockLocale(lang: Lang): string {
+  return lang === "ru" ? "ru-RU" : "en-GB";
+}

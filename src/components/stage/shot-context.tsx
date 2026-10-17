@@ -1,14 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
+import { stageName } from "@/lib/i18n";
 import type { StageDetail } from "@/lib/series/types";
-
-const KIND_LABELS = {
-  location: "Локация",
-  character: "Персонаж",
-  first_frame: "Первый кадр",
-} as const;
 
 function time(at: string): string {
   return at.slice(0, 16).replace("T", " ");
@@ -32,6 +28,7 @@ export function ShotContext({
   // Старый сервер (до перезапуска) этих полей не отдаёт.
   const context = detail.shotContext ?? null;
   const notes = detail.notes ?? [];
+  const t = useT();
   const [editing, setEditing] = useState<string | null>(null);
   const scenario = detail.shotSummary.trim();
   const action = context?.action.trim() ?? "";
@@ -43,9 +40,9 @@ export function ShotContext({
         <div className="rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs font-medium text-teal-900">
-              Действие кадра
-              {context.actionEditedByUser ? " · ваша правка" : ""}
-              {context.action && context.actionStale ? " · обновится при следующей отправке агенту" : ""}
+              {t("context.action")}
+              {context.actionEditedByUser ? t("context.edited") : ""}
+              {context.action && context.actionStale ? t("context.stale") : ""}
             </div>
             {editing === null ? (
               <button
@@ -54,7 +51,7 @@ export function ShotContext({
                 disabled={disabled}
                 onClick={() => setEditing(context.action)}
               >
-                {context.action ? "Изменить" : "Написать"}
+                {context.action ? t("context.change") : t("context.write")}
               </button>
             ) : null}
           </div>
@@ -74,28 +71,26 @@ export function ShotContext({
                     setEditing(null);
                   }}
                 >
-                  Сохранить
+                  {t("common.save")}
                 </Button>
                 <Button size="sm" variant="outline" disabled={disabled} onClick={() => setEditing(null)}>
-                  Отмена
+                  {t("common.cancel")}
                 </Button>
               </div>
-              <p className="text-xs text-stone-500">
-                Ваша версия важнее модели. Пустой текст — агент напишет действие заново.
-              </p>
+              <p className="text-xs text-stone-500">{t("context.yours")}</p>
             </div>
           ) : context.action ? (
             <p className="mt-1 whitespace-pre-wrap text-sm text-stone-800">{context.action}</p>
           ) : (
             <p className="mt-1 text-xs text-stone-500">
-              Агент напишет его при отправке: сверит сценарий с утверждёнными локацией и персонажами.
+              {t("context.empty")}
             </p>
           )}
         </div>
       ) : scenario ? (
         <div className="rounded-lg bg-stone-50 px-3 py-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-medium text-stone-600">Описание из сценария</div>
+            <div className="text-xs font-medium text-stone-600">{t("context.scenario")}</div>
             {context ? (
               <button
                 type="button"
@@ -103,7 +98,7 @@ export function ShotContext({
                 disabled={disabled}
                 onClick={() => setEditing("")}
               >
-                Написать своё
+                {t("context.writeOwn")}
               </button>
             ) : null}
           </div>
@@ -113,20 +108,20 @@ export function ShotContext({
 
       {notes.length ? (
         <details className="text-xs text-stone-500">
-          <summary className="cursor-pointer">Замечания к кадру ({notes.length}) · агент помнит их все</summary>
+          <summary className="cursor-pointer">{t("context.notes", { n: notes.length })}</summary>
           <ol className="mt-2 space-y-1">
             {notes.map((note) => (
               <li key={note.id} className="flex items-start gap-2 rounded-lg bg-stone-50 px-3 py-1.5">
                 <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-stone-700">
                   <span className="text-stone-500">
-                    {note.stageLabel} · {time(note.at)}:
+                    {stageName(t, note.stageId)} · {time(note.at)}:
                   </span>{" "}
                   {note.message}
                 </span>
                 <button
                   type="button"
                   className="shrink-0 text-stone-400 hover:text-red-700 disabled:opacity-50"
-                  title="Убрать замечание: агент его больше не увидит"
+                  title={t("context.removeNote")}
                   disabled={disabled}
                   onClick={() => onDeleteNote(note.id)}
                 >
@@ -135,25 +130,33 @@ export function ShotContext({
               </li>
             ))}
           </ol>
-          <p className="mt-1">Более позднее замечание важнее раннего. Замечания важнее сценария.</p>
+          <p className="mt-1">{t("context.notesRank")}</p>
         </details>
       ) : null}
 
       {context?.images.length ? (
         <details className="text-xs text-stone-500">
           <summary className="cursor-pointer">
-            Что на утверждённых картинках ({context.images.filter((item) => item.text).length} из{" "}
-            {context.images.length} описано)
+            {t("context.images", {
+              done: context.images.filter((item) => item.text).length,
+              total: context.images.length,
+            })}
           </summary>
           <ul className="mt-2 space-y-2">
             {context.images.map((item) => (
               <li key={`${item.kind}-${item.name}`} className="rounded-lg bg-stone-50 px-3 py-2">
                 <div className="font-medium text-stone-600">
-                  {KIND_LABELS[item.kind]}
+                  {t(
+                    item.kind === "location"
+                      ? "context.kind.location"
+                      : item.kind === "character"
+                        ? "context.kind.character"
+                        : "context.kind.first_frame",
+                  )}
                   {item.subject ? ` ${item.subject}` : ""} · <code>{item.name}</code>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-stone-700">
-                  {item.text ?? (item.describing ? "Модель смотрит картинку…" : "Ещё не описано: опишется само в течение минуты или при отправке агенту.")}
+                  {item.text ?? (item.describing ? t("context.describing") : t("context.undescribed"))}
                 </p>
               </li>
             ))}

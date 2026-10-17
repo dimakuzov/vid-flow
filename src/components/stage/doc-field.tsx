@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "@/components/language";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { hasDiskConflict, type FieldState } from "./use-stage-detail";
@@ -16,7 +17,8 @@ export function DocFieldLabel({
   note?: string;
   htmlFor?: string;
 }) {
-  const hint = [note, optional ? "необязательно" : ""].filter(Boolean).join(" · ");
+  const t = useT();
+  const hint = [note, optional ? t("doc.optional") : ""].filter(Boolean).join(" · ");
   return (
     <label
       htmlFor={htmlFor}
@@ -53,6 +55,7 @@ export function DocTextarea({
   placeholder?: string;
   className?: string;
 }) {
+  const t = useT();
   const conflict = hasDiskConflict(field, disk);
   return (
     <div className="space-y-1.5">
@@ -66,16 +69,16 @@ export function DocTextarea({
       />
       {conflict ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          <span>Файл изменился на диске — подтянуть?</span>
+          <span>{t("doc.conflict")}</span>
           <button type="button" className="font-medium underline" onClick={onPull}>
-            Подтянуть
+            {t("doc.pull")}
           </button>
           <button type="button" className="text-amber-800 underline" onClick={onKeep}>
-            Оставить моё
+            {t("doc.keep")}
           </button>
         </div>
       ) : field.dirty ? (
-        <p className="text-[11px] text-stone-400">Изменено, не сохранено.</p>
+        <p className="text-[11px] text-stone-400">{t("doc.dirty")}</p>
       ) : null}
     </div>
   );
