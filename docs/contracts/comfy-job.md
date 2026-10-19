@@ -13,6 +13,7 @@
 | `status: pending`, `queuedAt` | `enqueueComfyJob` | при постановке |
 | `status: running`, `promptId`, `submittedAt` | очередь | ComfyUI принял `POST /prompt` |
 | `queuePosition` | очередь | каждый проход по `GET /queue`: 0 — выполняется, 1.. — ждёт; `null` — неизвестно |
+| `lostAt`, `restarts` | очередь | ComfyUI отвечает, а задания нет ни в его очереди, ни в истории (ComfyUI или компьютер перезапускались): `lostAt` — с какого момента. Через минуту задание снова `pending` без `promptId`, `restarts` + 1, и следующий проход отправляет его заново. После двух повторов — `error`. Пока ComfyUI не отвечает, задание ждёт |
 | `status: done`, `files`, `finishedAt` | очередь | файлы скачаны в `saveTo` |
 | `status: error`, `error`, `nodeErrors`, `finishedAt` | очередь | ComfyUI отказал или упал |
 | `status: cancelled`, `finishedAt` | `cancelComfyJob` (кнопка «Отменить») | в любой момент до `done/error` |

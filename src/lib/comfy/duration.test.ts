@@ -140,6 +140,8 @@ test("PATCH runDuration: пишет durationSec, не трогает воркф�
 test("запуск: в задании очереди 129:161 = выбранное", async () => {
   makeShot("s04");
   setPrompt("s04", "Static shot, fixed camera. She sits up. Realistic, natural movement.");
+  // По умолчанию на эскизе LTX; проверяем граф Wan — выбираем его явно.
+  assert.equal((await patch("s04", { runWorkflow: "video_i2v" })).status, 200);
   assert.equal((await patch("s04", { runDuration: 4 })).status, 200);
   const { id } = queueStageRun(EP, "s04", STAGE);
   const job = readComfyJob(id)!;
@@ -227,7 +229,7 @@ test("реплики в задаче агенту: llm_task.md и text-режи�
   submit();
   assert.match(readLlmTask(EP, "s08", STAGE), /## Реплики \(shots\/s08\/speech\.md\)\n\nПусто: в кадре никто не говорит\./);
   const request = readAgentRequest(EP, "s08", STAGE)!;
-  assert.match(buildTextParts(request).user, /\(none: nobody speaks in this shot\)/);
+  assert.match(buildTextParts(request).user, /\(none: nobody speaks in this shot; take any spoken line out of the prompt\)/);
 
   fs.writeFileSync(path.join(shotDir(EP, "s08"), "speech.md"), "Катя: Мама, я дома.\n");
   assert.match(buildTextParts(request).user, /## Lines \(speech\.md[^\n]*\n\nКатя: Мама, я дома\./);

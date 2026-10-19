@@ -1,0 +1,312 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "final_h3_cinema",
+  "graph": "minimax_h3_cinema_api.json",
+  "stage": "final_render",
+  "label": "Финал MiniMax H3 Cinema: первый кадр + лица",
+  "description": "MiniMax H3 по референсам: первый кадр и лицо каждого персонажа, без видео-референса. Сам озвучивает реплики. По умолчанию для кадров с репликами.",
+  "playbook": "models/minimax_h3.en.md",
+  "imageLabel": "<Picture {n}>",
+  "order": 4,
+  "aliases": [
+    "final_h3",
+    "final_h3_768",
+    "final_h3_768_face"
+  ],
+  "defaultWhen": "speech",
+  "whenSketch": {
+    "of": "preview",
+    "nodes": [
+      {
+        "node": "190",
+        "field": "value"
+      }
+    ],
+    "filename": "_h3"
+  },
+  "inputs": {
+    "first": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "uploadAs": "{shotId}_final_first{ext}",
+      "label": "Утверждённый первый кадр"
+    },
+    "people": {
+      "kind": "image",
+      "from": [
+        "library:faces-or-characters"
+      ],
+      "pick": "all",
+      "min": 0,
+      "max": 6,
+      "uploadAs": "{shotId}_final_ref{index}{ext}",
+      "label": "Лица персонажей: лист лица, иначе лицо, иначе утверждённый персонаж (refs/{имя}_face_sheet или {имя}_face — свои на кадр)"
+    },
+    "preview": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "min": 0,
+      "label": "Утверждённое превью (только длительность)"
+    },
+    "text": {
+      "kind": "text",
+      "from": "prompt",
+      "required": true,
+      "requireSpeech": true,
+      "label": "prompt.md"
+    },
+    "sketch": {
+      "kind": "text",
+      "from": "approve-meta",
+      "of": "preview",
+      "nodes": [
+        {
+          "node": "190",
+          "field": "value"
+        },
+        {
+          "node": "129:93",
+          "field": "text"
+        },
+        {
+          "node": "398:376",
+          "field": "value"
+        }
+      ],
+      "fallback": "prompt",
+      "stage": "video_preview",
+      "required": false,
+      "label": "Approved sketch prompt"
+    },
+    "seconds": {
+      "kind": "number",
+      "from": "media:duration",
+      "of": "preview",
+      "min": 1,
+      "max": 20,
+      "clamp": true,
+      "label": "Длительность превью"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "28",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "first"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "301",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 0
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "301"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_1"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "302",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 1
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "302"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_2"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "303",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 2
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "303"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_3"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "304",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 3
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "304"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_4"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "305",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 4
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "305"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_5"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "306",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "inputs": [
+          "people"
+        ],
+        "index": 5
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "306"
+          },
+          {
+            "node": "121",
+            "field": "ref_images.ref_image_6"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "190",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "text",
+        "steps": [
+          {
+            "ensure": "subject_definitions ASTROCINEMAV01K2T:",
+            "at": "start",
+            "unless": "ASTROCINEMAV01K2T",
+            "separator": "\n"
+          }
+        ]
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "151",
+          "field": "noise_seed"
+        },
+        {
+          "node": "155",
+          "field": "noise_seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "111",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "input": "seconds"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "192",
+          "field": "filename_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/final/{shotId}_h3c"
+      }
+    }
+  ]
+}

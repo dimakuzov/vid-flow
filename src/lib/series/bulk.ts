@@ -7,6 +7,7 @@ import { STAGE_LABELS, STAGES, type StageId } from "./constants";
 import { readTextIfExists } from "./media";
 import { listShotIds, stageDir } from "./paths";
 import { checkShotAgent, readShotAgent, writeShotAgent } from "./shot-agent";
+import { BULK_CHAINS, writeRunChain } from "./run-chain";
 import { readShotMeta, type ShotMeta } from "./shot-meta";
 import { PHASE_LABELS, readStageState } from "./stage-state";
 import { deriveStageStatus } from "./status";
@@ -102,13 +103,23 @@ function assignAgents(result: BulkResult, episodeId: string, shotIds: string[], 
   }
 }
 
-function sendToAgent(episodeId: string, shotId: string, stageId: StageId, options: BulkOptions): void {
+/**
+ * Запрос агенту этапа кадра. `chain` — воркфлоу по порядку («▶ Все кадры» на эскизе: LTX, затем
+ * MiniMax): первый уходит сейчас, остальные — после прогона, через run_chain.json.
+ */
+function sendToAgent(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  options: BulkOptions,
+  chain: string[] = [],
+): void {
   const dir = stageDir(episodeId, shotId, stageId);
   // Агент кадра; у кадра без агента — выбор меню или агент доски по умолчанию.
   const own = readShotAgent(episodeId, shotId);
   const provider = own ? own.provider : options.provider;
   // Документы этапа уходят как есть: массовый запуск ничего в них не меняет.
-  submitAgentRequest({
+  const request = submitAgentRequest({
     episodeId,
     shotId,
     stageId,
@@ -119,8 +130,17 @@ function sendToAgent(episodeId: string, shotId: string, stageId: StageId, option
     provider,
     // Этап со своей моделью (первый кадр — Sonnet) важнее модели агента кадра.
     model: stageModel(provider, stageId, own ? (own.model ?? undefined) : options.model),
+    ...(chain.length ? { workflow: chain[0] } : {}),
     auto: true,
   });
+  writeRunChain(
+    episodeId,
+    shotId,
+    stageId,
+    chain.length > 1
+      ? { workflows: chain.slice(1), provider: request.provider, model: request.model, createdAt: request.createdAt }
+      : null,
+  );
 }
 
 function tryStart(
@@ -129,9 +149,10 @@ function tryStart(
   shotId: string,
   stageId: StageId,
   options: BulkOptions,
+  chain: string[] = [],
 ): void {
   try {
-    sendToAgent(episodeId, shotId, stageId, options);
+    sendToAgent(episodeId, shotId, stageId, options, chain);
     result.started.push({ shotId, stageId });
   } catch (error) {
     result.skipped.push({ shotId, stageId, reason: error instanceof Error ? error.message : "не запустилось" });
@@ -147,7 +168,7 @@ export function runStageForAllShots(episodeId: string, stageId: StageId, options
     const meta = readShotMeta(episodeId, shotId);
     const reason = blocked(episodeId, shotId, stageId, meta, options.redo === true);
     if (reason) result.skipped.push({ shotId, stageId, reason });
-    else tryStart(result, episodeId, shotId, stageId, options);
+    else tryStart(result, episodeId, shotId, stageId, options, BULK_CHAINS[stageId] ?? []);
   }
   return result;
 }

@@ -10,7 +10,6 @@ export interface HotkeyItem {
 
 export const HOTKEYS: HotkeyItem[] = [
   { keys: "Enter", action: "hotkey.stage.enter", scope: "stage" },
-  { keys: "Ctrl+Shift+Enter", action: "hotkey.stage.run", scope: "stage" },
   { keys: "A", action: "hotkey.stage.approve", scope: "stage" },
   { keys: "← →", action: "hotkey.stage.arrows", scope: "stage" },
   { keys: "Esc", action: "hotkey.stage.esc", scope: "stage" },

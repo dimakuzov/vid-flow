@@ -59,6 +59,12 @@ function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): st
     return `библиотека ${dataLabel(folder)}`;
   }
   if (source === "library:faces") return `лица: refs/{имя}_face или ${dataLabel(getCharactersRoot())}`;
+  if (source === "library:face-sheets") {
+    return `листы лица: refs/{имя}_face_sheet или *face_sheet* в ${dataLabel(getCharactersRoot())}`;
+  }
+  if (source === "library:faces-or-characters") {
+    return `на персонажа: лицо (refs/{имя}_face или ${dataLabel(getCharactersRoot())}), иначе approve этапа ${STAGE_LABELS.characters}`;
+  }
   const stage = source.slice("approve:".length) as StageId;
   return `approve этапа ${STAGE_LABELS[stage] ?? stage}`;
 }

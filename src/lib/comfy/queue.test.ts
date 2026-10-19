@@ -221,3 +221,74 @@ test("ComfyUI недоступен на этапе отправки: submittedAt
   assert.equal(job.queuePosition, null);
   assert.ok(job.queuedAt);
 });
+
+/** Отодвинуть lostAt задания в прошлое: минута ожидания прошла. */
+function ageLost(id: string) {
+  const file = path.join(tmp, "comfy_queue", `${id}.json`);
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  fs.writeFileSync(file, JSON.stringify({ ...data, lostAt: new Date(Date.now() - 2 * 60 * 1000).toISOString() }));
+}
+
+test("ComfyUI перезапустился и потерял задание: через минуту доска отправляет его заново, не больше двух раз", async () => {
+  newJob("j-lost");
+  let promptId = 0;
+  // ComfyUI работает, но после «перезапуска» не помнит ни очереди, ни истории.
+  routeComfy((url, init) => {
+    if (url.endsWith("/upload/image")) return json({ name: "view.png" });
+    if (url.endsWith("/prompt")) return json({ prompt_id: `p-lost-${++promptId}`, node_errors: {} });
+    if (url.endsWith("/queue") && init?.method !== "POST") return json({ queue_running: [], queue_pending: [] });
+    return json({});
+  });
+  await drainComfyQueue();
+  const first = readComfyJob("j-lost")?.promptId;
+  assert.match(String(first), /^p-lost-/);
+
+  // Первый проход после потери: только отметка, задание ещё ждёт.
+  await drainComfyQueue();
+  let job = readComfyJob("j-lost")!;
+  assert.equal(job.status, "running");
+  assert.ok(job.lostAt, "отмечено время потери");
+
+  // Минута прошла: задание снова pending, следующий проход отправляет его в ComfyUI.
+  ageLost("j-lost");
+  await drainComfyQueue();
+  job = readComfyJob("j-lost")!;
+  assert.equal(job.status, "pending");
+  assert.equal(job.restarts, 1);
+  await drainComfyQueue();
+  const second = readComfyJob("j-lost")?.promptId;
+  assert.match(String(second), /^p-lost-/);
+  assert.notEqual(second, first, "отправлено заново: новый prompt_id");
+
+  // Ещё одна потеря — второй перезапуск; третья — ошибка.
+  await drainComfyQueue();
+  ageLost("j-lost");
+  await drainComfyQueue();
+  await drainComfyQueue();
+  assert.equal(readComfyJob("j-lost")?.restarts, 2);
+  await drainComfyQueue();
+  ageLost("j-lost");
+  await drainComfyQueue();
+  job = readComfyJob("j-lost")!;
+  assert.equal(job.status, "error");
+  assert.match(job.error!, /потерял задание 3 раза подряд/);
+});
+
+test("ComfyUI выключен: отправленное задание ждёт, а не теряется", async () => {
+  newJob("j-down");
+  routeComfy((url, init) => {
+    if (url.endsWith("/upload/image")) return json({ name: "view.png" });
+    if (url.endsWith("/prompt")) return json({ prompt_id: "p-down", node_errors: {} });
+    if (url.endsWith("/queue") && init?.method !== "POST") return json({ queue_running: [["0", "p-down"]], queue_pending: [] });
+    return json({});
+  });
+  await drainComfyQueue();
+  globalThis.fetch = (async () => {
+    throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+  }) as typeof fetch;
+  for (let i = 0; i < 3; i++) await drainComfyQueue();
+  const job = readComfyJob("j-down")!;
+  assert.equal(job.status, "running");
+  assert.equal(job.lostAt, undefined);
+  assert.equal(job.restarts, undefined);
+});

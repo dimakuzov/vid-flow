@@ -29,7 +29,7 @@ A short instruction in English, one paragraph, no `##` headings. Do not retell t
 Picture order is the file-name order in `refs/`. The first name is image 1, the second is image 2, the third is image 3.
 
 1. What stays: materials, objects, and light that are on the references.
-2. What to build: a new location for the shot size. The user message about framing wins over the shot text.
+2. What to build: a new location for the shot size. The user message about framing wins over the shot text. A person in the shot text (a view from behind her shoulder) is not written. Write the empty place at that camera distance.
 3. One phrase for each picture's role. If image 2 or image 3 is not there, do not mention that number.
 4. End with `Empty room, no people.`
 

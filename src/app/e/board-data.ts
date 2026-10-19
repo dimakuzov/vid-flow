@@ -21,6 +21,7 @@ export function emptySeries(): SeriesSummary {
     episodes: [],
     shots: [],
     hiddenShots: [],
+    shotOrder: [],
     scenarioExists: false,
     hasRawScenario: false,
     formatRequestStatus: null,

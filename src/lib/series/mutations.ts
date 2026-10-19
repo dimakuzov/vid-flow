@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { StageId } from "./constants";
 import { listMediaFiles } from "./media";
-import { assertSafeSegment, ensureStageDirs, getDataRoot, isInside, shotDir, shotsDir, stageDir } from "./paths";
+import { assertSafeSegment, ensureStageDirs, getDataRoot, isInside, isShotId, shotDir, shotsDir, stageDir } from "./paths";
 import { syncPromptHistory } from "./prompt-history";
 import { readShotMeta } from "./shot-meta";
 import { readStatusFile, writeStatusFile } from "./status";
@@ -537,7 +537,7 @@ export function copyFilesToRefs(options: {
 
 export function deleteShot(episodeId: string, shotId: string): void {
   const id = assertSafeSegment(shotId, "кадр");
-  if (!/^s\d+$/i.test(id)) throw new Error("Некорректный кадр");
+  if (!isShotId(id)) throw new Error("Некорректный кадр");
   const dir = path.resolve(shotDir(episodeId, id));
   const root = path.resolve(shotsDir(episodeId));
   if (dir !== root && !dir.startsWith(root + path.sep)) {

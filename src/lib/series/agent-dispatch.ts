@@ -7,6 +7,7 @@ import { cancelComfyJob } from "../comfy/queue";
 import { queueStageRun } from "../comfy/stage-run";
 import { STAGES, type StageId } from "./constants";
 import { readFormatRequest, writeFormatRequest } from "./format-request";
+import { continueRunChain, writeRunChain } from "./run-chain";
 import { episodeRoot, listEpisodeIds, listShotIds } from "./paths";
 import {
   cancelAgentRequest,
@@ -126,8 +127,14 @@ export function reconcileStage(episodeId: string, shotId: string, stageId: Stage
 
   if (file.phase === "comfy") {
     const state: StageState = readStageState(episodeId, shotId, stageId);
-    if (state.phase === "idle") setIdle(episodeId, shotId, stageId);
-    else if (state.phase === "error") setError(episodeId, shotId, stageId, state.error || "Ошибка ComfyUI");
+    if (state.phase === "idle") {
+      setIdle(episodeId, shotId, stageId);
+      // «▶ Все кадры» с цепочкой (эскиз: LTX, затем MiniMax): следующий воркфлоу — агенту.
+      continueRunChain(episodeId, shotId, stageId);
+    } else if (state.phase === "error") {
+      writeRunChain(episodeId, shotId, stageId, null);
+      setError(episodeId, shotId, stageId, state.error || "Ошибка ComfyUI");
+    }
   }
 }
 
@@ -183,6 +190,7 @@ export async function cancelStage(episodeId: string, shotId: string, stageId: St
     const ids = file.jobIds?.length ? file.jobIds : file.jobId ? [file.jobId] : [];
     for (const id of ids) await cancelComfyJob(id);
   }
+  writeRunChain(episodeId, shotId, stageId, null);
   setIdle(episodeId, shotId, stageId);
 }
 

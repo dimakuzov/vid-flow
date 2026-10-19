@@ -42,6 +42,8 @@ export interface AgentBaseline {
   refsNote: string;
   workflowNote: string;
   refs: RefFingerprint[];
+  /** Воркфлоу, под который агент доски написал этот prompt.md. Нет — неизвестно (ручной агент, старые файлы). */
+  workflow?: string;
 }
 
 function readJson<T>(file: string): T | null {
@@ -107,7 +109,7 @@ export function fingerprintRefs(episodeId: string, shotId: string, stageId: Stag
 }
 
 /** Снимок после прохода агента: с ним следующий запрос сравнивает правки пользователя. */
-export function captureBaseline(episodeId: string, shotId: string, stageId: StageId): void {
+export function captureBaseline(episodeId: string, shotId: string, stageId: StageId, workflow?: string): void {
   const dir = stageDir(episodeId, shotId, stageId);
   const baseline: AgentBaseline = {
     capturedAt: new Date().toISOString(),
@@ -115,6 +117,7 @@ export function captureBaseline(episodeId: string, shotId: string, stageId: Stag
     refsNote: readTextIfExists(path.join(dir, "refs.md")),
     workflowNote: readTextIfExists(path.join(dir, "workflow.md")),
     refs: fingerprintRefs(episodeId, shotId, stageId),
+    ...(workflow ? { workflow } : {}),
   };
   writeJson(path.join(dir, BASELINE_FILE), baseline);
   writeJson(path.join(dir, TOUCH_FILE), { refsTouchedByUser: false });

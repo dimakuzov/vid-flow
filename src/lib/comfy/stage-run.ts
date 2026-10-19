@@ -3,6 +3,7 @@ import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, ImageInput } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
 import { characterClothingFiles, missingCharacterBase, tooManyClothingRefs } from "../series/character-base";
+import { latinToken } from "../series/latin-id";
 import { readTextIfExists } from "../series/media";
 import { stageDir, toPosix } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
@@ -140,7 +141,7 @@ function queueCopies(
   for (let take = 1; take <= takes; take++) {
     const built = buildPrompt(binding, graph, ctx);
     markTake(built.prompt, take, takes);
-    queued.push(enqueueBuilt(binding, ctx, takeJobId(`${ctx.shotId}-${binding.id}-${stamp}`, take, takes), built));
+    queued.push(enqueueBuilt(binding, ctx, takeJobId(`${latinToken(ctx.shotId)}-${binding.id}-${stamp}`, take, takes), built));
   }
   return queued;
 }
@@ -201,7 +202,7 @@ function queueCharacters(
       const built = buildPrompt(binding, graph, run);
       markTake(built.prompt, take, takes);
       prepared.push({
-        id: takeJobId(characterJobId(ctx.shotId, binding.id, name, stamp), take, takes),
+        id: takeJobId(characterJobId(latinToken(ctx.shotId), binding.id, name, stamp), take, takes),
         ctx: run,
         built,
       });

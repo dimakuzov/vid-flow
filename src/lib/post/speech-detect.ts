@@ -4,6 +4,7 @@ import path from "path";
 import { enqueueComfyJob, readComfyJob } from "../comfy/queue";
 import type { ApiPrompt, ComfyJobStatus } from "../contracts/comfy-job";
 import { getPlaybooksRoot, toPosix } from "../series/paths";
+import { latinToken } from "../series/latin-id";
 import { readShotFinal, type ShotFinal } from "./lines";
 import { activeShotIds, postDir, readJson, writeJson } from "./paths";
 
@@ -115,8 +116,9 @@ export async function enqueueSpeechDetect(
       continue;
     }
     const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-    const jobId = `post-speech-${episodeId}-${shotId}-${stamp}-${crypto.randomBytes(2).toString("hex")}`.slice(0, 81);
-    const upload = `fb_${episodeId}_${shotId}_${path.basename(final.file)}`;
+    const token = latinToken(shotId);
+    const jobId = `post-speech-${latinToken(episodeId)}-${token}-${stamp}-${crypto.randomBytes(2).toString("hex")}`.slice(0, 81);
+    const upload = `fb_${latinToken(episodeId)}_${token}_${path.basename(final.file)}`.replace(/[^a-zA-Z0-9._-]+/g, "_");
     const prompt = JSON.parse(JSON.stringify(graph)) as ApiPrompt;
     prompt[nodes.load].inputs.video = upload;
     enqueueComfyJob({

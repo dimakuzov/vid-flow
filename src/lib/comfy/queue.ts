@@ -30,7 +30,10 @@ import type { ComfyJob } from "../contracts/comfy-job";
 export type { ComfyJob };
 
 const running = new Set<string>();
-const HISTORY_TIMEOUT_MS = 15 * 60 * 1000;
+/** Сколько ждать историю пропавшего из очереди задания, прежде чем отправить его заново. */
+const LOST_GRACE_MS = 60 * 1000;
+/** Сколько раз отправлять заново потерянное задание. */
+const MAX_RESTARTS = 2;
 /** Облако опрашивается реже локального ComfyUI: видео там идёт минутами. */
 const CLOUD_POLL_MS = 15 * 1000;
 const lastCloudPoll = new Map<string, number>();
@@ -303,21 +306,39 @@ async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
   if (!history) {
     const position = queue ? queuePositionOf(queue, job.promptId) : (job.queuePosition ?? null);
     if (position != null || !queue) {
-      // Ждёт или выполняется (или очередь ComfyUI не прочиталась): не таймаут.
-      if (queue && position !== (job.queuePosition ?? null) && !cancelledMeanwhile(job.id)) {
+      // Ждёт или выполняется (или ComfyUI не отвечает — ждём, пока поднимется): не потеря.
+      if (queue && (position !== (job.queuePosition ?? null) || job.lostAt) && !cancelledMeanwhile(job.id)) {
         job.queuePosition = position;
+        job.lostAt = undefined;
         writeJob(job);
       }
       return;
     }
-    const started = job.updatedAt ? Date.parse(job.updatedAt) : Number.NaN;
-    if (job.queuePosition != null) {
-      // Только что пропал из очереди, истории ещё нет: отсчёт таймаута с этой записи.
+    // ComfyUI работает, а задания нет ни в очереди, ни в истории: его перезапускали
+    // (или компьютер выключался). Минута на случай, если история пишется с задержкой.
+    if (!job.lostAt) {
+      if (cancelledMeanwhile(job.id)) return;
+      job.lostAt = new Date().toISOString();
       job.queuePosition = null;
       writeJob(job);
-    } else if (Number.isFinite(started) && Date.now() - started > HISTORY_TIMEOUT_MS) {
-      throw new Error(`ComfyUI потерял задание: ${job.promptId} нет ни в очереди, ни в истории`);
+      return;
     }
+    if (Date.now() - Date.parse(job.lostAt) < LOST_GRACE_MS) return;
+    const restarts = job.restarts ?? 0;
+    if (restarts >= MAX_RESTARTS) {
+      throw new Error(
+        `ComfyUI потерял задание ${restarts + 1} раза подряд (${job.promptId} нет ни в очереди, ни в истории). Запустите этап заново.`,
+      );
+    }
+    if (cancelledMeanwhile(job.id)) return;
+    // Отправить заново: следующий проход цикла поставит его в ComfyUI.
+    job.status = "pending";
+    job.promptId = undefined;
+    job.submittedAt = undefined;
+    job.queuePosition = null;
+    job.lostAt = undefined;
+    job.restarts = restarts + 1;
+    writeJob(job);
     return;
   }
   const failed = historyError(history);

@@ -52,6 +52,7 @@ playbooks/workflows/comfy/
 | `label` | название в меню, по-русски, для пользователя |
 | `description` | одна строка: когда выбирать |
 | `playbook` | плейбук модели для агента (`.en.md`), путь от `playbooks/`. Агент пишет `prompt.md` по шаблону оттуда |
+| `imageLabel` | как модель называет картинки, `{n}` — номер: `<Picture {n}>` у MiniMax H3. Есть — агент получает список картинок графа под этими именами на любом этапе, людей зовёт `<Subject N>`; нет — `image {n}` и `characterN`, список только на первом кадре |
 | `order` | порядок в меню, без повторов внутри этапа |
 | `aliases` | старые имена для совместимости |
 
@@ -76,7 +77,11 @@ playbooks/workflows/comfy/
 | `approve:<stage>` | `approve/` другого этапа этого кадра |
 | `library:location` | `data/locations/<location из shot.md>/`: `view.png`, иначе первая картинка без `copy` в имени |
 | `library:faces` | лица персонажей: по одному на файл в `approve/` этапа characters, в том же порядке (по алфавиту). `refs/{name}_face.*` этого этапа, иначе в `data/characters/{name}/` — `face`, `portrait`, `portret` (в том числе `{name}_portret`, `portret_{name}`), иначе первая картинка с face/portr в имени без side и copy. Персонаж без лица пропускается |
+| `library:faces-or-characters` | по картинке на персонажа из `approve/` этапа characters, в том же порядке: лист лица (`refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`), иначе лицо (как у `library:faces`), иначе сам утверждённый персонаж. Никто не пропадает. В задаче агенту лист помечен «face sheet» |
+| `library:face-sheets` | листы лица персонажей из `approve/` этапа characters, в том же порядке: `refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`. Без листа персонаж пропускается |
 | массив | источники по порядку, берётся первый непустой |
+
+`maxAvailable` (у картинки) — вариант доступен, только если файлов входа не больше этого числа; иначе в `missing` строка «<подпись>: не больше N (сейчас M)». Вход может не иметь слотов и служить только условием: так `final_h3_head_swap` требует одного персонажа в кадре.
 
 `pick`: `first` — первая по имени (числа по значению), `newest` — самая новая по mtime, `all` — все по имени, не больше `max`. `min` (по умолчанию 1) — сколько нужно для `available`; `min: 0` — вход необязательный. `uploadAs` — имя файла при загрузке в ComfyUI: `{shotId}`, `{episodeId}`, `{index}`, `{ext}` (расширение с точкой, в нижнем регистре, по умолчанию `.png`); без него — имя файла.
 
@@ -247,7 +252,9 @@ playbooks/workflows/comfy/
 | `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |
 | `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с; промпт — `approve-meta` эскиза, запасной `prompt.md`) |
 | `final_ltx` | final_render | `ltx25_i2v_api.json` (нода `403`: 1.2 Мп, 9:16 → 832×1504, 24 к/с; `whenSketch` — эскиз LTX) |
-| `final_h3`, `final_h3_768`, `final_h3_768_face` | final_render | `minimax_h3_creator_api.json` (MiniMax H3; исходный промпт — `approve-meta` эскиза) |
+| `video_minimax` | video_preview | `minimax_h3_preview_api.json` (MiniMax H3 по референсам, 0.5 Мп; `imageLabel: <Picture {n}>`). По умолчанию на эскизе теперь `video_ltx` (order 5) |
+| `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema: первый кадр + по картинке на персонажа, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; промпт эскиза из `approve-meta` — только в задаче агенту) |
+| `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (замена головы: утверждённое превью + `library:face-sheets`; вход персонажей с `maxAvailable: 1`; без текста) |
 | `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; запуск только с галочкой на этот раз) |
 | `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
 

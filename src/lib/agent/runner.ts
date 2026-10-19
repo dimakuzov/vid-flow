@@ -5,7 +5,7 @@ import type { AgentProviderId } from "../contracts/agent-request";
 import { formatMinutes, modeTimeoutMs, providerParallel } from "./config";
 import { appendRunLog, captureBaseline, readAgentRequest, writeAgentRequest } from "./files";
 import { cleanPromptText, getAgentProvider } from "./providers";
-import { buildAgentTask } from "./task";
+import { buildAgentTask, selectedWorkflow } from "./task";
 import { stageUsesContext } from "../series/descriptions";
 import { ensureShotAction } from "../series/shot-action";
 
@@ -189,7 +189,7 @@ function applyResult(started: AgentRequestFile, result: AgentResult): void {
     }
     // Через updateStageDocs: прошлая версия prompt.md уходит в prompt_history.json.
     updateStageDocs({ episodeId, shotId, stageId, prompt: `${prompt}\n` });
-    captureBaseline(episodeId, shotId, stageId);
+    captureBaseline(episodeId, shotId, stageId, selectedWorkflow(episodeId, shotId, stageId)?.id);
   }
 
   writeAgentRequest({

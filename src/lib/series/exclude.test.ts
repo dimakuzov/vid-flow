@@ -58,9 +58,10 @@ test("убранный персонаж не уходит в граф, файл 
   assert.deepEqual(names(resolveImageInput(ctx("first_frame"), people)), ["lena_s01.png"]);
   assert.ok(fs.existsSync(path.join(stageDir(EP, "s01", "characters"), "approve", "julia_s01.png")));
   // Только на этом этапе: у финала тот же файл по-прежнему вход.
-  const final = input("final_render", "final_h3", "people");
+  const final = input("final_render", "final_h3_cinema", "people");
   fs.rmSync(path.join(stageDir(EP, "s01", "final_render"), "refs", "mine.png"));
-  assert.deepEqual(names(resolveImageInput(ctx("final_render"), final)), ["julia_s01.png", "lena_s01.png"]);
+  // У Юли нет портрета — идёт утверждённый файл; у Лены — портрет из библиотеки.
+  assert.deepEqual(names(resolveImageInput(ctx("final_render"), final)), ["julia_s01.png", "portret.png"]);
   put(path.join(stageDir(EP, "s01", "final_render"), "refs", "mine.png"));
 
   const detail = getStageDetail(EP, "s01", "first_frame");
@@ -74,12 +75,17 @@ test("убранный персонаж не уходит в граф, файл 
   assert.equal(excludedFiles(EP, "s01", "first_frame").size, 0);
 });
 
-test("свой референс убран — вход берёт следующий источник (approve персонажей)", () => {
-  const people = input("final_render", "final_h3", "people");
-  assert.deepEqual(names(resolveImageInput(ctx("final_render"), people)), ["mine.png"]);
-  setExcluded(EP, "s01", "final_render", "episodes/e01/shots/s01/final_render/refs/mine.png", true);
-  assert.deepEqual(names(resolveImageInput(ctx("final_render"), people)), ["julia_s01.png", "lena_s01.png"]);
-  assert.ok(fs.existsSync(path.join(stageDir(EP, "s01", "final_render"), "refs", "mine.png")));
+test("свой лист лица на кадр убран — персонаж не пропадает, берётся его следующий вариант", () => {
+  const people = input("final_render", "final_h3_cinema", "people");
+  // Чужой файл в refs/ финала MiniMax не берёт: у каждого персонажа свой вариант по имени.
+  assert.deepEqual(names(resolveImageInput(ctx("final_render"), people)), ["julia_s01.png", "portret.png"]);
+  put(path.join(stageDir(EP, "s01", "final_render"), "refs", "lena_face_sheet.png"));
+  assert.deepEqual(names(resolveImageInput(ctx("final_render"), people)), ["julia_s01.png", "lena_face_sheet.png"]);
+  setExcluded(EP, "s01", "final_render", "episodes/e01/shots/s01/final_render/refs/lena_face_sheet.png", true);
+  assert.deepEqual(names(resolveImageInput(ctx("final_render"), people)), ["julia_s01.png", "portret.png"]);
+  assert.ok(fs.existsSync(path.join(stageDir(EP, "s01", "final_render"), "refs", "lena_face_sheet.png")));
+  setExcluded(EP, "s01", "final_render", "episodes/e01/shots/s01/final_render/refs/lena_face_sheet.png", false);
+  fs.rmSync(path.join(stageDir(EP, "s01", "final_render"), "refs", "lena_face_sheet.png"));
 });
 
 test("лицо из библиотеки тоже можно убрать", () => {

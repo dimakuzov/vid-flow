@@ -7,7 +7,6 @@ import { errorText, requestJson } from "@/components/stage/api";
 import { clockLocale, stageName, type Lang, type Translate } from "@/lib/i18n";
 import { STAGES, type StageId } from "@/lib/series/constants";
 import type { ShotSummary } from "@/lib/series/types";
-import { BulkResultView, type BulkResult } from "./bulk-menu";
 import { useFloatingMenu } from "./floating-menu";
 
 /** Следующий этап кадра, как его выбирает доска: первый неутверждённый из нужных кадру. */
@@ -53,7 +52,7 @@ export function ShotAgentLine({ shot }: { shot: ShotSummary }) {
   );
 }
 
-/** «▶ Агент» на кадре: выбрать агента кадра, сохранить, запустить следующий этап или остановить. */
+/** «▶ Агент» на кадре: выбрать агента кадра, сохранить или остановить. Этап отсюда не запускается. */
 export function ShotAgentMenu({
   episodeId,
   shot,
@@ -68,7 +67,6 @@ export function ShotAgentMenu({
   const { anchor, open, menuRef, toggle, close } = useFloatingMenu(288);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const [result, setResult] = useState<BulkResult | null>(null);
   const [error, setError] = useState("");
   const nextStage = nextStageOf(shot);
   // Персонажей агент делает сам: выбор ограничен теми, кто умеет работать с файлами.
@@ -80,7 +78,6 @@ export function ShotAgentMenu({
     setBusy(true);
     setError("");
     setNote("");
-    setResult(null);
     try {
       await work();
       onDone();
@@ -97,17 +94,6 @@ export function ShotAgentMenu({
     act(async () => {
       await requestJson(`${shotApi}/agent`, { method: "PUT", body: choice, fallbackError: t("shot.saveFailed") });
       setNote(t("shot.saved"));
-    });
-
-  const runNext = () =>
-    act(async () => {
-      setResult(
-        await requestJson<BulkResult>(`${shotApi}/next-stage`, {
-          method: "POST",
-          body: choice,
-          fallbackError: t("bulk.runFailed"),
-        }),
-      );
     });
 
   const stop = () =>
@@ -139,8 +125,7 @@ export function ShotAgentMenu({
           <div>
             <div className="text-sm font-semibold text-stone-900">{t("shot.agentTitle", { id: shot.id })}</div>
             <p className="mt-1 leading-snug">
-              {t("shot.agentLead", { activity: activityText(shot, t, lang) })}{" "}
-              {nextStage ? t("shot.next", { stage: stageName(t, nextStage) }) : t("shot.allApproved")}
+              {t("shot.agentLead", { activity: activityText(shot, t, lang) })}
             </p>
           </div>
           {agent.providers ? (
@@ -166,14 +151,6 @@ export function ShotAgentMenu({
             >
               {t("shot.save")}
             </button>
-            <button
-              type="button"
-              onClick={runNext}
-              disabled={busy || !nextStage}
-              className="h-8 rounded-lg bg-teal-800 px-3 text-sm font-medium text-white hover:bg-teal-900 disabled:opacity-60"
-            >
-              {busy ? "…" : t("shot.runNext")}
-            </button>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -194,7 +171,6 @@ export function ShotAgentMenu({
           </div>
           {error ? <p className="text-red-800">{error}</p> : null}
           {note ? <p>{note}</p> : null}
-          {result ? <BulkResultView result={result} withStage /> : null}
         </div>
       ) : null}
     </div>

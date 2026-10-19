@@ -27,7 +27,7 @@ import {
   type AgentDispatch,
 } from "../agent/files";
 import { getAgentProvider } from "../agent/providers";
-import { chosenDurationSec, durationTaskLine, renderGraphImages } from "../agent/task";
+import { chosenDurationSec, durationTaskLine, previewDurationSec, renderGraphImages, workflowSwitch } from "../agent/task";
 import { startAgentRun } from "../agent/runner";
 import { STAGES, type StageId } from "./constants";
 import { readTextIfExists, writeText } from "./media";
@@ -212,17 +212,22 @@ function renderSpeech(episodeId: string, shotId: string, stageId: StageId): stri
   if (!stageHasSpeech(stageId)) return "";
   const speech = readShotSpeech(episodeId, shotId).trim();
   const body = speech
-    ? `${speech}\n\nРеплика уже на английском переносится в prompt.md дословно. Реплика по-русски пишется по-английски: кириллицу не копировать и на русский не переводить. Имя перед двоеточием в prompt.md не писать — говорящий там character1, character2.`
-    : "Пусто: в кадре никто не говорит.";
+    ? `${speech}\n\nЭто speech.md на момент этого запроса: реплики могли измениться. Если реплики в текущем prompt.md другие — бери эти. Реплика уже на английском переносится в prompt.md дословно. Реплика по-русски пишется по-английски: кириллицу не копировать и на русский не переводить. Имя перед двоеточием в prompt.md не писать — говорящий там character1, character2.`
+    : "Пусто: в кадре никто не говорит. Реплики из текущего prompt.md убери.";
   return `## Реплики (shots/${shotId}/${SPEECH_FILE})\n\n${body}\n\n`;
 }
 
 /** Длительность из меню этапа (бриф 03): строка с пустой строкой перед ней, иначе пусто. */
 function renderDuration(episodeId: string, shotId: string, stageId: StageId, workflow: string | null): string {
   const seconds = chosenDurationSec(episodeId, shotId, stageId, workflow);
-  return seconds == null
+  if (seconds != null) {
+    return `\n${durationTaskLine(seconds)} Длительность доска ставит сама: \`N sec\` в prompt.md не пиши.\n`;
+  }
+  // Финал по длине утверждённого превью: агенту число нужно для текста (MiniMax: «A 4-second shot»).
+  const preview = previewDurationSec(episodeId, shotId, stageId, workflow);
+  return preview == null
     ? ""
-    : `\n${durationTaskLine(seconds)} Длительность доска ставит сама: \`N sec\` в prompt.md не пиши.\n`;
+    : `\nДлительность клипа: ${preview} с — длина утверждённого превью, её ставит доска. Где плейбук просит длину кадра, пиши это число.\n`;
 }
 
 /** Файлы, убранные пользователем из графа этапа: блок с пустой строкой перед ним, иначе пусто. */
@@ -249,9 +254,13 @@ function renderPromptRules(stageId: StageId): string {
 
 Люди в промпте — character1, character2, character3, в порядке их референсов (как в списке «Images the graph receives»; если списка нет — по алфавиту имён из строки персонажей, чтобы на всех этапах у человека был один номер). Имена из сообщения, shot.md и имён файлов нужны только чтобы понять, о ком речь. В prompt.md их не писать. Пример в плейбуке с Julia или Lena — старая форма: пиши character1 и character2.
 
-Каждого опиши одним-двумя предложениями, чтобы модель отличала людей, без имени из задачи. Если у человека есть референсы, в тех же предложениях привяжи их: \`character1 is image 2 and the face from image 4\`. Номера — из списка картинок. Где плейбук пишет \`@img-N\`, используй эту метку так же.
+Каждого человека привяжи к его картинкам один раз, в первых строках prompt.md, и добавь несколько слов, по которым людей различить, — как на референсе (телосложение, волосы, самая заметная вещь): \`character1 is image 2 and the face from image 4: a tall slim young man in an off-white jacket.\` Номера — из списка картинок. Если список картинок и плейбук называют людей \`<Subject N>\`, а картинки \`<Picture N>\` (MiniMax H3), пиши эти метки: \`<Subject 1>\` — это character1, а привязка идёт в subject_definitions: \`<Subject 1> is the young woman defined by <Picture 2>\`.
 
-\`prompt.md\` — вся инструкция этого запуска. Не ссылаться на прошлый промпт и прошлый результат и не писать «как раньше», «оставь всё как было», «the same as last time» вместо текста. Если пользователь просит одно изменение («всё хорошо, добавь пакет в руки Ивану»), заново выпиши прошлый промпт целиком и добавь это изменение: пакет в руках того, кто в задаче Иван, под его номером characterN. Не пиши фразу, что нужно повторить прошлый результат. \`exactly as in image N\` — это про референс, так и оставляй.
+\`prompt.md\` — вся инструкция этого запуска, а прошлый результат модель не видела. Каждое предложение — каким кадр должен быть сейчас: как близко человек, где сидит, что держит. Сравнение с прошлым результатом (\`than before\`, \`as before\`, \`closer than\`, \`last time\`) модели ничего не даёт; если оно есть в текущем prompt.md, напиши вместо него состояние, которое оно значит: «much closer than before» → \`very close: her face and shoulders fill most of the frame\`.
+
+Если текущий prompt.md написан в форме другого воркфлоу (начало, метки картинок и людей, разделы не как в плейбуке выбранного), перепиши его целиком в форме этого плейбука: содержание (действие, его порядок и время, реплики, правки пользователя) сохрани, старую форму не переноси.
+
+Если пользователь просит одно изменение, пересобери prompt.md по шаблону плейбука: оставь строки, которые ещё нужны кадру и замечаниям пользователя, впиши изменение в ту строку, к которой оно относится, и не переноси строки, которые больше не нужны. Каждая мысль — один раз. «Всё хорошо, добавь пакет в руки Ивану» — текущий промпт, где пакет в строке действия того, кто в задаче Иван, под его номером characterN. \`exactly as in image N\` — это про референс, так и оставляй.
 
 `;
 }
@@ -259,6 +268,14 @@ function renderPromptRules(stageId: StageId): string {
 /** Замечания, действие кадра и описания картинок: блок с пустой строкой после него, иначе пусто. */
 function renderContext(request: AgentRequestFile): string {
   const text = renderShotContext(request.episodeId, request.shotId, request.stageId, request.createdAt);
+  return text ? `${text}
+
+` : "";
+}
+
+/** prompt.md написан под другой воркфлоу этапа: блок с пустой строкой после него, иначе пусто. */
+function renderSwitch(episodeId: string, shotId: string, stageId: StageId, workflow: WorkflowChoice | null): string {
+  const text = workflowSwitch(episodeId, shotId, stageId, workflow);
   return text ? `${text}
 
 ` : "";
@@ -348,7 +365,7 @@ ${meta.summary || "(действие кадра не описано)"}
 
 Это исходный текст сценария, написанный до картинок. Если он расходится с картинками или замечаниями ниже, верны они.
 
-${renderContext(request)}${renderPromptRules(stageId)}${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
+${renderContext(request)}${renderSwitch(episodeId, shotId, stageId, choices.find((choice) => choice.id === selected) ?? null)}${renderPromptRules(stageId)}${renderSpeech(episodeId, shotId, stageId)}## Воркфлоу этапа
 
 ${renderWorkflows(choices, selected)}
 ${renderDuration(episodeId, shotId, stageId, selected)}${renderImages(episodeId, shotId, stageId, boardQueues ? selected : null)}

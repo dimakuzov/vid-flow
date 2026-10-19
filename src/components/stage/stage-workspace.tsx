@@ -174,24 +174,6 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       return data.message;
     });
 
-  const runStage = () =>
-    act(async () => {
-      await saveDocs();
-      const data = await requestJson<{ message: string; stage?: StageDetail }>(`${stageApi}/run`, {
-        method: "POST",
-        body: {
-          ...(detail.workflow ? { runWorkflow: detail.workflow } : {}),
-          ...(cloudCost && allowCloud ? { allowCloud: true } : {}),
-        },
-        fallbackError: t("page.runFailed"),
-      });
-      // Разрешение — на один запуск.
-      setAllowCloud(false);
-      if (data.stage) stage.merge(data.stage);
-      else await stage.reload();
-      return data.message;
-    });
-
   const chooseWorkflow = (workflowId: string) =>
     act(async () => {
       const data = await requestJson<StageDetail>(stageApi, {
@@ -316,9 +298,9 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
   };
 
   const backToTable = () => router.push(episodePagePath(episodeId, shotId));
-  const keys = useRef({ send: sendToAgent, run: runStage, approve: approveSelected, back: backToTable, canRun, stageBusy });
+  const keys = useRef({ send: sendToAgent, approve: approveSelected, back: backToTable });
   useEffect(() => {
-    keys.current = { send: sendToAgent, run: runStage, approve: approveSelected, back: backToTable, canRun, stageBusy };
+    keys.current = { send: sendToAgent, approve: approveSelected, back: backToTable };
   });
 
   useEffect(() => {
@@ -339,11 +321,6 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         return;
       }
       if (isTypingTarget(event.target) || overlayOpen()) return;
-      if (event.ctrlKey && event.shiftKey && event.key === "Enter" && !event.altKey && !event.metaKey) {
-        event.preventDefault();
-        if (keys.current.canRun && !keys.current.stageBusy) keys.current.run();
-        return;
-      }
       if (event.code === "KeyA" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
         keys.current.approve();
@@ -478,11 +455,6 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               onDuration={chooseDuration}
             />
           </div>
-          {!stageBusy ? (
-            <Button disabled={busy || (Boolean(cloudCost) && !allowCloud)} onClick={runStage}>
-              {t("page.run")}
-            </Button>
-          ) : null}
           {cloudCost && !stageBusy ? (
             <label className="flex w-full items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               <input

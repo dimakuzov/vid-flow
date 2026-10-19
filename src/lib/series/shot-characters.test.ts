@@ -13,7 +13,7 @@ delete process.env.SERIES_ROOT;
 process.env.FRAMEBOARD_LOOPS = "off";
 
 import { createEpisode, shotDir } from "./paths";
-import { readShotMeta, setShotCharacters, setShotTitle } from "./shot-meta";
+import { readShotFragment, readShotMeta, setShotCharacters, setShotFragment, setShotTitle } from "./shot-meta";
 
 test("список персонажей меняет только строку characters", () => {
   createEpisode("e01");
@@ -48,4 +48,24 @@ test("название кадра меняет заголовок и не тро
   assert.match(text, /Чайник на столе\./);
   assert.equal(readShotMeta("e01", "s02").title, "Кухня вечером");
   assert.throws(() => setShotTitle("e01", "s02", "   "), /пустым/);
+});
+
+test("фрагмент сценария пишется в кадр и не трогает персонажей и соседний раздел", () => {
+  createEpisode("e01");
+  const file = path.join(shotDir("e01", "s03"), "shot.md");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    "# Кухня\n\n- characters: lena\n- location: kitchen\n\n## Summary\nСтарый текст.\nЕщё строка.\n\n## Заметки\nСвой раздел.\n",
+  );
+  assert.equal(readShotFragment("e01", "s03"), null);
+  const saved = setShotFragment("e01", "s03", "Лена входит.\nМама отвечает.");
+  assert.equal(saved, "Лена входит.\nМама отвечает.");
+  assert.equal(readShotFragment("e01", "s03"), "Лена входит.\nМама отвечает.");
+  const text = fs.readFileSync(file, "utf8");
+  assert.match(text, /^- characters: lena$/m);
+  assert.match(text, /^- location: kitchen$/m);
+  assert.match(text, /## Заметки\nСвой раздел\./);
+  assert.equal(readShotMeta("e01", "s03").summary, "Лена входит.\nМама отвечает.");
+  assert.equal(readShotMeta("e01", "s03").title, "Кухня");
 });

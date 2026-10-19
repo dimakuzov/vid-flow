@@ -22,6 +22,7 @@ import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
 import { chosenCharacterFile, excludedFiles, readRunSettings } from "../series/run-settings";
+import { latinToken } from "../series/latin-id";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech, speechPhrases } from "../series/speech";
 
@@ -108,6 +109,8 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
           source === "refs" ||
           source === "library:location" ||
           source === "library:faces" ||
+          source === "library:faces-or-characters" ||
+          source === "library:face-sheets" ||
           source === "library:character" ||
           (stage && STAGES.includes(stage as StageId));
         if (!known) fail(`вход ${name}: неизвестный источник ${source}`);
@@ -412,6 +415,27 @@ export function libraryFace(name: string): string | null {
   );
 }
 
+/** Лист лица: несколько видов одного лица на одной картинке (`lena_face_sheet.png`). */
+export const FACE_SHEET = /face[_ -]?sheet/i;
+
+/** Лист лица персонажа в библиотеке: первая картинка с face_sheet в имени, кроме копий. */
+export function libraryFaceSheet(name: string): string | null {
+  const root = getCharactersRoot();
+  let folderName: string | undefined;
+  try {
+    folderName = fs.readdirSync(root).find((item) => item.toLowerCase() === name.toLowerCase());
+  } catch {
+    return null;
+  }
+  if (!folderName) return null;
+  return (
+    listFiles(path.join(root, folderName)).find((file) => {
+      const base = path.basename(file);
+      return FACE_SHEET.test(base) && !/copy/i.test(base);
+    }) ?? null
+  );
+}
+
 /** Персонажи кадра в порядке файлов approve/ этапа characters: `julia_s05.png` → julia. */
 function approvedCharacters(ctx: ShotContext): string[] {
   const suffix = `_${ctx.shotId}`.toLowerCase();
@@ -446,6 +470,51 @@ function faceFiles(ctx: ShotContext): string[] {
     .filter((file): file is string => Boolean(file));
 }
 
+/** Листы лица персонажей из approve: `refs/{name}_face_sheet` этапа, иначе библиотека. Без листа — пропуск. */
+function faceSheetFiles(ctx: ShotContext): string[] {
+  const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
+  const suffix = `_${ctx.shotId}`.toLowerCase();
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, "characters"), "approve")).flatMap((file) => {
+    const stem = path.parse(file).name;
+    const name = stem.toLowerCase().endsWith(suffix) ? stem.slice(0, -suffix.length) : stem;
+    const id = name.toLowerCase();
+    const sheet = findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`]) ?? libraryFaceSheet(name);
+    return sheet ? [sheet] : [];
+  });
+}
+
+/** Файлов входа больше, чем допускает `maxAvailable`: подпись для «не хватает». null — в пределах. */
+function tooMany(ctx: ShotContext, input: ImageInput): string | null {
+  if (input.maxAvailable == null) return null;
+  const count = resolveImageInput(ctx, { ...input, max: undefined }).length;
+  return count > input.maxAvailable ? `${input.label}: не больше ${input.maxAvailable} (сейчас ${count})` : null;
+}
+
+/**
+ * По картинке на персонажа из approve (MiniMax): лист лица (`refs/{name}_face_sheet` этапа, иначе
+ * из библиотеки), иначе одно лицо, иначе сам утверждённый персонаж.
+ */
+function faceOrCharacterFiles(ctx: ShotContext): string[] {
+  const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
+  const suffix = `_${ctx.shotId}`.toLowerCase();
+  // Убранный кнопкой «Убрать» файл пропускается — берётся следующий вариант того же персонажа.
+  const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, "characters"), "approve")).flatMap((file) => {
+    const stem = path.parse(file).name;
+    const name = stem.toLowerCase().endsWith(suffix) ? stem.slice(0, -suffix.length) : stem;
+    const id = name.toLowerCase();
+    const candidates = [
+      findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`]),
+      libraryFaceSheet(name),
+      findImage(refs, [`${id}_face`]),
+      libraryFace(name),
+      file,
+    ];
+    const chosen = candidates.find((item): item is string => Boolean(item) && !isExcluded(excluded, item!));
+    return chosen ? [chosen] : [];
+  });
+}
+
 function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["kind"]): string[] {
   const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
@@ -453,6 +522,8 @@ function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["ki
     return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
   }
   if (source === "library:faces") return kind === "image" ? faceFiles(ctx) : [];
+  if (source === "library:faces-or-characters") return kind === "image" ? faceOrCharacterFiles(ctx) : [];
+  if (source === "library:face-sheets") return kind === "image" ? faceSheetFiles(ctx) : [];
   if (source === "library:character") return kind === "image" ? libraryCharacter(ctx) : [];
   const stage = source.slice("approve:".length) as StageId;
   return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "approve"), exts);
@@ -576,6 +647,8 @@ export function missingInputs(ctx: ShotContext, binding: GraphBinding): string[]
   for (const [name, input] of Object.entries(binding.inputs)) {
     if (input.kind !== "image" && input.kind !== "video") continue;
     const need = imageNeed(ctx, name, input);
+    const extra = tooMany(ctx, input);
+    if (extra) missing.push(extra);
     if (need < 1) continue;
     if (resolveImageInput(ctx, input).length < need) missing.push(input.label);
   }
@@ -865,6 +938,25 @@ interface ResolvedText {
   note: string | null;
 }
 
+/**
+ * Тексты из метаданных утверждённых роликов (входы approve-meta) — для задачи агенту: финал
+ * без видео-референса пишет движение сам и должен знать, что было в утверждённом эскизе.
+ */
+export function approvedMetaTexts(
+  ctx: ShotContext,
+  binding: GraphBinding,
+): { label: string; text: string; where: string }[] {
+  const readPrompt = (stage: StageId) =>
+    readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "prompt.md")).trim();
+  const out: { label: string; text: string; where: string }[] = [];
+  for (const input of Object.values(binding.inputs)) {
+    if (input.kind !== "text" || input.from !== "approve-meta") continue;
+    const resolved = resolveTextInput(ctx, binding, input, readPrompt, readPrompt(ctx.stageId));
+    if (resolved.text.trim()) out.push({ label: input.label, text: resolved.text.trim(), where: resolved.where });
+  }
+  return out;
+}
+
 /** Текст входа. approve-meta читает самый новый ролик `of`; нет текста — fallback prompt.md. */
 function resolveTextInput(
   ctx: ShotContext,
@@ -1106,6 +1198,20 @@ function numberValue(
   return secondsInText(promptMd, input);
 }
 
+/**
+ * Секунды из ролика (`media:duration`), которые уйдут в граф: длина утверждённого превью.
+ * Для задачи агенту — он пишет ту же длину в текст. null — такого входа или ролика нет.
+ */
+export function mediaDurationSec(ctx: ShotContext, binding: GraphBinding): number | null {
+  for (const input of Object.values(binding.inputs)) {
+    if (input.kind !== "number" || input.from !== "media:duration" || !input.of) continue;
+    const video = binding.inputs[input.of];
+    if (video?.kind !== "video") continue;
+    return numberValue(input, "", { [input.of]: resolveImageInput(ctx, video) }, undefined);
+  }
+  return null;
+}
+
 /** Вход-число с источником settings:seconds (меню длительности). null — у манифеста его нет. */
 export function settingsSecondsInput(binding: GraphBinding): { name: string; input: NumberInput } | null {
   for (const [name, input] of Object.entries(binding.inputs)) {
@@ -1176,7 +1282,7 @@ function newSeed(): number {
 function uploadName(input: ImageInput, file: string, index: number, ctx: ShotContext): string {
   if (!input.uploadAs) return path.basename(file);
   return fillPlaceholders(input.uploadAs, {
-    shotId: ctx.shotId,
+    shotId: latinToken(ctx.shotId),
     episodeId: ctx.episodeId,
     index: String(index),
     ext: path.extname(file).toLowerCase() || ".png",
@@ -1214,6 +1320,8 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
     if (input.kind === "image" || input.kind === "video") {
       images[name] = resolveImageInput(ctx, input);
       if (images[name].length < imageNeed(ctx, name, input)) missing.push(input.label);
+      const extra = tooMany(ctx, input);
+      if (extra) missing.push(extra);
     } else if (input.kind === "text") {
       const textInput = textInputFor(input, meta.characters);
       const resolved = resolveTextInput(ctx, binding, textInput, readPrompt, promptMd);
@@ -1260,7 +1368,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       write(
         slot,
         fillPlaceholders(value.template, {
-          shotId: ctx.shotId,
+          shotId: latinToken(ctx.shotId),
           episodeId: ctx.episodeId,
           stageId: ctx.stageId,
           workflow: binding.id,

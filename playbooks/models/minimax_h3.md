@@ -1,207 +1,108 @@
-# Промпт для финального рендера MiniMax H3: как писать и как не писать
+# MiniMax H3 Cinema (эскиз видео и финал): как писать промпт
 
-Основано на финальных рендерах клипа «Вера» (S1–S28). Здесь только про **текст**, который читает модель: что в нём работало, что портило результат, что было бесполезно.
-Про выбор локально / API и память — в `minimax_h3_final_render_guide.md`.
+Оригинал на русском. Для агента: `playbooks/models/minimax_h3.en.md`.
 
----
-
-## 1. Главное в пяти пунктах
-
-1. **Текст не исправит плохие входные данные.** Если первый кадр и low-res ролик расходятся (рукава в S6, протечка воды в S4), модель следует ролику и смешивает обе версии. Сначала исправляем исходник, потом пишем текст.
-2. **Основа — отрефайненный Wan-промпт + одна фиксированная фраза.** Свой промпт целиком не пишем: формат Context-IR (субъекты, секции, метки `@img-N`) рефайнер делает лучше.
-3. **Короче — лучше.** Каждая успешная правка была заменой или удалением фразы, а не добавлением абзаца. Ни разу длинный промпт не дал результат лучше короткого.
-4. **Модель реагирует на слова, а не на отрицания.** «no sparkles» = «sparkles». Описываем то, что должно быть.
-5. **Каждый рефайн проверять глазами.** Примерно в каждом втором шоте с персонажами рефайнер что-то ломал: номера картинок, лишний персонаж, «крупный план», «оглядывается».
+Этот плейбук у двух вариантов: `video_minimax` на эскизе видео (граф `minimax_h3_preview_api.json`, один проход 0.5 Мп) и `final_h3_cinema` на финале (граф `minimax_h3_cinema_api.json`, второй проход с апскейлом латента до 1.5 Мп). Оба — MiniMax H3 **по референсам** (reference to video) с ЛоРой Cinema. Видео-референса нет: модель получает утверждённый первый кадр, по картинке на каждого персонажа и текст. Всё движение задаёт текст. Пользователь выбрал этот граф, потому что он стабильно держит качество и сходство людей; старый граф H3 с low-res видео как референсом часто ломался.
 
 ---
 
-## 2. Из чего состоит текст
-
-```
-[фиксированная фраза]
-[тело от рефайнера — правим точечно]
-+ секции: subject_definitions / summary / retention_analysis
-+ overall_soundscape
-```
-
-**Фиксированная фраза** — всегда первой (после `[Shot 1]`, если он есть):
-> The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it.
-
-Исключение: если в low-res ролике мерцание или шум, которые не нужны в финале (S4), — «use @vid-1 as a reference for the movements only».
-
-**Закрывающая строка** завершает тело. H3 перестраивал композицию, двигал камеру и плохо рисовал лица; строка делает первый кадр и превью обязательными, даёт H3 свободу в качестве и просит заново анимировать губы:
-> @img-1 is the required first frame: the video opens exactly on it. @vid-1 is the required motion guide: every person and every object moves exactly as in @vid-1, with the same timing, the same positions and the same camera. This is a quality pass over @vid-1: re-render it in much higher detail and realism, with sharp, clean faces, eyes, skin, hair, fabric, light and textures, free of the blur, noise and artifacts of @vid-1. Where someone speaks, re-animate the mouth and face so the lips pronounce every word of the dialogue with precise lip sync. Do not add, remove or move people or objects, and do not change the composition.
-
-Доска гарантирует обе: если в теле нет `use @vid-1 as a reference`, она ставит фиксированную фразу первой; если нет `required motion guide` — дописывает закрывающую строку в конец (`steps` манифеста). Нужен свой вариант (S4) — напишите его сами, второй копии доска не добавит.
-
-**Триггер лоры** — слово `r34l1sm`. Доска ставит его самым первым в теле, перед фиксированной фразой и остальным текстом. Самому его не писать: если оно уже есть в теле, второй раз доска не добавит. Лора `minimax/h3-realism-people-t2v-i2v-r2v.safetensors`, сила 0.7, на всех трёх вариантах H3 (в `loras` графа, рядом с turbo).
-
-Что на самом деле получил H3 — смотреть в метаданных самого файла видео или в `data/comfy_queue/<id>.json`. Не открывать видео для проверки в интерфейсе ComfyUI: веб-часть ноды Continuity перезаписывает `creator_data` своим пустым состоянием (пустой промпт, без ассетов, 16:9), и сохранённый воркфлоу показывает уже его.
-
-**Исходник для Refine** — промпт утверждённого эскиза, как он записан в метаданных ролика (`video_preview/approve/`, ключ `prompt`). Нет метаданных — `prompt.md` эскиза, и доска пишет об этом в `run_log.md`. Не промпт старой H3-генерации: действие там могло быть другим (S6: в старом тексте вода краснела, в утверждённом ролике — смывается). Правка `prompt.md` после утверждения ролика в финал не попадает, пока ролик не перегенерируют.
-
----
-
-## 3. Что было не так и что помогло
-
-| Шот | Что получилось | Откуда взялось | Что исправило |
-|---|---|---|---|
-| **S7** | крупный план лица вместо всего кадра | рефайнер написал «medium close-up», «focusing on her facial movements», а в retention — «toiletries simplified» | эти слова убрали + **перечислили, что где в кадре** (зеркало, плитка, полка с предметами, шторка) и что всё остаётся на месте до конца |
-| **S7** | кровь течёт, хотя уже есть на первом кадре | в Wan-промпте «blood slowly trickles» | «the streak of blood already in @img-1 stays exactly as it is» |
-| **S14** | смотрит в сторону, «убегает от кого-то» | в Wan-промпте «looking around confused» | «looks straight ahead in the direction she is running… her gaze stays fixed forward» |
-| **S13** | хватается за перила сразу, рывками | «hurries», «urgent motion», «hand slides along the railing» | «steady, even pace… only at the very end of the shot she takes hold of the railing» |
-| **S16** | убегает вдаль, камера едет | 1) добавленная сцена «неловкой паузы»; 2) «camera pans with her»; 3) лишние секунды без действия | вернули **короткий удачный промпт** пользователя, «static camera… never changes its position» **3 раза**, одна строка в конце: «until the end of the shot both stay at the spot» |
-| **S4** | блёстки и звёздочки | 1) список «no sparkles, no glitter, no stars…» — блёсток **стало больше**; 2) «pours hot water», «boiling» → брызги на тёмном фоне | убрали все запреты; позитивно: «matte surfaces, soft diffused light, calm air»; «a slow, thin, gentle trickle»; убрали «crystalline» из звука |
-| **S6** | первая секунда — «каша» | 1) в модель ушёл сырой промпт без рефайна; 2) на первом кадре нет рукавов, в ролике есть | рефайн + **новый low-res без рукавов**. Текстом не исправлялось |
-
-Шоты, прошедшие с первого раза (S1, S3, S10, S11, S12, S15, S18, S22–S26), — все по стандартной схеме, **без добавлений к рефайну**, кроме привязки персонажей.
-
----
-
-## 4. Проверка рефайна — по пунктам
-
-### 4.1. `subject_definitions`
-Самая частая ошибка. Рефайнер путал, какая картинка кто (S2, S14, S19, S21, S28): персонажа привязывал к первому кадру, локацию — к портрету; сдвигал номера; один раз выдумал четвёртую девушку.
-
-Шаблон:
-```
-<Subject 1> is the young woman from @img-1 and @img-2 (her face and clothing as in @img-2), <волосы, одежда>.
-<Subject 2> is the <локация> from @img-1 and @vid-1, <2–3 ключевых предмета>.
-```
-- Персонаж ↔ свой `@img-N` + «(her/his face and clothing as in @img-N)».
-- Локация ↔ `@img-1` и `@vid-1`.
-- Без имён: пол и внешность.
-- Несколько персонажей — по одной отличительной детали (красное платье / очки и серый свитер / синий жакет с вышивкой).
-
-### 4.2. `retention_analysis`
-Везде `fully_preserved`. `partially_preserved` («layout adapted», «simplified») и `attribute_transfer` — это разрешение модели менять кадр. Заменять.
-
-### 4.3. Тело — стоп-слова
-
-| Слово в тексте | Что делает модель | Замена |
-|---|---|---|
-| close-up, focusing on her face | приближает камеру | static medium shot, not a close-up + список того, что в кадре |
-| looks around, glancing | крутит головой | looks straight ahead, gaze stays fixed forward |
-| hurries, urgent, frantic | рывки | steady, even pace |
-| camera pans / follows | двигает камеру | static shot, fixed camera (если нужна статика) |
-| pours, boiling, splashing | брызги, блики | a slow, thin, gentle trickle |
-| crystalline, glass, glint, shiny | искры, блеск | убрать |
-| действие, уже видное на первом кадре | повторяет его заново | already present in @img-1 and stays as it is |
-
-### 4.4. Звук
-Только окружение и реплики персонажей в кадре. Без закадрового голоса, без «звенящих» и «кристальных» слов.
-
----
-
-## 5. Что писать — и что нет
-
-### Писать (работало)
-- **Статику камеры — 2–3 раза разными словами**, в начале и в конце: «Static shot, fixed camera… does not move, pan, tilt, zoom or rotate… the camera position never changes».
-- **Композицию**, если модель её ломает: что где стоит и что остаётся на месте до конца.
-- **Время действия**: «for one second, then…», «only at the very end».
-- **Направление взгляда**, если это важно.
-- **Чем заканчивается кадр**, если роль длиннее действия: одна строка «stays at the spot until the end» — без новых событий.
-- **Нужное состояние позитивно**: «matte», «soft diffused light», «calm air», «steady pace».
-
-### Не писать (портило)
-- **Списки запретов** («no …, no …, no …»). У H3 в этом режиме нет негативного промпта (cfg = 1), такие слова работают как подсказка.
-- **Новые события для заполнения времени** (переглядывания, паузы) — персонаж начинает импровизировать и уходит из кадра.
-- **Атмосферные абзацы** про свет, настроение, текстуры — рефайнер пишет их сам, добавки размывают главное.
-- **Противоречия ролику**: если в low-res вода протекает, фраза «вода не протекает» не сработает.
-- **Описание тех, чьё лицо не видно**: реф персонажа со спины не нужен и только замедляет рендер.
-
-### Бесполезно (проверено)
-- **Роль `first_frame`** для первого кадра — результат идентичен роли `reference`, а упоминание `@img-1` в тексте ломает face pass. Оставляем `reference` + фиксированную фразу.
-- **«The first frame must exactly replicate @img-1»** не спасает, если первый кадр и ролик расходятся по содержанию.
-- **Повторять одно и то же требование больше 3 раз** — после 2–3 повторов эффект не растёт.
-
----
-
-## 6. Дополнительные настройки, которые влияют на результат
-
-- **Face pass** — выключать, если в кадре нет людей: детектор находил «лицо» на рисунке на кружке (S4) и перерисовывал этот участок. На доске: в `final_h3_768` face pass выключен, `final_h3_768_face` — тот же 768 с face pass.
-- **Реф персонажа**: портрет 512×512 для крупных планов; для мелких лиц — персонаж из `env\` (уже в одежде из кадра).
-- **Длительность** = длина low-res ролика. Если секунд больше, чем действия, модель придумывает продолжение (S16).
-- **Seed** случайный. Если результат почти хороший, сначала новый seed, потом правка текста.
-
----
-
-## 7. Чек-лист перед запуском
-
-1. Первый кадр и low-res ролик совпадают (одежда, предметы, свет).
-2. Refine по оригинальному Wan-промпту.
-3. Фиксированная фраза — первой.
-4. `subject_definitions`: персонаж ↔ свой `@img-N`, локация ↔ `@img-1` + `@vid-1`, без имён, без лишних персонажей.
-5. `retention_analysis`: везде `fully_preserved`.
-6. В теле нет стоп-слов (4.3) и списков запретов.
-7. Камера: если статика — сказано 2–3 раза.
-8. Конец кадра описан одной строкой, без новых событий.
-9. Face pass выключен, если людей нет.
-
----
-
-## 8. Как это работает на доске
-
-Для агента: `playbooks/models/minimax_h3.en.md` (тот же смысл по-английски).
-
-Этап `final_render`, граф `playbooks/workflows/comfy/minimax_h3_creator_api.json` (одна нода `MiniMaxH3Creator`, настройки из шаблона `vera_final_1152`). Три варианта в меню:
-
-| id | Что | Когда |
-|---|---|---|
-| `final_h3_768_face` | 768, face pass включён | по умолчанию, лица в кадре |
-| `final_h3` | 1152, face pass включён | лица, и кадру нужно разрешение выше |
-| `final_h3_768` | 768, face pass выключен | кадров без людей, мелкие лица, нужно быстрее или не хватает памяти |
-
-Wan-варианты `final_i2v` / `final_flf` остались запасными.
-
-**Что доска подставляет сама** (в `creator_data` ноды):
+## 1. Что получает модель
 
 | Метка | Что | Откуда |
-|---|---|---|
-| `@vid-1` | low-res ролик | `video_preview/approve/` (самый новый) |
-| `@img-1` | первый кадр | `first_frame/approve/` (самый новый) |
-| `@img-2`, `@img-3` | референсы персонажей | `final_render/refs/` (по имени), иначе `characters/approve/`. Не больше двух. Нет файлов — метки нет |
-| длительность | = длина low-res ролика | читается из mp4, округляется до секунды |
-| исходный промпт эскиза | `prompt` сегмента и `refined.source` | метаданные ролика в `video_preview/approve/`; нет их — `prompt.md` эскиза |
+| --- | --- | --- |
+| `<Picture 1>` | утверждённый первый кадр: место, камера, люди в своей одежде | `first_frame/approve/` (самый новый) |
+| `<Picture 2>`, `<Picture 3>`, … | по картинке на персонажа, в порядке списка в задаче: лист лица (несколько видов одного лица на одной картинке), иначе одно лицо, иначе утверждённый персонаж | `refs/` этого этапа (`{имя}_face_sheet`, затем `{имя}_face`), иначе библиотека (`*face_sheet*`, затем портрет), иначе `characters/approve/` |
+| длительность | эскиз: меню этапа (иначе `N sec` в `prompt.md`); финал: длина утверждённого превью | доска |
+| текст | `prompt.md` как есть | этот этап |
 
-Референс персонажа нужен, только если видно лицо (раздел 6). Если в кадре лица не видно, а в `characters/approve/` лежат персонажи — положите в `final_render/refs/` один нужный файл или выберите `final_h3_768`.
+В задаче список «Images the graph receives»: метки картинок и кто на какой. Метки брать ровно оттуда. В задаче есть длительность клипа, а на финале — промпт утверждённого превью (движение, которое нужно сохранить).
 
-**`prompt.md` финала** — результат Refine по разделам. Слово `r34l1sm` в текст не писать: доска ставит его первой в тело.
+## 2. `prompt.md` — это ровно текст для модели
 
-```md
-## body
-[Shot 1] The scene begins from @img-1, the same camera position, the same frame, The first frame must exactly replicate @img-1. use @vid-1 as a reference, use the movements and the lighting changes from it. <тело рефайна, поправленное по разделу 4.3>
-
-## subject_definitions
-<Subject 1> is the young woman from @img-1 and @img-2 (her face and clothing as in @img-2), <волосы, одежда>.
-
-## summary
-[video editing] The target video is an edited version of @vid-1: <одна фраза>, re-rendered at much higher quality.
-
-## retention_analysis
-<Subject 1> (appears in [Shot 1]): fully_preserved - <что сохраняется>.
-
-## soundscape
-<только звук окружения; реплики — в ## body>
-```
-
-- `body` обязателен. Текст без заголовков целиком считается `body`.
-- `subject_definitions`, `summary`, `retention_analysis` можно не писать: тогда их выводит нода. Лучше писать: ошибки рефайнера (раздел 4.1) правятся именно здесь.
-- Номера `@img-N` должны совпадать с таблицей выше. Два персонажа: `@img-2` — первый по имени файла, `@img-3` — второй.
-- Промпт всегда на английском. На русский ничего не переводить: доска такой `prompt.md` не отправит. Единственный текст, который копируется как есть, — реплика из `speech.md` (ниже); это не перевод.
-- Реплики: см. «Диалог» ниже. Реплик нет — в `## soundscape` только звук окружения.
-
-**Диалог** (у кадра есть реплики в `speech.md`, раздел «Реплики» / `Lines`). MiniMax сам озвучивает кадр и двигает губами, поэтому каждая реплика идёт в `## body` дословно, нумерованным диалогом, в грамматике самой ноды (инструкция refine в Continuity: `families/h3/prompts/base-en.txt`, §4.4): говорящий по внешности и месту в кадре, постоянный ID `(S1)`, `(S2)`, слова — внутри `<d>[English] …</d>`. Кто слева и кто справа — по промпту первого кадра из задачи. Звук окружения — в `## soundscape`, реплики туда не идут (по инструкции ноды диалог описывается в теле и в soundscape не повторяется).
+Без заголовков `##` и без Markdown. Разделы — обычные строки с двоеточием, в этом порядке. Только английский.
 
 ```text
-1. The young woman on the left (S1) says: <d>[English] Don't mind him. He just wants the attention. And you gave it to him.</d>
-2. The young woman on the right (S2) says: <d>[English] But why?</d>
-3. The young woman on the left (S1) says: <d>[English] Everybody wants it. I am Julia, by the way.</d>
-4. The young woman on the right (S2) says: <d>[English] I am Lena. Nice to meet you.</d>
+subject_definitions ASTROCINEMAV01K2T:
+<Subject 1> is the young woman defined by <Picture 2>. Use <Picture 2> for her face: <hair, face, a few words>. Her clothes and body are the ones already on her in <Picture 1>. <what she holds, if it matters>
+<Subject 2> is the young man defined by <Picture 3>. Use <Picture 3> for his face: <hair, face, a few words>. His clothes and body are the ones already on him in <Picture 1>.
+
+<Picture 1> is the opening frame and the place. The video begins on this exact picture: the same camera, the same framing, the same people in the same poses, the same clothes, the same light, every object in its place.
+
+summary:
+[reference generation] A <N>-second shot. <Picture 1> is the first frame. <Picture 2> is <Subject 1>'s face. <Picture 3> is <Subject 2>'s face.
+
+retention_analysis:
+Every person keeps the face from their picture and the clothes already on them in <Picture 1>. fully_preserved through the whole shot.
+
+detailed_description:
+The shot lasts <N> seconds and never cuts.
+
+[Shot 1] <camera>. <where everyone is, exactly as in <Picture 1>>. <the action, in order, with timing>. <the lines>. <how the shot ends>.
+
+overall_soundscape:
+<the sound of the place and of the action>
+
+non_diegetic_music:
+None.
 ```
 
-`## soundscape`: `Ambient sound of a quiet lecture hall, soft whispers and intimate conversation.`
+1. **Первая строка всегда `subject_definitions ASTROCINEMAV01K2T:`.** `ASTROCINEMAV01K2T` — слово-триггер ЛоРы Cinema. Если строки нет, доска поставит её первой; лучше написать самому, чтобы она не задвоилась.
+2. **Люди — `<Subject 1>`, `<Subject 2>`, …** в порядке списка в задаче. Имён из задачи, текста кадра и файлов нет.
+3. **Каждый человек привязан один раз**, в `subject_definitions`, к своей картинке. Для листа лица (в списке «face sheet»): `Use <Picture N> for her face: it shows the same face from several angles.` Лист — один человек, а не несколько. Для одного лица: `Use <Picture N> for her face`. Для утверждённого персонажа (в списке «approved figure and clothes»): `<Subject N> is the young man defined by <Picture N>: his face and hair as in <Picture N>`. Одежда всегда берётся с `<Picture 1>`: в ней люди уже стоят в первом кадре.
+4. **Несколько слов, по которым человека узнать** (волосы, лицо), как на картинке. Одежду не перечислять: её показывает `<Picture 1>`.
+5. **`<N>`** — длительность клипа из задачи, в `summary` и в `detailed_description`.
+6. **`summary`** называет каждую картинку один раз: первый кадр, затем чьё лицо на каждой.
+7. **`retention_analysis`** — `fully_preserved`. `partially_preserved` или «adapted» разрешают модели менять людей.
+8. **`non_diegetic_music:`** — `None.`, если пользователь не просит музыку.
 
-Реплики не переводить, не сокращать, не добавлять. У говорящего один ID на весь кадр. Если какой-то реплики из `speech.md` нет в `prompt.md`, доска H3 не запустит. Один говорящий по умолчанию идёт в H3 (`final_h3_768_face`), двое и больше — в HeyGen (`final_heygen`, облако только по галочке на этот запуск), без реплик — в Wan (`final_wan_720`). Эскиз LTX важнее: тогда по умолчанию `final_ltx`. Если выбранный вариант не этот — `suggestedWorkflow`. Таблица — `playbooks/stages/final_render.md`.
+## 3. `detailed_description`: движение
 
-**`## summary`** для этого прохода начинается с типа задачи `[video editing]`: `The target video is an edited version of @vid-1: the same motion and composition, re-rendered at much higher quality, with the lips re-animated to the dialogue.`
+Видео, с которого можно скопировать движение, нет, поэтому всё движение — в тексте.
+
+1. **Откуда движение.** На эскизе видео: действие кадра и замечания пользователя говорят, что происходит; описание первого кадра — где все стоят в начале. На финале: в задаче есть промпт утверждённого превью; сохранить его движения, их порядок и время, переписав в этой форме (промпт превью MiniMax уже в ней). Если текущий `prompt.md` в форме другого воркфлоу (LTX: `use image as the first frame.`), переписать его в этой форме, сохранив содержание.
+2. **Начало — это `<Picture 1>`.** Места, позы и взгляд — как в первом кадре; действие продолжается оттуда.
+3. **Камера одной-двумя короткими фразами**, в начале и в конце: `A static medium shot at seated height.` … `The camera holds unmoving.` Если камера в кадре движется — одно движение и его скорость.
+4. **Время**: `for one second, then…`, `at the same moment…`, `only at the very end…`. Действие заполняет всю длительность; последняя фраза — чем кадр заканчивается: `until the end of the shot both stay seated`.
+5. **Взгляд с целью**: `looks along the path at the far lamp post`, `looks at <Subject 2>`.
+6. **Свет**: одна фраза — тот свет, что есть на `<Picture 1>`, по описанию первого кадра. Своего света не придумывать.
+
+### Реплики
+
+Реплики кадра (раздел «Lines» задачи, `speech.md`) идут в `detailed_description` в тот момент, когда звучат, в разметке модели: `<Subject 1> says quietly, <d>[English] It is kind of scary.</d>` Одна фраза на реплику, говорящий по метке, слова внутри `<d>[English] …</d>`. Английская реплика переносится дословно. Реплика с кириллицей пишется по-английски. В `overall_soundscape` реплик нет. Реплик в задаче нет — никто не говорит.
+
+Пока кто-то говорит, сказать, что делают остальные: `At the same moment <Subject 2> stays seated and slowly licks his ice cream.`
+
+## 4. Слова, из-за которых модель делает другое
+
+Уроки прошлого графа H3 по тексту остаются в силе:
+
+| Слово в тексте | Что делает модель | Вместо этого |
+| --- | --- | --- |
+| close-up, focusing on her face | приближает камеру | план `<Picture 1>` + что в кадре |
+| looks around, glancing | вертит головой | looks at <цель>, взгляд остаётся там |
+| hurries, urgent, frantic | дёргается | steady, even pace |
+| camera pans / follows | двигает камеру | static shot, the camera holds |
+| pours, boiling, splashing | брызги, блики | a slow, thin, gentle trickle |
+| crystalline, glass, glint, shiny | искры, блеск | matte, soft diffused light |
+| действие, которое уже видно на `<Picture 1>` | повторяет его | already there in `<Picture 1>` and stays as it is |
+
+**Писать, что должно быть, а не чего быть не должно.** `no sparkles` даёт искры. Прежде чем писать `not`, `no`, `never`, `do not`, найти, что в тексте может вызвать нежелательное, и заменить нужным состоянием (`matte surfaces, calm air`). Отрицание остаётся, только если прогон уже показал ошибку, а позитивная формулировка её не исправила.
+
+**Короче — лучше.** Каждое удачное исправление заменяло или убирало фразу. Новые события, чтобы заполнить время (взгляды, паузы), заставляют людей импровизировать.
+
+## 5. Перед запуском
+
+1. Первая строка — `subject_definitions ASTROCINEMAV01K2T:`.
+2. Каждая картинка из списка названа той же меткой; каждый человек привязан к своей картинке один раз; имён нет.
+3. `<N>` — длительность клипа из задачи.
+4. `retention_analysis`: `fully_preserved`.
+5. Движение — по действию кадра и замечаниям (на финале — по утверждённому превью); начало совпадает с `<Picture 1>`; камера названа в начале и в конце; кадр кончается без нового события.
+6. Каждая реплика из `speech.md` — в `detailed_description` в `<d>[English] …</d>`; в звуке реплик нет.
+7. Нет слов из таблицы раздела 4; нет отрицаний там, где можно сказать нужное состояние.
+8. `non_diegetic_music: None.`, если не просили.
+
+## 6. Варианты и выбор по умолчанию
+
+Эскиз видео: по умолчанию LTX (`video_ltx`); «▶ Все кадры» гонит на каждом кадре сначала LTX, затем этот вариант MiniMax. Таблица — `playbooks/stages/video_preview.md`.
+
+Финал (таблица — `playbooks/stages/final_render.md`) идёт за утверждённым превью: превью MiniMax делает по умолчанию `final_h3_cinema`, превью LTX — `final_ltx`. Иначе один говорящий — по умолчанию `final_h3_cinema`; двое и больше — HeyGen (`final_heygen`, облако только после галочки пользователя на один запуск); никто не говорит — Wan (`final_wan_720`). Если выбранный вариант не подходит кадру, впиши его id в `suggestedWorkflow` в `agent_request.json`.

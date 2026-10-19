@@ -47,6 +47,10 @@ export interface StageSummary {
 export interface ShotSummary {
   id: string;
   title: string;
+  /** Текст кадра из shot.md, если своей правки фрагмента ещё нет. */
+  summary?: string;
+  /** Правка фрагмента сценария в карточке. null — правки нет, показывается сырой кусок. */
+  fragment?: string | null;
   characters: string[];
   location: string;
   stages: Record<StageId, StageSummary>;
@@ -78,6 +82,8 @@ export interface SeriesSummary {
   shots: ShotSummary[];
   /** Кадры на диске, скрытые из таблицы галкой импорта. Файлы у них на месте. */
   hiddenShots: ShotSummary[];
+  /** Все кадры эпизода в порядке таблицы, включая скрытые. Номера папок тут не меняются. */
+  shotOrder: string[];
   scenarioExists: boolean;
   hasRawScenario: boolean;
   formatRequestStatus: "pending" | "running" | "done" | "error" | null;

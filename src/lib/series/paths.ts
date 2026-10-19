@@ -238,15 +238,47 @@ export function ensureStageDirs(episodeId: string, shotId: string): void {
   }
 }
 
+/** Папка кадра: `s01` или `s` и название без пробелов и слешей. */
+export function isShotId(value: string): boolean {
+  return /^s[^\\/\s.]+$/i.test(value) && !value.includes("..");
+}
+
+/** Порядок кадров из `shot_order.json`. Пусто — на диске ещё нет своего порядка. */
+export function readShotOrder(episodeId: string): string[] {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(episodeRoot(episodeId), "shot_order.json"), "utf8")) as {
+      ids?: unknown;
+    };
+    if (!Array.isArray(data.ids)) return [];
+    return data.ids.filter((id): id is string => typeof id === "string" && isShotId(id));
+  } catch {
+    return [];
+  }
+}
+
+function isShotDir(parent: string, name: string): boolean {
+  if (!isShotId(name)) return false;
+  if (/^s\d+$/i.test(name)) return true;
+  return fs.existsSync(path.join(parent, name, "shot.md"));
+}
+
 export function listShotIds(episodeId: string): string[] {
   const dir = shotsDir(episodeId);
   if (!fs.existsSync(dir)) return [];
-  return fs
+  const onDisk = fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => /^s\d+$/i.test(name))
+    .filter((entry) => entry.isDirectory() && isShotDir(dir, entry.name))
+    .map((entry) => entry.name);
+  const byLower = new Map(onDisk.map((name) => [name.toLowerCase(), name]));
+  const listed: string[] = [];
+  for (const id of readShotOrder(episodeId)) {
+    const found = byLower.get(id.toLowerCase());
+    if (found && !listed.includes(found)) listed.push(found);
+  }
+  const rest = onDisk
+    .filter((name) => !listed.some((id) => id.toLowerCase() === name.toLowerCase()))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return [...listed, ...rest];
 }
 
 export function toPosix(relativePath: string): string {

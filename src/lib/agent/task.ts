@@ -2,7 +2,15 @@ import fs from "fs";
 import path from "path";
 import type { AgentMode, AgentRequestFile, AgentTask } from "../contracts/agent-request";
 import type { ImageInput, WorkflowChoice } from "../contracts/graph-binding";
-import { resolveImageInput, slotFile, stageBindings, stageDuration } from "../comfy/binding";
+import {
+  approvedMetaTexts,
+  FACE_SHEET,
+  mediaDurationSec,
+  resolveImageInput,
+  slotFile,
+  stageBindings,
+  stageDuration,
+} from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
@@ -10,7 +18,7 @@ import { getPlaybooksRoot, stageDir } from "../series/paths";
 import { excludedFiles, readRunSettings } from "../series/run-settings";
 import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
-import { LLM_TASK, readAgentDispatch } from "./files";
+import { LLM_TASK, readAgentDispatch, readBaseline } from "./files";
 import { renderShotContext } from "./shot-context";
 
 /*
@@ -36,9 +44,26 @@ prompt.md is English. No Cyrillic anywhere in it. Do not translate any of it int
 
 People in prompt.md are character1, character2, character3, in the order of their reference images (the same order as «Images the graph receives»; if that list is absent, alphabetical order of the names in the characters line, so the same person keeps the same number on every stage). Names in the user message, in shot.md and in file names are only so you know whom the user means. Do not write those names in prompt.md. An example in the playbook that says Julia, Lena or any other name is the old form: write character1 and character2.
 
-Describe each person in one or two sentences, enough to tell them apart, with no production name. If that person has reference images, bind them in those sentences: \`character1 is image 2 and the face from image 4\`. Use the numbers from the image list. Where the playbook says @img-N, use that label the same way.
+Bind each person to their images once, in the first lines of prompt.md, with a few words that tell the people apart as the reference shows them (build, hair, the most visible garment): \`character1 is image 2 and the face from image 4: a tall slim young man in an off-white jacket.\` Use the numbers from the image list. When the image list and the playbook name people <Subject N> and pictures <Picture N> (MiniMax H3), use those labels instead: <Subject 1> is character1, and the binding goes into subject_definitions: \`<Subject 1> is the young woman defined by <Picture 2>\`.
 
-prompt.md is the whole instruction for this one run. Do not mention an earlier prompt, an earlier result, or that something should be done "as before", "the same as last time" or "keep everything". When the user asks for one change, write the previous prompt out again in full with that change included. "All good, put a bag in Ivan's hands" becomes the previous prompt plus the bag in the hands of whichever character Ivan is, not a line that says to repeat the last result. "exactly as in image N" is about a reference picture, and that stays.`;
+prompt.md is the whole instruction for this one run, and the model has not seen any earlier result. Write every sentence as the picture should be now: how close the person is, where they sit, what they hold. A comparison with an earlier result ("than before", "as before", "closer than", "last time", "the same as last time") gives the model nothing to work with; when the current prompt.md has one, write the state it means instead: "much closer than before" becomes "very close: her face and shoulders fill most of the frame".
+
+When the current prompt.md is written in another workflow's form (its opening, its labels, its sections differ from this playbook), rewrite all of it in this playbook's form: keep its content (the action, its order and timing, the spoken lines, the user's corrections) and leave its old form behind.
+
+When the user asks for one change, rebuild prompt.md from the playbook template: keep the lines that still serve the shot and the user's notes, put the change into the line it belongs to, and leave out lines that no longer serve. Every idea appears once. "All good, put a bag in Ivan's hands" becomes the current prompt with the bag in the action line of whichever character Ivan is. "exactly as in image N" is about a reference picture, and that stays.`;
+
+/**
+ * Локация — пустое место. Текст кадра часто описывает, кто там потом встанет
+ * («вид из-за её плеча»), и модель переносит человека в prompt.md как ракурс.
+ * Правило стоит после плейбука и отменяет и его, и текст кадра.
+ */
+export const LOCATION_EMPTY_RULES = `These rules override the playbook and the shot text.
+
+This stage draws an empty place. Do not write a person into prompt.md unless the user message explicitly asks for a person in the location.
+
+The shot text may say who will stand there later: a close-up of someone, a view from behind her shoulder, two people talking. Take from it only the camera height and which part of the place stays empty. Write that part as the place. "A close-up of Lena from behind her shoulder" becomes "a close-up of the empty place", never "framing from behind a woman's shoulder" and never "the shoulder out of frame".
+
+When the user says to remove a person, or not to add people, delete every mention of a person, a body, a face, a shoulder, a silhouette or a figure from the previous prompt. Do not keep it by moving the body out of frame or by calling it framing. A phrase the user quoted must not appear again and must not be reworded into another mention of that person.`;
 
 /** Вариант, с которым доска поставит прогон после ответа агента. null — у этапа нет воркфлоу. */
 export function selectedWorkflow(episodeId: string, shotId: string, stageId: StageId): WorkflowChoice | null {
@@ -61,9 +86,25 @@ function personOnImage(
   input: ImageInput,
   file: string,
   shotId: string,
-): { role: "location" | "figure" | "face" | "other"; name: string } {
+): { role: "location" | "first" | "figure" | "face" | "sheet" | "other"; name: string } {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   const stem = path.parse(file).name;
+  // Лист лица, лицо или сам персонаж: утверждённый файл лежит в characters/approve, лица — нет.
+  if (sources.includes("library:faces-or-characters")) {
+    const approved = path.basename(path.dirname(file)) === "approve";
+    if (approved) {
+      const suffix = `_${shotId}`;
+      const name = stem.toLowerCase().endsWith(suffix.toLowerCase()) ? stem.slice(0, -suffix.length) : stem;
+      return { role: "figure", name: name.toLowerCase() };
+    }
+    if (FACE_SHEET.test(stem)) {
+      const owner = stem.replace(/[_ -]?face[_ -]?sheet.*$/i, "") || path.basename(path.dirname(file));
+      return { role: "sheet", name: owner.toLowerCase() };
+    }
+    const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
+    return { role: "face", name: name.toLowerCase() };
+  }
+  if (sources.includes("approve:first_frame")) return { role: "first", name: "" };
   if (sources.includes("library:faces")) {
     const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
     return { role: "face", name: name.toLowerCase() };
@@ -80,9 +121,10 @@ function personOnImage(
 }
 
 /**
- * Номера картинок, которые получит граф первого кадра: `image N` в prompt.md. Номер — порядок
- * слотов-картинок манифеста, которым достался файл (тот же slotFile, что и при запуске): ряд
- * `image_2`…`image_6` заполняется подряд, без пропусков. Что не влезло в граф — отдельной строкой.
+ * Номера картинок, которые получит граф: `image N` на первом кадре, а у манифеста с
+ * `imageLabel` (MiniMax H3: `<Picture N>`) — на любом этапе. Номер — порядок слотов-картинок
+ * манифеста, которым достался файл (тот же slotFile, что и при запуске): ряд заполняется подряд,
+ * без пропусков. Что не влезло в граф — отдельной строкой.
  */
 export function renderGraphImages(
   episodeId: string,
@@ -90,9 +132,12 @@ export function renderGraphImages(
   stageId: StageId,
   workflowId: string | null | undefined,
 ): string {
-  if (stageId !== "first_frame" || !workflowId) return "";
+  if (!workflowId) return "";
   const binding = stageBindings(stageId).find((item) => item.id === workflowId)?.binding;
-  if (!binding) return "";
+  if (!binding || (stageId !== "first_frame" && !binding.imageLabel)) return "";
+  // MiniMax зовёт картинки <Picture N>, людей — <Subject N>; Qwen — image N и characterN.
+  const label = (n: number) => (binding.imageLabel ? binding.imageLabel.replace("{n}", String(n)) : `image ${n}`);
+  const person = (n: number) => (binding.imageLabel ? `<Subject ${n}>` : `character${n}`);
   const ctx = { episodeId, shotId, stageId };
   const images: Record<string, string[]> = {};
   for (const [name, input] of Object.entries(binding.inputs)) {
@@ -117,31 +162,41 @@ export function renderGraphImages(
     const fileName = path.basename(found.file);
     const number = lines.length + 1;
     if (who.role === "location") {
-      lines.push(`- image ${number}: the location (${fileName})`);
-    } else if (who.role === "figure" || who.role === "face") {
-      const kind = who.role === "face" ? "face" : "approved figure and clothes";
+      lines.push(`- ${label(number)}: the location (${fileName})`);
+    } else if (who.role === "first") {
+      lines.push(`- ${label(number)}: the approved first frame: the place, the camera and the people in their clothes (${fileName})`);
+    } else if (who.role === "figure" || who.role === "face" || who.role === "sheet") {
+      const kind =
+        who.role === "sheet"
+          ? "face sheet: several views of the same face"
+          : who.role === "face"
+            ? "face"
+            : "approved figure and clothes";
       lines.push(
-        `- image ${number}: character${characterFor(who.name)} ${kind} (${who.name} in the task; do not write that name) (${fileName})`,
+        `- ${label(number)}: ${person(characterFor(who.name))} ${kind} (${who.name} in the task; do not write that name) (${fileName})`,
       );
     } else {
-      lines.push(`- image ${number}: ${found.input.label} (${fileName})`);
+      lines.push(`- ${label(number)}: ${found.input.label} (${fileName})`);
     }
   }
   if (!lines.length) return "";
   const left = Object.entries(images).flatMap(([name, files]) =>
     files.filter((_, index) => !sent.has(`${name}:${index}`)).map((file) => path.basename(file)),
   );
+  const bind = binding.imageLabel
+    ? `Every picture above goes to the model. In prompt.md the people are ${person(1)}, ${person(2)}, … in this order, and the pictures are named exactly as above. Bind each person once, in subject_definitions: \`${person(1)} is the young woman defined by ${label(2)}\`. The name from the task or the file stays out of prompt.md.`
+    : "Every image above goes to the model. In prompt.md the people are character1, character2, … in this order. Bind each one once, in the first lines, by these numbers: `character1 is image 2 and the face from image 4`. The name from the task or the file stays out of prompt.md.";
   const parts = [
-    "## Images the graph receives (use these numbers in prompt.md)",
+    `## Images the graph receives (use these ${binding.imageLabel ? "names" : "numbers"} in prompt.md)`,
     "",
     ...lines,
     "",
-    "Every image above goes to the model. In prompt.md call the people character1, character2, … in this order. One or two sentences each, and bind the references by these numbers: `character1 is image 2 and the face from image 4`. Do not write the name from the task or the file.",
+    bind,
   ];
   if (left.length) {
     parts.push("", `Not sent, the graph takes at most ${lines.length} images: ${left.join(", ")}. Do not refer to them.`);
   }
-  parts.push("", "Never write file names or paths in prompt.md: the model sees only the image numbers.");
+  parts.push("", `Never write file names or paths in prompt.md: the model sees only the ${binding.imageLabel ? "picture names" : "image numbers"}.`);
   return parts.join("\n");
 }
 
@@ -153,6 +208,40 @@ export function chosenDurationSec(
   workflowId: string | null | undefined,
 ): number | null {
   return stageDuration({ episodeId, shotId, stageId }, workflowId ?? null).durationSec;
+}
+
+/**
+ * Текущий prompt.md написан агентом под другой воркфлоу этапа (agent_baseline.json): агенту — раздел
+ * «перепиши в форме этого плейбука». Иначе пусто. Пользователь мог сменить воркфлоу в меню и
+ * нажать «Отправить агенту» без сообщения, или «▶ Все кадры» ведёт цепочку LTX → MiniMax.
+ */
+export function workflowSwitch(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  workflow: WorkflowChoice | null,
+): string {
+  const baseline = readBaseline(episodeId, shotId, stageId);
+  if (!workflow || !baseline?.workflow || baseline.workflow === workflow.id) return "";
+  if (!readTextIfExists(path.join(stageDir(episodeId, shotId, stageId), "prompt.md")).trim()) return "";
+  const before = listWorkflowChoices(episodeId, shotId, stageId).find((choice) => choice.id === baseline.workflow);
+  return [
+    "## The current prompt.md was written for another workflow",
+    "",
+    `It was written for \`${baseline.workflow}\`${before ? ` (${before.label})` : ""}; this run uses \`${workflow.id}\` (${workflow.label}). Rewrite all of it in the form of the playbook above: its opening, its labels for the pictures and the people, its sections. Keep its content: the action, its order and timing, the spoken lines, and every correction from the user's notes. Phrases that belong to the old form stay behind.`,
+  ].join("\n");
+}
+
+/** Длина утверждённого превью, которую доска поставит в граф (вход media:duration). null — нет. */
+export function previewDurationSec(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  workflowId: string | null | undefined,
+): number | null {
+  if (!workflowId) return null;
+  const binding = stageBindings(stageId).find((item) => item.id === workflowId)?.binding;
+  return binding ? mediaDurationSec({ episodeId, shotId, stageId }, binding) : null;
 }
 
 /** Строка для llm_task.md: длительность выбрана в меню, `N sec` в prompt.md не нужен. */
@@ -193,15 +282,17 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   const workflow = selectedWorkflow(episodeId, shotId, stageId);
   const playbook = resolvePlaybook(stageId, workflow?.playbook);
   const rules = GENERATION_STAGES.has(stageId) ? `\n\n${GENERATION_PROMPT_RULES}` : "";
+  const locationRules = stageId === "location" ? `\n\n${LOCATION_EMPTY_RULES}` : "";
   const system = playbook
-    ? `${TEXT_RULES}${rules}\n\n# Playbook (${playbook.file})\n\n${playbook.text.trim()}\n`
-    : `${TEXT_RULES}${rules}\n`;
+    ? `${TEXT_RULES}${rules}\n\n# Playbook (${playbook.file})\n\n${playbook.text.trim()}\n${locationRules}`
+    : `${TEXT_RULES}${rules}${locationRules}\n`;
 
   const meta = readShotMeta(episodeId, shotId);
   const prompt = readTextIfExists(path.join(dir, "prompt.md")).trim();
   const refsNote = readTextIfExists(path.join(dir, "refs.md")).trim();
   const refs = listFiles(path.join(dir, "refs"));
   const seconds = chosenDurationSec(episodeId, shotId, stageId, workflow?.id);
+  const previewSeconds = seconds == null ? previewDurationSec(episodeId, shotId, stageId, workflow?.id) : null;
   const lines = [
     "## User request",
     "",
@@ -220,9 +311,16 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
           `- clip duration: ${seconds} s, chosen by the user in the board menu. The action must fit into this time. The board sets the duration itself: do not write "N sec" in prompt.md.`,
         ]
       : []),
+    ...(previewSeconds != null
+      ? [
+          `- clip duration: ${previewSeconds} s, the length of the approved preview; the board sets it. Where the playbook asks for the length of the shot, write this number.`,
+        ]
+      : []),
   ];
   const context = renderShotContext(episodeId, shotId, stageId, request.createdAt);
   if (context) lines.push("", context);
+  const switched = workflowSwitch(episodeId, shotId, stageId, workflow);
+  if (switched) lines.push("", switched);
   lines.push(
     "",
     "## Current prompt.md",
@@ -249,9 +347,19 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     const speech = readShotSpeech(episodeId, shotId).trim();
     lines.push(
       "",
-      "## Lines (speech.md). An English line goes into prompt.md word for word. A line in Cyrillic is written in English: do not copy the Cyrillic and do not translate the line into Russian. The speaker is character1, character2, not the name before the colon.",
+      "## Lines (speech.md as of this request; it may have changed since the current prompt.md was written). An English line goes into prompt.md word for word. A line in Cyrillic is written in English: do not copy the Cyrillic and do not translate the line into Russian. The speaker is character1, character2, not the name before the colon. When the spoken lines in the current prompt.md differ from these, use these.",
       "",
-      speech || "(none: nobody speaks in this shot)",
+      speech || "(none: nobody speaks in this shot; take any spoken line out of the prompt)",
+    );
+  }
+  // Финал без видео-референса: движение эскиза агент переносит в текст сам.
+  const metaBinding = workflow ? stageBindings(stageId).find((item) => item.id === workflow.id)?.binding : undefined;
+  for (const meta of metaBinding ? approvedMetaTexts({ episodeId, shotId, stageId }, metaBinding) : []) {
+    lines.push(
+      "",
+      `## ${meta.label} (from ${meta.where}: the motion of the approved preview; keep its movements, their order and timing, written in this playbook's form)`,
+      "",
+      meta.text,
     );
   }
   const images = renderGraphImages(episodeId, shotId, stageId, workflow?.id);

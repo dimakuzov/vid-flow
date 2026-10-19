@@ -25,7 +25,7 @@ import { describingNow, shotDescriptions, stageUsesContext } from "./description
 import { actionEditedByUser, actionStale, readShotAction } from "./shot-action";
 import { readShotNotes } from "./shot-notes";
 import { previousCharacterImages } from "./character-base";
-import { readShotMeta } from "./shot-meta";
+import { readShotFragment, readShotMeta } from "./shot-meta";
 import {
   deriveStageStatus,
   expectedApproveCount,
@@ -114,6 +114,7 @@ function emptySeries(episodes: SeriesChoice[]): SeriesSummary {
     episodes,
     shots: [],
     hiddenShots: [],
+    shotOrder: [],
     scenarioExists: false,
     hasRawScenario: false,
     formatRequestStatus: null,
@@ -145,9 +146,10 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
   const raw = readTextIfExists(path.join(root, "scenario_raw.md"));
   const scenario = readTextIfExists(path.join(root, "scenario.md"));
   const hidden = new Set(readHiddenShotIds(episodeId).map((id) => id.toLowerCase()));
+  const shotOrder = listShotIds(episodeId);
   const shots: ShotSummary[] = [];
   const hiddenShots: ShotSummary[] = [];
-  for (const shotId of listShotIds(episodeId)) {
+  for (const shotId of shotOrder) {
     try {
       const meta = readShotMeta(episodeId, shotId);
       const stages = Object.fromEntries(
@@ -159,6 +161,8 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
       const summary: ShotSummary = {
         id: shotId,
         title: meta.title,
+        summary: meta.summary,
+        fragment: readShotFragment(episodeId, shotId),
         characters: meta.characters,
         location: meta.location,
         stages,
@@ -184,6 +188,7 @@ export function scanSeries(requestedEpisodeId?: string | null): SeriesSummary {
     episodes,
     shots,
     hiddenShots,
+    shotOrder,
     scenarioExists: scenario.trim().length > 0,
     hasRawScenario: raw.trim().length > 0,
     formatRequestStatus: formatRequest?.status ?? null,

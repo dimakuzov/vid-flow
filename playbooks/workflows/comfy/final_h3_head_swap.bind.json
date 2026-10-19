@@ -1,0 +1,78 @@
+{
+  "format": "frameboard.graph-binding/1",
+  "id": "final_h3_head_swap",
+  "graph": "minimax_h3_head_swap_api.json",
+  "stage": "final_render",
+  "label": "Финал MiniMax H3: замена головы по листу лица (один персонаж)",
+  "description": "Улучшает утверждённое превью и ставит голову по листу лица. Только один персонаж в кадре, нужен его face_sheet. Промпт не нужен: жмите «Запустить».",
+  "order": 12,
+  "inputs": {
+    "video": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "uploadAs": "{shotId}_final_src{ext}",
+      "label": "Утверждённое превью"
+    },
+    "sheet": {
+      "kind": "image",
+      "from": "library:face-sheets",
+      "pick": "first",
+      "uploadAs": "{shotId}_face_sheet{ext}",
+      "label": "Лист лица персонажа (face_sheet)"
+    },
+    "people": {
+      "kind": "image",
+      "from": "approve:characters",
+      "pick": "all",
+      "maxAvailable": 1,
+      "label": "Утверждённые персонажи"
+    }
+  },
+  "slots": [
+    {
+      "targets": [
+        {
+          "node": "867",
+          "field": "video"
+        }
+      ],
+      "value": {
+        "input": "video"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "349",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "sheet"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "13",
+          "field": "noise_seed"
+        }
+      ],
+      "value": {
+        "seed": "random"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "539",
+          "field": "filename_prefix"
+        }
+      ],
+      "value": {
+        "template": "frameboard/final/{shotId}_head_swap"
+      }
+    }
+  ]
+}

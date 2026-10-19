@@ -15,6 +15,16 @@ export type ImageSource =
    */
   | "library:faces"
   /**
+   * По одной картинке на персонажа из approve/ этапа characters, в том же порядке: лист лица
+   * (`{name}_face_sheet`), иначе лицо (как у library:faces), иначе сам утверждённый персонаж.
+   */
+  | "library:faces-or-characters"
+  /**
+   * Листы лица персонажей из approve/ этапа characters, в том же порядке: `refs/{name}_face_sheet.*`
+   * этапа, иначе картинка с face_sheet в имени в data/characters/{name}/. Без листа персонаж пропускается.
+   */
+  | "library:face-sheets"
+  /**
    * База одного персонажа прогона (`forEach: character`): full_body.png, иначе body.png,
    * иначе первая картинка без «copy» в data/characters/{имя}/.
    */
@@ -33,6 +43,11 @@ export interface ImageInput {
   min?: number;
   /** Сколько взять максимум (для pick: all). */
   max?: number;
+  /**
+   * Вариант доступен, только если файлов не больше этого числа: `1` у входа персонажей —
+   * «в кадре один персонаж» (замена головы MiniMax). Больше — вариант недоступен, с подписью почему.
+   */
+  maxAvailable?: number;
   /** Имя файла при загрузке в ComfyUI. Плейсхолдеры: {shotId}, {episodeId}, {index}, {ext}. По умолчанию — имя файла. */
   uploadAs?: string;
   /**
@@ -232,6 +247,12 @@ export interface GraphBinding {
   description: string;
   /** Плейбук модели для агента (английский), путь от playbooks/: models/qwen_location.en.md. */
   playbook?: string;
+  /**
+   * Как модель называет картинки: `<Picture {n}>` (MiniMax H3). Есть — агент получает в задаче
+   * список картинок графа под этими именами, на любом этапе. Нет — `image {n}`, список только
+   * на первом кадре.
+   */
+  imageLabel?: string;
   /** Порядок в меню. Вариант по умолчанию — первый по order, у которого есть все обязательные входы. */
   order: number;
   /**

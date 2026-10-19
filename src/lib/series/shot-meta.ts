@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import { readTextIfExists, writeText } from "./media";
 import { shotDir } from "./paths";
@@ -102,6 +103,34 @@ export function setShotTitle(episodeId: string, shotId: string, title: string): 
   else content = content.trim() ? `# ${next}\n\n${content}` : `# ${next}\n\n- characters: \n- location: \n`;
   writeText(file, content.endsWith("\n") ? content : `${content}\n`);
   return next;
+}
+
+/** Правка фрагмента сценария в карточке кадра. null — своей правки ещё нет, показывается текст из сырого сценария. */
+export function readShotFragment(episodeId: string, shotId: string): string | null {
+  const file = path.join(shotDir(episodeId, shotId), "fragment.md");
+  if (!fs.existsSync(file)) return null;
+  return readTextIfExists(file);
+}
+
+/**
+ * Сохраняет текст фрагмента в кадре и в раздел Summary shot.md.
+ * Заголовок, персонажи и локация не меняются. Этот текст потом читает сборка кадра.
+ */
+export function setShotFragment(episodeId: string, shotId: string, fragment: string): string {
+  const text = fragment.replace(/\r\n/g, "\n");
+  writeText(path.join(shotDir(episodeId, shotId), "fragment.md"), text);
+  const file = path.join(shotDir(episodeId, shotId), "shot.md");
+  let content = readTextIfExists(file);
+  const block = `## Summary\n${text.trim()}\n`;
+  if (/##\s*Summary\s*\n/i.test(content)) {
+    content = content.replace(/##\s*Summary\s*\n[\s\S]*?(?=\n##\s|$)/i, block);
+  } else if (content.trim()) {
+    content = `${content.trimEnd()}\n\n${block.trimEnd()}`;
+  } else {
+    content = `# ${shotId}\n\n- characters: \n- location: \n\n${block.trimEnd()}`;
+  }
+  writeText(file, content.endsWith("\n") ? content : `${content}\n`);
+  return text;
 }
 
 export function readShotMeta(episodeId: string, shotId: string): ShotMeta {

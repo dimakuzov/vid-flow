@@ -208,7 +208,7 @@ The board does not switch by itself. If the selected variant does not fit, write
 | Sketch: someone speaks, or the shot needs sound | `video_ltx` |
 | Final: the sketch was made with LTX | `final_ltx` |
 | Final: nobody speaks, the sketch is Wan | `final_wan_720` |
-| Final: one speaker | `final_h3_768_face` |
+| Final: one speaker | `final_h3_cinema` |
 | Final: two or more speakers | `final_heygen` (the cloud runs only after the user ticks the box for this one run) |
 
 An LTX caption is the paragraph in `playbooks/models/ltx_video.en.md`: it opens on the framing of the first frame. Do not paste it into Wan.

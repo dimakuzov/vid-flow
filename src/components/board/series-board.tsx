@@ -12,7 +12,7 @@ import { BootstrapPanel } from "./bootstrap-panel";
 import { BulkMenu } from "./bulk-menu";
 import { NewEpisodeDialog } from "./new-episode-dialog";
 import { PostPanel } from "./post-panel";
-import { ShotAgentLine, ShotAgentMenu } from "./shot-agent-menu";
+import { ShotAgentLine } from "./shot-agent-menu";
 import { StageCell } from "./stage-cell";
 
 /** Название кадра прямо в таблице. Пишется в заголовок shot.md, остальной текст не трогается. */
@@ -126,7 +126,6 @@ function ShotHeader({
         {shot.location || t("board.noLocation")}
       </div>
       <ShotAgentLine shot={shot} />
-      <ShotAgentMenu episodeId={episodeId} shot={shot} onDone={onChanged} />
     </div>
   );
 }
@@ -366,7 +365,6 @@ export function SeriesBoard({
           <>
             {/* Телефон: кадр — карточка, этапы списком. Кнопки «для всех кадров» — строкой сверху. */}
             <div className="mb-4 flex flex-wrap gap-x-3 gap-y-1 md:hidden">
-              <BulkMenu episodeId={episodeId} target={{ kind: "assign" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
               {STAGES.map((stageId) => (
                 <div key={stageId} className="flex items-center gap-1 text-[11px] text-stone-500">
                   <span>{stageName(t, stageId)}</span>
@@ -409,7 +407,6 @@ export function SeriesBoard({
                   <tr>
                     <th className="px-2 py-2 text-left align-top text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                       {t("board.shot")}
-                      <BulkMenu episodeId={episodeId} target={{ kind: "assign" }} shotCount={series.shots.length} withoutAgent={withoutAgent} onDone={onChanged} />
                     </th>
                     {STAGES.map((stageId) => (
                       <th
@@ -463,15 +460,20 @@ export function SeriesBoard({
           tableShots={series.shots.map((shot) => ({
             id: shot.id,
             title: shot.title,
+            summary: shot.summary ?? "",
+            fragment: shot.fragment ?? null,
             characters: shot.characters,
             location: shot.location,
           }))}
           hiddenShots={(series.hiddenShots ?? []).map((shot) => ({
             id: shot.id,
             title: shot.title,
+            summary: shot.summary ?? "",
+            fragment: shot.fragment ?? null,
             characters: shot.characters,
             location: shot.location,
           }))}
+          shotOrder={series.shotOrder ?? []}
           initialScenario={initialScenario}
           initialRawScenario={initialRawScenario}
           initialPreview={initialPreview}

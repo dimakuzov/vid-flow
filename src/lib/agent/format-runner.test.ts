@@ -74,7 +74,9 @@ async function settle(episodeId: string) {
 test("подсказка модели: правила разметки, библиотека персонажей и локаций, сырой текст", () => {
   const prompt = buildFormatPrompt("Катя входит в кафе.");
   assert.match(prompt.system, /## s01/);
-  assert.match(prompt.system, /не дели один прописанный кадр/);
+  assert.match(prompt.system, /не дели один прописанный кадр|Сцену не дробить/);
+  assert.match(prompt.system, /Реплики копируй дословно/);
+  assert.match(prompt.system, /название дословно/);
   assert.match(prompt.user, /персонажи: katya/);
   assert.match(prompt.user, /локации: cafe/);
   assert.match(prompt.user, /Катя входит в кафе\./);
@@ -163,6 +165,45 @@ test("разметка с репликами и длительностью: spee
   assert.equal(readShotSpeech("e10", "s02"), "", "без реплик файла нет");
   assert.equal(readRunSettings("e10", "s02", "video_preview").durationSec, 12, "больше 12 — до предела");
   assert.match(buildFormatPrompt("x").system, /- speech: /);
+});
+
+test("разметка не подменяет название сцены и не меняет реплики местами", async () => {
+  reply = {
+    status: "done",
+    prompt: `# Ep
+
+## s01 Ужин
+- characters: lena, mama
+- location: kitchen
+- duration: 6
+- speech: MAMA: Иди ужинать.
+- speech: LENA: Мама, я дома.
+Лена дома.
+
+## s02 Лишнее
+Ещё кадр.
+`,
+  };
+  await post({
+    episodeId: "e20",
+    rawText: `Episode
+1. ИНТ. Кухня — вечер
+LENA
+Мама, я дома.
+MAMA
+Иди ужинать.
+2. НАТ. Улица — ночь
+Пустая улица.
+`,
+    provider: "claude",
+  });
+  await settle("e20");
+  assert.equal(readFormatRequest(episodeRoot("e20"))?.status, "done");
+  assert.deepEqual(listShotIds("e20"), ["s01", "s02"]);
+  assert.equal(readShotMeta("e20", "s01").title, "ИНТ. Кухня — вечер");
+  assert.equal(readShotMeta("e20", "s02").title, "НАТ. Улица — ночь");
+  assert.equal(readShotSpeech("e20", "s01"), "LENA: Мама, я дома.\nMAMA: Иди ужинать.\n");
+  assert.match(calls.at(-1)?.user ?? "", /s01: ИНТ\. Кухня — вечер/);
 });
 
 const ONE_SHOT = "## s01 Кафе\n- characters: katya\n- location: cafe\nКатя входит.";

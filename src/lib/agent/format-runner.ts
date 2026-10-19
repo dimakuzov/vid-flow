@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { AgentRequestFile, AgentResult } from "../contracts/agent-request";
 import { applyBootstrap, parseScenario } from "../series/bootstrap";
+import { formatLawNote, lockFormattedScenario } from "../series/format-guard";
 import { readFormatRequest, writeFormatRequest, FORMAT_RULES, type FormatRequest } from "../series/format-request";
 import { readTextIfExists, writeText } from "../series/media";
 import { episodeRoot, getCharactersRoot, getLocationsRoot } from "../series/paths";
@@ -73,6 +74,7 @@ function folderNames(root: string): string[] {
 export function buildFormatPrompt(raw: string): { system: string; user: string } {
   const characters = folderNames(getCharactersRoot());
   const locations = folderNames(getLocationsRoot());
+  const law = formatLawNote(raw);
   const user = [
     "## Библиотека",
     "",
@@ -83,8 +85,12 @@ export function buildFormatPrompt(raw: string): { system: string; user: string }
     "",
     raw.trim(),
     "",
+    law,
+    law ? "" : null,
     "Напиши scenario.md.",
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
   return { system: SYSTEM, user };
 }
 
@@ -101,7 +107,10 @@ export function applyFormatResult(request: FormatRequest, result: AgentResult): 
     finish(request, { status: "error", error: result.error || "Модель вернула ошибку" });
     return;
   }
-  const scenario = cleanPromptText(result.prompt ?? "");
+  const cleaned = cleanPromptText(result.prompt ?? "");
+  const parsed = cleaned ? parseScenario(cleaned) : null;
+  const raw = readTextIfExists(path.join(episodeRoot(request.episodeId), "scenario_raw.md"));
+  const scenario = lockFormattedScenario(raw, cleaned, parsed?.shots ?? [], parsed?.seriesTitle ?? "");
   const shots = scenario ? parseScenario(scenario).shots.length : 0;
   if (!shots) {
     finish(request, { status: "error", error: "Модель не вернула кадров «## s01». Попробуйте другую модель." });

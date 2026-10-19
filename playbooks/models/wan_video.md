@@ -208,7 +208,7 @@ Static shot, fixed camera. The boy in the grey coat stands by the door at the ba
 | Эскиз: есть речь или нужен звук | `video_ltx` |
 | Финал: эскиз сделан LTX | `final_ltx` |
 | Финал: никто не говорит, эскиз Wan | `final_wan_720` |
-| Финал: говорит один | `final_h3_768_face` |
+| Финал: говорит один | `final_h3_cinema` |
 | Финал: говорят двое и больше | `final_heygen` (облако только по галочке пользователя на этот запуск) |
 
 Подпись LTX — абзац из `playbooks/models/ltx_video.md`: он открывается крупностью первого кадра. В Wan её не подставлять.

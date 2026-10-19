@@ -12,7 +12,7 @@ The approved location becomes the background of the first frame as it is: the fi
 
 - **Long shot**: the whole space, eye level, the spot for the people free.
 - **Medium shot**: `Move the camera forward` to about two metres from the spot where the people will be. What stands behind them (window, desk, board) at the size it will have behind a person seen from the waist up; the lower part of the frame is free for them.
-- **Close-up**: `Turn the camera to a close-up`: a fragment behind a head (part of a wall, a window, a few desks) is enough.
+- **Close-up**: `Turn the camera to a close-up`: a fragment of the place (part of a wall, a window, a few desks) is enough. Do not write the person who will stand there.
 
 Name the place for the people: `the empty chair in the center of the frame`, `the window on the right half, the floor in front of it free`.
 

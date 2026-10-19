@@ -222,3 +222,17 @@ test("видео: в задаче описание утверждённого п
   assert.doesNotMatch(first, /Approved first frame/);
   assert.equal(getStageDetail(EP, "s01", "location").shotContext, null);
 });
+
+test("локация: человек из текста кадра в промпт не переносится", () => {
+  const { system } = buildTextParts({
+    episodeId: EP,
+    shotId: "s01",
+    stageId: "location",
+    message: "убери женщину",
+    createdAt: new Date().toISOString(),
+  } as AgentRequestFile);
+  assert.match(system, /empty place/);
+  assert.match(system, /from behind her shoulder/);
+  assert.match(system, /must not appear again/);
+  assert.doesNotMatch(system, /Describe each person/);
+});

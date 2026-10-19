@@ -10,7 +10,7 @@ import type { VoiceJob } from "@/lib/post/voice-job";
 
 /*
  * Секция «Пост» под таблицей кадров (docs/contracts/post.md): озвучка реплик в ElevenLabs
- * и таймлайн для DaVinci Resolve. Субтитры — следующая часть.
+ * и проект Kdenlive. Субтитры — следующая часть.
  */
 
 const SIZES = [
@@ -231,6 +231,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
   const [allowPaid, setAllowPaid] = useState(false);
   const [size, setSize] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const musicInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -320,8 +321,25 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
     SIZES.find((item) => item.label === size) ??
     SIZES.find((item) => item.width === state.defaultSize.width && item.height === state.defaultSize.height) ??
     SIZES[0];
-  const latest = state.timelines[state.timelines.length - 1];
   const project = state.projects[state.projects.length - 1];
+
+  async function addMusic(file: File) {
+    const body = new FormData();
+    body.set("file", file);
+    setBusy(true);
+    setMessage("");
+    try {
+      const res = await fetch(postApi(episodeId, "/music"), { method: "POST", body });
+      const data = (await res.json()) as { error?: string; file?: string };
+      if (!res.ok) throw new Error(data.error || "Не удалось добавить музыку");
+      setMessage(data.file ? `Музыка добавлена: ${data.file}` : "Музыка добавлена");
+      await load();
+    } catch (err) {
+      setMessage(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <section className="min-w-0 rounded-2xl border border-stone-300/70 bg-white/80 p-4 sm:p-5">
@@ -559,8 +577,8 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
           ) : null}
 
           {state.lines.length ? (
-            <>
-              <h4 className="mt-4 text-sm font-medium text-stone-800">{t("post.lines")}</h4>
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm font-medium text-stone-800">{t("post.lines")}</summary>
               <p className="mt-1 text-xs text-stone-500">{t("post.linesLead")}</p>
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-sm">
@@ -670,7 +688,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                   </tbody>
                 </table>
               </div>
-            </>
+            </details>
           ) : null}
 
           <h4 className="mt-4 text-sm font-medium text-stone-800">{t("post.kdenlive")}</h4>
@@ -712,6 +730,20 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             >
               {building ? (speechActive ? t("post.buildingSpeech") : t("post.building")) : t("post.build")}
             </Button>
+            <input
+              ref={musicInput}
+              type="file"
+              accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,audio/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void addMusic(file);
+              }}
+            />
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => musicInput.current?.click()}>
+              Добавить музыку
+            </Button>
             {project ? (
               <>
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => void openProject()}>
@@ -721,11 +753,6 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                   {t("post.download", { name: project.name })}
                 </a>
               </>
-            ) : null}
-            {latest ? (
-              <a href={latest.url} className="text-xs text-stone-500 underline-offset-4 hover:underline" download>
-                {t("post.fcpxml")}
-              </a>
             ) : null}
           </div>
           {project ? (

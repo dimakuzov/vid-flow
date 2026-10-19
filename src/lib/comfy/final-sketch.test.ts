@@ -14,7 +14,7 @@ process.env.FRAMEBOARD_LOOPS = "off";
 delete process.env.SERIES_ROOT;
 
 import { createEpisode, ensureStageDirs, shotDir, stageDir } from "../series/paths";
-import { buildPrompt, readVideoPromptText, sketchPromptTaskNote, stageBindings } from "./binding";
+import { approvedMetaTexts, buildPrompt, readVideoPromptText, sketchPromptTaskNote, stageBindings } from "./binding";
 import { listWorkflowChoices } from "./workflows";
 
 const EP = "e01";
@@ -183,7 +183,7 @@ test("эскиз Wan — final_wan_720; один говорящий — H3; ди
   assert.equal(defaultFinal(), "final_wan_720");
   fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Lena: Don't mind him.\n");
   try {
-    assert.equal(defaultFinal(), "final_h3_768_face");
+    assert.equal(defaultFinal(), "final_h3_cinema");
     fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Lena: Don't mind him.\nJulia: But why?\n");
     assert.equal(defaultFinal(), "final_heygen");
   } finally {
@@ -205,13 +205,12 @@ test("нет метаданных: имя файла _ltx выбирает фи�
   assert.equal(defaultFinal(), "final_wan_720", "в метаданных нода Wan, подстрока _ltx в имени не считается");
 });
 
-test("H3 берёт исходный промпт из метаданных эскиза", () => {
+test("H3 Cinema: агент получает промпт эскиза из метаданных, а не правленый prompt.md", () => {
   clearApprove();
   putApprove("s01_i2v_00001_.mp4", mp4WithPrompt(wanGraph("Static shot. Lena holds still.")));
   fs.writeFileSync(path.join(stageDir(EP, "s01", "video_preview"), "prompt.md"), "EDITED AFTER APPROVE.");
-  fs.writeFileSync(path.join(stageDir(EP, "s01", "final_render"), "prompt.md"), "Static shot. Lena holds her hand to her chest.");
-  const { prompt } = buildFinal("final_h3_768_face");
-  const data = JSON.parse(String(prompt["1"].inputs.creator_data));
-  assert.equal(data.segments[0].prompt, "Static shot. Lena holds still.");
-  assert.equal(data.segments[0].refined.source, "Static shot. Lena holds still.");
+  const binding = stageBindings("final_render").find((item) => item.id === "final_h3_cinema")!.binding!;
+  const texts = approvedMetaTexts({ episodeId: EP, shotId: "s01", stageId: "final_render" }, binding);
+  assert.deepEqual(texts.map((item) => item.text), ["Static shot. Lena holds still."]);
+  assert.match(texts[0].where, /^метаданные s01_i2v_00001_\.mp4$/);
 });

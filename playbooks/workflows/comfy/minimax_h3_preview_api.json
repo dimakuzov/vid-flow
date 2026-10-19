@@ -1,0 +1,496 @@
+{
+  "4": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "28": {
+    "inputs": {
+      "image": "first_frame.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 1 (first frame)"
+    }
+  },
+  "33": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "66": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression"
+    }
+  },
+  "100": {
+    "inputs": {
+      "unet_name": "minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "102": {
+    "inputs": {
+      "value": 1.5
+    },
+    "class_type": "easy float",
+    "_meta": {
+      "title": "Final Resolution(Stage 2)"
+    }
+  },
+  "108": {
+    "inputs": {
+      "lora_name": "minimax\\lightx2v_hybrid-4to8step-Turbo_r48.safetensors",
+      "strength_model": 0.7,
+      "model": [
+        "183",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "111": {
+    "inputs": {
+      "value": 5
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Duration(Second)"
+    }
+  },
+  "112": {
+    "inputs": {
+      "aspect_ratio": "9:16 (Portrait Widescreen)",
+      "megapixels": 0.5,
+      "multiple": 32
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector (Stage1)"
+    }
+  },
+  "120": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Model Attention Backend"
+    }
+  },
+  "121": {
+    "inputs": {
+      "prompt": [
+        "190",
+        0
+      ],
+      "width": [
+        "112",
+        0
+      ],
+      "height": [
+        "112",
+        1
+      ],
+      "length": [
+        "66",
+        1
+      ],
+      "ref_image_size": "max",
+      "clip": [
+        "33",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ],
+      "audio_vae": [
+        "5",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "28",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "301",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "302",
+        0
+      ],
+      "ref_images.ref_image_3": [
+        "303",
+        0
+      ],
+      "ref_images.ref_image_4": [
+        "304",
+        0
+      ],
+      "ref_images.ref_image_5": [
+        "305",
+        0
+      ],
+      "ref_images.ref_image_6": [
+        "306",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Reference to Video"
+    }
+  },
+  "145": {
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "conditioning": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "146": {
+    "inputs": {
+      "model": [
+        "108",
+        0
+      ],
+      "conditioning": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "150": {
+    "inputs": {
+      "noise": [
+        "155",
+        0
+      ],
+      "guider": [
+        "145",
+        0
+      ],
+      "sampler": [
+        "164",
+        0
+      ],
+      "sigmas": [
+        "165",
+        0
+      ],
+      "latent_image": [
+        "121",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "151": {
+    "inputs": {
+      "noise_seed": 0
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "153": {
+    "inputs": {
+      "samples": [
+        "156",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "155": {
+    "inputs": {
+      "noise_seed": 0
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "156": {
+    "inputs": {
+      "av_latent": [
+        "150",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "Separate AV Latent"
+    }
+  },
+  "158": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 4,
+      "denoise": 0.25,
+      "model": [
+        "108",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "159": {
+    "inputs": {
+      "samples": [
+        "156",
+        1
+      ],
+      "vae": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE Decode Audio"
+    }
+  },
+  "164": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "165": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 8,
+      "denoise": 1,
+      "model": [
+        "108",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "167": {
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "183": {
+    "inputs": {
+      "lora_name": "minimax\\Cinema-MH3-V02_000010000.safetensors",
+      "strength_model": 1,
+      "model": [
+        "186",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA-Cinema"
+    }
+  },
+  "186": {
+    "inputs": {
+      "lora_name": "minimax\\MysticXXX_MMH3-V1.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "120",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "187": {
+    "inputs": {
+      "lora_name": "minimax\\电影感loraV1.0正式版_剪枝与非剪枝通用.safetensors",
+      "strength_model": 0.7,
+      "model": [
+        "186",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA-Film"
+    }
+  },
+  "190": {
+    "inputs": {
+      "value": "subject_definitions ASTROCINEMAV01K2T:\n<Subject 1> is the <person> defined by <Picture 2>. Use <Picture 2> for the face: <hair, face>. The clothes and body are the ones already on them in <Picture 1>.\n\n<Picture 1> is the opening frame and the place. The video begins on this exact picture: the same camera, the same framing, the same people in the same poses, the same clothes, the same light, every object in its place.\n\nsummary:\n[reference generation] A <N>-second shot. <Picture 1> is the first frame. <Picture 2> is <Subject 1>'s face.\n\nretention_analysis:\nEvery person keeps the face from their picture and the clothes already on them in <Picture 1>. fully_preserved through the whole shot.\n\ndetailed_description:\nThe shot lasts <N> seconds and never cuts.\n\n[Shot 1] <action>\n\noverall_soundscape:\n<environment sound>\n\nnon_diegetic_music:\nNone.\n"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "191": {
+    "inputs": {
+      "fps": 24,
+      "bit_depth": "auto",
+      "color_space": "sRGB",
+      "codec": "auto",
+      "images": [
+        "153",
+        0
+      ],
+      "audio": [
+        "159",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "192": {
+    "inputs": {
+      "filename_prefix": "frameboard/video/h3",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "191",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "301": {
+    "inputs": {
+      "image": "reference_1.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 2 (character 1)"
+    }
+  },
+  "302": {
+    "inputs": {
+      "image": "reference_2.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 3 (character 2)"
+    }
+  },
+  "303": {
+    "inputs": {
+      "image": "reference_3.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 4 (character 3)"
+    }
+  },
+  "304": {
+    "inputs": {
+      "image": "reference_4.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 5 (character 4)"
+    }
+  },
+  "305": {
+    "inputs": {
+      "image": "reference_5.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 6 (character 5)"
+    }
+  },
+  "306": {
+    "inputs": {
+      "image": "reference_6.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Picture 7 (character 6)"
+    }
+  }
+}

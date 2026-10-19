@@ -21,7 +21,7 @@ const EP = "e01";
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-test("LTX 2.5: в меню эскиза не по умолчанию, собирает граф от первого кадра", () => {
+test("LTX 2.5: на эскизе по умолчанию, собирает граф от первого кадра", () => {
   createEpisode(EP);
   fs.mkdirSync(shotDir(EP, "s01"), { recursive: true });
   fs.writeFileSync(path.join(shotDir(EP, "s01"), "shot.md"), "# s01\n\n- characters: lena\n- location: arch\n");
@@ -37,7 +37,7 @@ test("LTX 2.5: в меню эскиза не по умолчанию, собир
   const choices = listWorkflowChoices(EP, "s01", "video_preview");
   const ltx = choices.find((choice) => choice.id === "video_ltx");
   assert.ok(ltx?.available, JSON.stringify(ltx?.missing));
-  assert.equal(choices.find((choice) => choice.isDefault)?.id, "video_i2v", "по умолчанию остаётся Wan");
+  assert.equal(choices.find((choice) => choice.isDefault)?.id, "video_ltx", "по умолчанию LTX");
 
   writeRunSettings(EP, "s01", "video_preview", { workflow: "video_ltx", durationSec: 6 });
   const loaded = stageBindings("video_preview").find((item) => item.id === "video_ltx")!;

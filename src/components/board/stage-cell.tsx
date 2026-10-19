@@ -135,25 +135,6 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
     }
   }
 
-  async function runAction() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const data = await requestJson<{ message?: string; stage?: StageDetail }>(`${stageApi}/run`, {
-        method: "POST",
-        body: detail?.workflow ? { runWorkflow: detail.workflow } : {},
-        fallbackError: t("cell.runFailed"),
-      });
-      if (data.stage) setDetail(data.stage);
-      setMessage(data.message || t("cell.started"));
-      onChanged();
-    } catch (error) {
-      setMessage(errorText(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function cancelAction() {
     setBusy(true);
     setMessage("");
@@ -370,11 +351,7 @@ export function StageCell({ episodeId, shotId, stageId, stage, onChanged }: Stag
               <p className="text-xs text-stone-500">
                 {t("cell.agentOnly")}
               </p>
-            ) : (
-              <Button disabled={busy || !detail} onClick={runAction}>
-                {t("cell.run")}
-              </Button>
-            )}
+            ) : null}
             {stage.status === "error" ? (
               <Button variant="outline" disabled={busy} onClick={cancelAction}>
                 {t("cell.reset")}

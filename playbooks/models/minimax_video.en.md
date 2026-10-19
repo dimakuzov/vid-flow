@@ -2,7 +2,7 @@
 
 English copy for the model. Russian original: `playbooks/models/minimax_video.md`.
 
-Status: the MiniMax H3 final render is connected to the board — playbook `playbooks/models/minimax_h3.en.md`, variants `final_h3` and `final_h3_768`. Below are the notes from before: where MiniMax is needed instead of Wan and which files are installed.
+Status: the MiniMax H3 final render is connected to the board — playbook `playbooks/models/minimax_h3.en.md`, variant `final_h3_cinema`. Below are the notes from before: where MiniMax is needed instead of Wan and which files are installed.
 
 ## Where it is used
 

@@ -191,8 +191,8 @@ const messages = {
   "bulk.assignButton": { en: "▶ Agents by shot", ru: "▶ Агенты по кадрам" },
   "bulk.allButton": { en: "▶ Every shot", ru: "▶ Все кадры" },
   "bulk.assignLead": {
-    en: "Assigns an agent to shots that do not have one. It starts nothing: a stage begins only when you press Send to agent, ▶ Every shot above a stage, or Run the next stage in the shot menu.",
-    ru: "Назначает агента кадрам без агента. Ничего не запускает: этап начнётся, только когда вы нажмёте «Отправить агенту», «▶ Все кадры» над этапом или «Запустить следующий этап» в меню кадра.",
+    en: "Assigns an agent to shots that do not have one. It starts nothing: a stage begins only when you press Send to agent or ▶ Every shot above a stage.",
+    ru: "Назначает агента кадрам без агента. Ничего не запускает: этап начнётся по «Отправить агенту» или «▶ Все кадры» над этапом.",
   },
   "bulk.charactersLead": {
     en: "On each shot, that shot's agent builds the characters in ComfyUI. Needs Claude Code or the chat agent.",
@@ -219,7 +219,10 @@ const messages = {
 
   "shot.agentButton": { en: "▶ Agent", ru: "▶ Агент" },
   "shot.agentTitle": { en: "Shot agent {id}", ru: "Агент кадра {id}" },
-  "shot.agentLead": { en: "Every run of this shot uses it. Now: {activity}.", ru: "Им идут все запуски этого кадра. Сейчас: {activity}." },
+  "shot.agentLead": {
+    en: "This shot's stages run with it. Each stage's model is chosen on the stage itself. Now: {activity}.",
+    ru: "Им идут запуски этапов этого кадра. Модель каждого этапа выбирается на самом этапе. Сейчас: {activity}.",
+  },
   "shot.next": { en: "Next stage — {stage}.", ru: "Следующий этап — {stage}." },
   "shot.allApproved": { en: "Every stage is approved.", ru: "Все этапы утверждены." },
   "shot.save": { en: "Save", ru: "Сохранить" },
@@ -250,8 +253,8 @@ const messages = {
   "cell.edit": { en: "Edit", ru: "Редактировать" },
   "cell.busy": { en: "{status}. Run and send-to-agent stay closed until the operation finishes.", ru: "{status}. Запуск и отправка агенту закрыты до конца операции." },
   "cell.agentOnly": {
-    en: "The board does not run this stage: the agent queues the run (Edit → Send to agent).",
-    ru: "Этот этап доска не запускает: прогон ставит агент («Редактировать» → «Отправить агенту»).",
+    en: "The agent queues the run: Edit → Send to agent.",
+    ru: "Прогон ставит агент: «Редактировать» → «Отправить агенту».",
   },
   "cell.run": { en: "Run", ru: "Запустить" },
   "cell.reset": { en: "Clear the error", ru: "Сбросить ошибку" },
@@ -651,10 +654,10 @@ const messages = {
   "roster.readFailed": { en: "Could not read the characters", ru: "Не удалось прочитать персонажей" },
 
   "post.title": { en: "Post", ru: "Пост" },
-  "post.voiceTitle": { en: "Voice and the DaVinci project", ru: "Озвучка и проект DaVinci" },
+  "post.voiceTitle": { en: "Voice and the project", ru: "Озвучка и проект" },
   "post.voiceLead": {
-    en: "Lines come from the Lines of each shot (speech.md). One voice file per character holds all of their lines — the voice does not change between phrases. On the timeline each line is a slice of that file, and the clip edge in Resolve can be dragged.",
-    ru: "Реплики берутся из «Реплик» кадров (speech.md). Один файл озвучки на персонажа со всеми его репликами — голос не меняется между фразами. В таймлайне каждая реплика — отрезок этого файла, край клипа в Resolve можно потянуть.",
+    en: "Lines come from the Lines of each shot (speech.md). One voice file per character holds all of their lines — the voice does not change between phrases. On the timeline each line is a slice of that file, and the clip edge in Kdenlive can be dragged.",
+    ru: "Реплики берутся из «Реплик» кадров (speech.md). Один файл озвучки на персонажа со всеми его репликами — голос не меняется между фразами. В таймлайне каждая реплика — отрезок этого файла, край клипа в Kdenlive можно потянуть.",
   },
   "post.voices": { en: "Voices", ru: "Голоса" },
   "post.noLines": { en: "No lines: fill in Lines on the preview or final stages of the shots.", ru: "Реплик нет: заполните «Реплики» на этапах превью или финала кадров." },

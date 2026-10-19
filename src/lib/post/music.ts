@@ -77,3 +77,20 @@ export function musicLevelKeyframes(totalFrames: number, speech: { start: number
   set(last, SILENT_DB);
   return [...points.entries()].sort((a, b) => a[0] - b[0]);
 }
+
+/** Кладёт файл в post/music. Имя с диска сохраняется, повтор не затирает уже лежащий файл. */
+export function addMusicFile(episodeId: string, filename: string, bytes: Buffer): string {
+  const ext = path.extname(filename).toLowerCase();
+  if (!MUSIC_EXTENSIONS.has(ext)) throw new Error("Музыка: mp3, wav, flac, m4a, ogg или aac");
+  const base = path.basename(filename).replace(/[\\/]/g, "");
+  if (!base || base.startsWith(".")) throw new Error("Некорректное имя файла");
+  const dir = musicDir(episodeId);
+  fs.mkdirSync(dir, { recursive: true });
+  let target = path.join(dir, base);
+  if (fs.existsSync(target)) {
+    const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+    target = path.join(dir, `${path.parse(base).name}_${stamp}${ext}`);
+  }
+  fs.writeFileSync(target, bytes);
+  return path.basename(target);
+}

@@ -24,17 +24,19 @@ The only goal of this stage is to add the characters into the location. Nothing 
 Each block is one or two sentences. Say what to place and where first. Say what to keep last. Stay under about 200 words. Past about 250 words and 8 demands, the model keeps only some of them.
 
 ```text
-Place the girl from image 2 into the <place, one word> from image 1.
-<where, described by what is visible on image 1>
+character1 is image 2.                      (with a portrait: character1 is image 2 and the face from image 3.)
+<Shot size>. Add character1 <on the exact spot, described by what is visible on image 1>.
 <size in the frame: by the shot size, see «Shot size»>
 <one action, body direction, where they look>
 <only a story detail, or a detail that already broke>
-Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.
-No special lighting on her: she is lit by the same light as everything in image 1.
+character1's clothes, shoes, bag and everything they wear or carry exactly as in image 2.
+character1 is lit by the same light as everything in image 1.
 <lock, see «Lock»>
 ```
 
-For a man, change `girl` to `man` and `her`/`she` to `his`/`he`.
+With two people: the first lines bind character1 and character2, then one sentence adds both on their spot.
+
+Every idea appears once: the people are added once (the «Add» sentence), image 1 is kept once (the lock), each reference is bound once. The lock does not say again that people are added.
 
 ### Image numbers
 
@@ -42,15 +44,33 @@ The task lists the images the graph receives under «Images the graph receives»
 
 Every image in the list goes to the model, so the prompt names each one: who is on it and what it is for. An image the prompt does not mention confuses the model: it does not know where to put it and may paint a portrait in as a second person.
 
-With two people, bind each one to the images in the first sentences, then one or two sentences so the model can tell them apart: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Place character1 and character2 into the lecture hall from image 1.` In ep2 the prompts said `Lena from image 2` while image 2 was Julia, and the two girls swapped roles for nine runs. A production name does the same: the model does not know which picture it belongs to.
+With two people, bind each one to the images in the first sentences, then one or two sentences so the model can tell them apart: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Medium shot. Add character1 and character2, both at the second desk from image 1, …` In ep2 the prompts said `Lena from image 2` while image 2 was Julia, and the two girls swapped roles for nine runs. A production name does the same: the model does not know which picture it belongs to.
 
 Do not describe what a person looks like from memory: hair, glasses, clothes come from the reference. A wrong description pulls the model to the wrong person. Do not write the name from the task.
 
 Never write a file name or a path (`refs/portret.png`, `shots/s10/...`) in the prompt. The model sees only images by number. The board refuses to run a prompt with a file name in it.
 
-### What and where
+### Add and place in one sentence
 
-Keep it short: `Place the girl from image 2 into the street from image 1`.
+One sentence adds the people and puts them on their spot: `Add character1 and character2, both sit on the wooden bench from image 1, on the right of the frame`. Do not write a separate `Place … into the park from image 1` before it: that gives the same people two places (the path, then the bench) and two orders to add them.
+
+### Say what you want, not what to avoid
+
+The model reads every word as part of the picture. A negation puts the unwanted thing into the prompt: `NOT at the camera` adds the word camera, `do not add other people` adds people. Before writing `not`, `no`, `never`, `do not`, `NOT`:
+
+1. Find what in the prompt or in the references can cause the unwanted result: a missing target, a word that suggests it, a pose on the reference.
+2. Fix that cause, and write the wanted state as a fact.
+
+| Instead of | Write |
+| --- | --- |
+| `looks to the left, NOT at the camera` | `looks past the left edge of the frame, towards the window` (the gaze has a target) |
+| `NOT standing` | `sits on the bench, back against the backrest, knees bent` |
+| `not on the grass` | `on the grey paved strip right next to the curb` |
+| `Do not add any other people` | `The only people in the frame are character1 and character2.` |
+| `nothing moved` | `every object in the same place and size` |
+| `the braid is NOT finished, NO hair tie` | `the braid is half done, the loose end hangs free, unlike image 2` |
+
+A negation stays only when a run already showed the error and the positive wording did not fix it; one per prompt at most. When the user's message says «не …», turn it into the wanted state the same way.
 
 ### No character references
 
@@ -62,8 +82,8 @@ Clothes, shoes, the bag, a hat, an umbrella and every other item come from the c
 
 Instead of a description, one line per person:
 
-- One person: `Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.`
-- Two people: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3. Nothing changed.`
+- One person: `character1's clothes, shoes, bag and everything she wears or carries exactly as in image 2.`
+- Two people: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3.`
 
 Do not take clothes from the shot text (shot.md): when it differs from the reference, the reference is right.
 
@@ -81,7 +101,7 @@ When the location description shows more than one space, put each person in the 
 
 ### Shot size
 
-Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` mean a close-up. Each size has its own size block. The lock is the same for all of them (see «Lock»).
+Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план`, `much closer` mean a close-up. Rewrite the size sentences to the close-up block below, as the frame should be now: `very close: her face and shoulders fill most of the frame`. The model has not seen the earlier picture, so `closer than before` gives it nothing to measure against. Each size has its own size block. The lock is the same for all of them (see «Lock»).
 
 The camera and the location never move, whatever the shot size. The size comes only from how close to the camera the person stands.
 
@@ -107,9 +127,9 @@ The portraits come after the characters, so the location and character numbers d
 
 One main action. The model takes the direction of movement from the pose in the reference. If the picture runs to the right and the shot needs left, about half the seeds ignore the text. Use a reference that already faces the right way, or run 5–10 seeds.
 
-Write the gaze explicitly: `looks down at her knee, NOT at the camera`. Otherwise the gaze often goes into the lens.
+Write the gaze explicitly, with a target in image 1: `looks down at her knee`, `looks along the path at the far lamp post`. Without a target the gaze often goes into the lens; a target fixes it better than `NOT at the camera`.
 
-Describe difficult geometry physically. For a mirror this worked: `stands squarely facing the mirror, shoulders parallel to it, looks at her own eyes in the mirror, NOT into the lens`. `looks at herself` is not enough.
+Describe difficult geometry physically. For a mirror this worked: `stands squarely facing the mirror, shoulders parallel to it, looks at her own eyes in the mirror`. `looks at herself` is not enough.
 
 Extra hands disappeared after: `elbows out to the sides, her own hands behind her head, the arms clearly belong to her shoulders`.
 
@@ -121,7 +141,7 @@ Name location objects that disappear: `striped glass cup with toothbrushes, tall
 
 Put a detail in an exact spot: `the blood stain is exactly where the tissue touches her nostril`.
 
-If the reference contradicts the needed state, say so: `the braid is NOT finished, NO hair tie (unlike image 2)`. Or use another reference.
+If the reference contradicts the needed state, say so: `the braid is half done, the loose end hangs free (unlike image 2)`. Or use another reference.
 
 A small detail such as blood is more reliable as a second step, an edit of a finished frame. Built from scratch, it comes out too large.
 
@@ -129,7 +149,7 @@ A small detail such as blood is more reliable as a second step, an edit of a fin
 
 The light and colours of the location do not change. The person gets the light that is already in image 1, not a light of their own.
 
-One line: `No special lighting on her: she is lit by the same light as everything in image 1.` If needed: `slightly underexposed like everything around`.
+One line: `character1 is lit by the same light as everything in image 1.` If needed: `slightly underexposed like everything around`.
 
 Do not name a light or colour of your own: no `harsh yellow lamp`, `cold blue-grey cast`, or `dim blue twilight`, unless you are sure that is exactly what image 1 shows. The model paints a named colour over the whole picture: in episode3 the user wrote «do not change the light either». `match the lighting` does almost nothing on its own: the character stays studio-lit and brighter than the room, which is why the line above is needed.
 
@@ -139,11 +159,13 @@ Change the light only when the user explicitly asks. Then edit the finished fram
 
 ### Lock
 
-The last line is the same for every shot size:
+The last line is the same for every shot size. It keeps image 1 and names who is in the frame; it does not say again that people are added:
 
 ```text
-Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. The only people in the frame are character1 and character2.
 ```
+
+One person: `… character1 is the only person in the frame.` The user asked to change something in image 1 (remove a bin, open a door): `Keep image 1 exactly as it is, except <the change, as the target state>: …`.
 
 If an object already disappeared or moved, name it in the lock: `the same window in the same place and size, the same handrail`.
 
@@ -172,7 +194,9 @@ No more than one or two edits in a row. After that, assemble again from the clea
 - A light, colour, weather or effect of your own that image 1 does not show.
 - A description of the whole surroundings, or objects image 1 does not have.
 - A camera angle or camera move, «show the room closer».
-- A negation without a positive replacement. `not on the grass` is weaker than describing the grey strip by the curb.
+- A negation where the wanted state can be said (see «Say what you want, not what to avoid»).
+- The same demand twice: a second sentence that adds the people, a `Place … into` before the «Add» sentence, the lock repeating that people are added, `Nothing changed.` after the clothes lines.
+- Lines left over from an earlier version of the prompt that no longer serve the request.
 - `IMPORTANT`, capitals, and repeating one demand.
 - `small`, `correct scale`, `realistic proportions` without an object.
 - A long style tail. One short line at the end is enough if you need it.
@@ -181,12 +205,14 @@ No more than one or two edits in a row. After that, assemble again from the clea
 
 1. Assembly or edit.
 2. Shot size taken from shot.md or the user message. The size block matches it; the camera and the location do not move.
-3. Image numbers taken from «Images the graph receives». Every person has a name and a number. No file names or paths.
-4. Every image in the list is named in the prompt. For every portrait, a line `<Name>'s face exactly as in image N`.
+3. Image numbers taken from «Images the graph receives». People are character1, character2 by those numbers. No names, file names or paths.
+4. Every image in the list is named in the prompt. For every portrait, a line `characterN's face exactly as in image N`.
+4a. One «Add» sentence puts the people on their spot; no separate `Place … into`. Every idea appears once.
+4b. No negation where the wanted state can be said. Each `not` / `NOT` / `do not` left has a run behind it.
 5. For every person, a line `clothes … exactly as in image N`. Clothes and items are not described, except what the user explicitly asked to change.
 6. The spot is described through what is visible on image 1, with no new objects.
 7. Long shot: height tied to an object. Medium: where the frame cuts the body. Close-up: the person right at the camera.
-8. One action, body direction, and gaze.
+8. One action, body direction, and a gaze with a target.
 9. The reference does not contradict the shot. If it does, write `unlike image 2` or pick another file.
 10. Details are only story details or details that already broke.
 11. Light: `the same light as everything in image 1`, no colours, weather or effects of your own.
@@ -201,7 +227,7 @@ This failed: a long clothing list, `wet pavement`, `one third of the frame heigh
 The accepted prompt (the clothes, light and lock lines rewritten to today's rules):
 
 ```text
-Place the girl from image 2 into the street from image 1. She runs on the grey paved strip at the very bottom of the frame, right next to the curb of the road, in front of the grass; both boots on this strip. She is at the very left edge of the frame, just entering from the left, running from left to right, mid-stride, one hand on the bag strap, head turned up to the right, lost and panicked. She is fairly small: about one quarter of the frame height, in proportion to the birch tree and the parked car. Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged. No special lighting on her: she is lit by the same light as everything in image 1, a dark figure, face in shadow. Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Long shot. Add character1 running on the grey paved strip at the very bottom of the frame, right next to the curb of the road, in front of the grass; both boots on this strip. She is at the very left edge of the frame, just entering from the left, running from left to right, mid-stride, one hand on the bag strap, head turned up to the right, lost and panicked. She is fairly small: about one quarter of the frame height, in proportion to the birch tree and the parked car. character1's clothes, shoes, bag and everything she wears or carries exactly as in image 2. She is lit by the same light as everything in image 1, a dark figure, face in shadow. Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
 
 ## Accepted in ep2: close-up and medium shot
@@ -209,9 +235,9 @@ Place the girl from image 2 into the street from image 1. She runs on the grey p
 Close-up (s03, accepted on run 13; runs 1–5 gave a full-height figure because the prompt said `She stands in the middle of the floor`). The clothes, light and lock lines are rewritten to today's rules:
 
 ```text
-Place the girl from image 2 into the lecture hall from image 1. She stands right in front of the camera, very close: her face fills most of the frame, an extreme close-up. She is turned to the left in profile. She looks to the left, NOT at the camera. Her expression is calm and composed. She gazes thoughtfully around the room.
-Her clothes exactly as in image 2, unchanged. No special lighting on her: she is lit by the same light as everything in image 1.
-Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Close-up. Add character1 standing right in front of the camera, very close: her face fills most of the frame. She is turned to the left in profile and looks past the left edge of the frame, towards the far rows of the hall. Her expression is calm and composed.
+character1's clothes exactly as in image 2. She is lit by the same light as everything in image 1.
+Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
 
 If character1 has a portrait, add the line `character1's face exactly as in image 3`.
@@ -219,5 +245,20 @@ If character1 has a portrait, add the line `character1's face exactly as in imag
 Medium shot (s06, accepted). It worked because the location was already shot at the podium's distance, and an object (the podium) cuts the body:
 
 ```text
-Place the professor from image 2 into the lecture hall from image 1. He stands behind the podium, his torso visible above the edge, shoulders and head clearly his own. The top of his head reaches about three quarters of the way up the tiered seating behind him. Both arms raised up at shoulder height, palms open, his mouth open, expression stern and commanding. He looks straight ahead and slightly down, angry, NOT at the camera. His body leans forward over the podium. His clothes exactly as in image 2, unchanged. No special lighting on him: he is lit by the same light as everything in image 1. Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Medium shot. Add character1 standing behind the podium, his torso visible above the edge, shoulders and head clearly his own. The top of his head reaches about three quarters of the way up the tiered seating behind him. Both arms raised up at shoulder height, palms open, his mouth open, expression stern and commanding. He looks over the front rows towards the back of the hall, angry. His body leans forward over the podium. character1's clothes exactly as in image 2. He is lit by the same light as everything in image 1. Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
+
+## Accepted with two people (bench, episode 4)
+
+The user's own fix of an agent prompt: the people are added in one sentence together with the spot, and the lock does not repeat that they are added.
+
+```text
+character1 is image 2: a very tall, slim young man in an off-white jacket. character2 is image 3 and the face from image 4: a slim young woman with long dark brown hair and a black leather jacket.
+Medium shot. Add character1 and character2, both sit on the wooden bench from image 1, on the right of the frame, backs against the backrest, close to the camera, with a small gap of empty seat between them. The bottom edge of the frame cuts them just above the knees, heads in the upper third.
+character2 sits on the left half, leaning back, looking straight ahead along the path, a faint relieved smile. character1 sits on the right half, leaning back, looking straight ahead along the path, very calm, a slight smile. Each holds a waffle cone with vanilla ice cream.
+character2's face exactly as in image 4. character1's clothes exactly as in image 2. character2's clothes exactly as in image 3.
+They are lit by the same light as everything in image 1.
+Keep image 1 exactly as it is, except the dark bin beside the bench is gone, with plain asphalt and leaves where it stood: the same camera position, angle and framing, the same bench with green cast-iron ends in the same place and size, the same lamp posts, hedge and trees, the same light and colours. The only people in the frame are character1 and character2.
+```
+
+The earlier version of this prompt said `Place them into the park path from image 1` and then `Both sit on the bench`: two places for the same people, and the model got two instructions to add them.

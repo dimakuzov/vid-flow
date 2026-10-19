@@ -12,6 +12,7 @@ import {
   type ImageEditRecord,
 } from "../series/mutations";
 import { getComfyQueueRoot, getPlaybooksRoot, stageDir, toPosix } from "../series/paths";
+import { latinToken } from "../series/latin-id";
 import { assertStageFree, writeStageState } from "../series/stage-state";
 import { buildPrompt, comfyWorkflowsDir, validateBinding } from "./binding";
 import { enqueueComfyJob, readComfyJob, startComfyQueue } from "./queue";
@@ -309,7 +310,7 @@ export async function queueImageEdit(options: {
     throw new Error("Исходный файл изменился во время сборки задания");
   }
   const job = enqueueComfyJob({
-    id: `${options.shotId}-edit-${binding.id}-${Date.now()}`,
+    id: `${latinToken(options.shotId)}-edit-${binding.id}-${Date.now()}`,
     status: "pending",
     episodeId: options.episodeId,
     shotId: options.shotId,

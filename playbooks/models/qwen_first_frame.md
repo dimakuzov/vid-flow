@@ -24,17 +24,19 @@
 Каждый блок — одно-два предложения. Сначала что и куда вставить, в конце что сохранить. Промпт короче ~200 слов. Больше ~250 слов и 8 требований модель выполняет частично.
 
 ```text
-Place the girl from image 2 into the <place, one word> from image 1.
-<where, described by what is visible on image 1>
+character1 is image 2.                      (with a portrait: character1 is image 2 and the face from image 3.)
+<Shot size>. Add character1 <on the exact spot, described by what is visible on image 1>.
 <size in the frame: by the shot size, see «Shot size»>
 <one action, body direction, where they look>
 <only a story detail, or a detail that already broke>
-Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.
-No special lighting on her: she is lit by the same light as everything in image 1.
+character1's clothes, shoes, bag and everything they wear or carry exactly as in image 2.
+character1 is lit by the same light as everything in image 1.
 <lock, see «Lock»>
 ```
 
-Для мужчины `girl` меняется на `man`, `her`/`she` — на `his`/`he`.
+Если людей двое: первые строки привязывают character1 и character2, затем одно предложение добавляет обоих на их место.
+
+Каждая мысль — один раз: люди добавляются один раз (предложение «Add»), image 1 сохраняется один раз (замок), каждый референс привязан один раз. Замок не повторяет, что люди добавлены.
 
 ### Номера картинок
 
@@ -42,15 +44,33 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 Все картинки из списка уходят в модель, поэтому в промпте названа каждая: кто на ней и зачем она. Картинка без слов в промпте сбивает модель: она не знает, куда её деть, и может вписать портрет вторым человеком.
 
-Если людей двое, в первых предложениях привязать каждого к картинкам и дать одно-два предложения, чтобы модель их различала: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Place character1 and character2 into the lecture hall from image 1.` В ep2 промпты писали `Lena from image 2`, а image 2 была Юля, и девять прогонов девушки менялись ролями. Имя из задачи делает то же: модель не знает, к какой картинке оно относится.
+Если людей двое, в первых предложениях привязать каждого к картинкам и дать одно-два предложения, чтобы модель их различала: `character1 is image 2 and the face from image 4. character2 is image 3 and the face from image 5. Medium shot. Add character1 and character2, both at the second desk from image 1, …` В ep2 промпты писали `Lena from image 2`, а image 2 была Юля, и девять прогонов девушки менялись ролями. Имя из задачи делает то же: модель не знает, к какой картинке оно относится.
 
 Внешность по памяти не описывать: волосы, очки, одежда берутся с референса. Неверное описание тянет модель не к тому человеку. Имя из задачи в промпт не писать.
 
 Имена файлов и пути (`refs/portret.png`, `shots/s10/...`) в промпт не писать. Модель видит только картинки по номерам. Промпт с именем файла доска не запустит.
 
-### Что и куда
+### Добавить и поставить одним предложением
 
-Коротко: `Place the girl from image 2 into the street from image 1`.
+Одно предложение добавляет людей и ставит их на место: `Add character1 and character2, both sit on the wooden bench from image 1, on the right of the frame`. Перед ним не писать отдельное `Place … into the park from image 1`: это два места для одних и тех же людей (дорожка, потом лавка) и два указания их добавить.
+
+### Писать, что нужно, а не чего не делать
+
+Модель читает каждое слово как часть картинки. Отрицание вносит нежелательное в промпт: `NOT at the camera` добавляет слово «камера», `do not add other people` — людей. Прежде чем писать `not`, `no`, `never`, `do not`, `NOT`:
+
+1. Найти, что в промпте или в референсах может вызвать нежелательный результат: нет цели, слово-подсказка, поза на референсе.
+2. Исправить эту причину и написать нужное состояние как факт.
+
+| Вместо | Писать |
+| --- | --- |
+| `looks to the left, NOT at the camera` | `looks past the left edge of the frame, towards the window` (у взгляда есть цель) |
+| `NOT standing` | `sits on the bench, back against the backrest, knees bent` |
+| `not on the grass` | `on the grey paved strip right next to the curb` |
+| `Do not add any other people` | `The only people in the frame are character1 and character2.` |
+| `nothing moved` | `every object in the same place and size` |
+| `the braid is NOT finished, NO hair tie` | `the braid is half done, the loose end hangs free, unlike image 2` |
+
+Отрицание остаётся, только если прогон уже показал ошибку, а позитивная формулировка её не исправила; не больше одного на промпт. Если пользователь пишет «не …», это тоже переводится в нужное состояние.
 
 ### Без референсов персонажей
 
@@ -62,8 +82,8 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 Вместо описания — одна строка на каждого человека:
 
-- Один: `Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged.`
-- Двое: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3. Nothing changed.`
+- Один: `character1's clothes, shoes, bag and everything she wears or carries exactly as in image 2.`
+- Двое: `character1's clothes exactly as in image 2. character2's clothes and bag exactly as in image 3.`
 
 Одежду из текста кадра (shot.md) не брать: если она расходится с референсом, верен референс.
 
@@ -81,7 +101,7 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 ### План кадра
 
-План берётся из первых слов текста кадра (`Close up`, `Medium shot`, `Long shot`). Сообщение пользователя важнее shot.md: «ещё ближе», «очень крупный план» — это крупный план. У каждого плана свой блок размера. Замок один для всех (см. «Замок»).
+План берётся из первых слов текста кадра (`Close up`, `Medium shot`, `Long shot`). Сообщение пользователя важнее shot.md: «ещё ближе», «очень крупный план», `much closer` — это крупный план. Предложения про размер переписываются по блоку крупного плана ниже — каким кадр должен быть сейчас: `very close: her face and shoulders fill most of the frame`. Прошлую картинку модель не видела, поэтому `closer than before` ей не с чем сравнить. У каждого плана свой блок размера. Замок один для всех (см. «Замок»).
 
 Камера и локация не двигаются ни на каком плане. План получается только тем, насколько близко к камере стоит человек.
 
@@ -107,9 +127,9 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 Одно главное действие. Направление движения модель берёт из позы на референсе. Если на картинке бег вправо, а нужен влево, около половины seed игнорирует текст. Тогда нужен референс с нужным направлением или 5–10 seed.
 
-Взгляд писать явно: `looks down at her knee, NOT at the camera`. Иначе взгляд часто уходит в камеру.
+Взгляд писать явно, с целью на image 1: `looks down at her knee`, `looks along the path at the far lamp post`. Без цели взгляд часто уходит в камеру; цель помогает лучше, чем `NOT at the camera`.
 
-Сложную геометрию описывать физически. Для зеркала сработало: `stands squarely facing the mirror, shoulders parallel to it, looks at her own eyes in the mirror, NOT into the lens`. `looks at herself` недостаточно.
+Сложную геометрию описывать физически. Для зеркала сработало: `stands squarely facing the mirror, shoulders parallel to it, looks at her own eyes in the mirror`. `looks at herself` недостаточно.
 
 Чужие руки пропали после: `elbows out to the sides, her own hands behind her head, the arms clearly belong to her shoulders`.
 
@@ -121,7 +141,7 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 Точное место детали: `the blood stain is exactly where the tissue touches her nostril`.
 
-Если референс противоречит нужному состоянию: `the braid is NOT finished, NO hair tie (unlike image 2)`, либо другой референс.
+Если референс противоречит нужному состоянию: `the braid is half done, the loose end hangs free (unlike image 2)`, либо другой референс.
 
 Мелкую деталь вроде крови надёжнее добавить вторым шагом, правкой готового кадра. При сборке с нуля она выходит слишком большой.
 
@@ -129,7 +149,7 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 Свет и цвет локации не меняются. Человек получает тот свет, который уже есть на image 1, а не свой.
 
-Одна строка: `No special lighting on her: she is lit by the same light as everything in image 1.` При необходимости: `slightly underexposed like everything around`.
+Одна строка: `character1 is lit by the same light as everything in image 1.` При необходимости: `slightly underexposed like everything around`.
 
 Не называть свой свет и цвет: ни `harsh yellow lamp`, ни `cold blue-grey cast`, ни `dim blue twilight`, если агент не уверен, что это именно то, что видно на image 1. Названный цвет модель красит на всю картинку: в episode3 пользователь писал «свет тоже не меняй». `match the lighting` почти ничего не даёт: персонаж остаётся студийным и светлее комнаты, поэтому нужна строка выше.
 
@@ -139,11 +159,13 @@ No special lighting on her: she is lit by the same light as everything in image 
 
 ### Замок
 
-Последняя строка — одна для всех планов:
+Последняя строка — одна для всех планов. Она сохраняет image 1 и называет, кто в кадре; что люди добавлены, она не повторяет:
 
 ```text
-Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. The only people in the frame are character1 and character2.
 ```
+
+Один человек: `… character1 is the only person in the frame.` Пользователь попросил изменить что-то на image 1 (убрать урну, открыть дверь): `Keep image 1 exactly as it is, except <изменение, как целевое состояние>: …`.
 
 Если какой-то предмет уже пропадал или сдвигался, назвать его в замке: `the same window in the same place and size, the same handrail`.
 
@@ -172,7 +194,9 @@ Edit image 1: <one change>. Keep EVERYTHING else exactly the same: <what must no
 - Свой свет, цвет, погоду и эффекты, которых нет на image 1.
 - Описание всего окружения и предметы, которых нет на image 1.
 - Ракурс и движение камеры, «показать комнату ближе».
-- Отрицание без позитивной замены: `not on the grass` слабее, чем описание серой полосы у бордюра.
+- Отрицание там, где можно сказать нужное состояние (см. «Писать, что нужно, а не чего не делать»).
+- Одно требование дважды: второе предложение, которое добавляет людей, `Place … into` перед предложением «Add», замок, повторяющий, что люди добавлены, `Nothing changed.` после строк одежды.
+- Строки, оставшиеся от прошлой версии промпта, которые больше не нужны запросу.
 - `IMPORTANT`, капс и повтор одного требования.
 - `small`, `correct scale`, `realistic proportions` без предмета.
 - Длинный стилевой хвост. Хватает одной короткой строки в конце, если она нужна.
@@ -181,12 +205,14 @@ Edit image 1: <one change>. Keep EVERYTHING else exactly the same: <what must no
 
 1. Сборка или правка.
 2. План взят из shot.md или сообщения пользователя. Блок размера ему соответствует, камера и локация не двигаются.
-3. Номера картинок — из «Images the graph receives». У каждого человека имя и номер. Ни имён файлов, ни путей.
-4. Каждая картинка из списка названа в промпте. Для каждого портрета — строка `<Name>'s face exactly as in image N`.
+3. Номера картинок — из «Images the graph receives». Люди — character1, character2 по этим номерам. Ни имён, ни имён файлов, ни путей.
+4. Каждая картинка из списка названа в промпте. Для каждого портрета — строка `characterN's face exactly as in image N`.
+4a. Одно предложение «Add» ставит людей на место; отдельного `Place … into` нет. Каждая мысль — один раз.
+4b. Нет отрицаний там, где можно сказать нужное состояние. За каждым оставшимся `not` / `NOT` / `do not` стоит прогон.
 5. Для каждого человека строка `clothes … exactly as in image N`. Одежда и вещи не описаны, кроме того, что пользователь явно попросил изменить.
 6. Место описано через видимое на image 1, без новых предметов.
 7. Общий план: рост привязан к предмету. Средний: где край кадра режет тело. Крупный: человек у самой камеры.
-8. Одно действие, направление тела и взгляд.
+8. Одно действие, направление тела и взгляд с целью.
 9. Референс не противоречит кадру. Если противоречит — `unlike image 2` или другой файл.
 10. Детали только сюжетные или уже ломавшиеся.
 11. Свет: `the same light as everything in image 1`, без своих цветов, погоды и эффектов.
@@ -201,7 +227,7 @@ Edit image 1: <one change>. Keep EVERYTHING else exactly the same: <what must no
 Принятый промпт (строки одежды, света и замок переписаны по нынешним правилам):
 
 ```text
-Place the girl from image 2 into the street from image 1. She runs on the grey paved strip at the very bottom of the frame, right next to the curb of the road, in front of the grass; both boots on this strip. She is at the very left edge of the frame, just entering from the left, running from left to right, mid-stride, one hand on the bag strap, head turned up to the right, lost and panicked. She is fairly small: about one quarter of the frame height, in proportion to the birch tree and the parked car. Her clothes, shoes, bag and everything she wears or carries exactly as in image 2, unchanged. No special lighting on her: she is lit by the same light as everything in image 1, a dark figure, face in shadow. Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Long shot. Add character1 running on the grey paved strip at the very bottom of the frame, right next to the curb of the road, in front of the grass; both boots on this strip. She is at the very left edge of the frame, just entering from the left, running from left to right, mid-stride, one hand on the bag strap, head turned up to the right, lost and panicked. She is fairly small: about one quarter of the frame height, in proportion to the birch tree and the parked car. character1's clothes, shoes, bag and everything she wears or carries exactly as in image 2. She is lit by the same light as everything in image 1, a dark figure, face in shadow. Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
 
 ## Принято в ep2: крупный и средний план
@@ -209,9 +235,9 @@ Place the girl from image 2 into the street from image 1. She runs on the grey p
 Крупный план (s03, принят на 13-м прогоне; прогоны 1–5 давали фигуру в полный рост, потому что в промпте было `She stands in the middle of the floor`). Строки одежды, света и замок переписаны по нынешним правилам:
 
 ```text
-Place the girl from image 2 into the lecture hall from image 1. She stands right in front of the camera, very close: her face fills most of the frame, an extreme close-up. She is turned to the left in profile. She looks to the left, NOT at the camera. Her expression is calm and composed. She gazes thoughtfully around the room.
-Her clothes exactly as in image 2, unchanged. No special lighting on her: she is lit by the same light as everything in image 1.
-Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Close-up. Add character1 standing right in front of the camera, very close: her face fills most of the frame. She is turned to the left in profile and looks past the left edge of the frame, towards the far rows of the hall. Her expression is calm and composed.
+character1's clothes exactly as in image 2. She is lit by the same light as everything in image 1.
+Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
 
 Если у character1 есть портрет, добавляется строка `character1's face exactly as in image 3`.
@@ -219,5 +245,20 @@ Keep image 1 exactly as it is: the same camera position, angle and framing, the 
 Средний план (s06, принят). Сработал, потому что локация уже снята с расстояния кафедры, а предмет (кафедра) режет тело:
 
 ```text
-Place the professor from image 2 into the lecture hall from image 1. He stands behind the podium, his torso visible above the edge, shoulders and head clearly his own. The top of his head reaches about three quarters of the way up the tiered seating behind him. Both arms raised up at shoulder height, palms open, his mouth open, expression stern and commanding. He looks straight ahead and slightly down, angry, NOT at the camera. His body leans forward over the podium. His clothes exactly as in image 2, unchanged. No special lighting on him: he is lit by the same light as everything in image 1. Keep image 1 exactly as it is: the same camera position, angle and framing, the same objects in the same places, nothing added, nothing removed, nothing moved, the same light and colours. Only the people are added. Do not add any other people.
+character1 is image 2. Medium shot. Add character1 standing behind the podium, his torso visible above the edge, shoulders and head clearly his own. The top of his head reaches about three quarters of the way up the tiered seating behind him. Both arms raised up at shoulder height, palms open, his mouth open, expression stern and commanding. He looks over the front rows towards the back of the hall, angry. His body leans forward over the podium. character1's clothes exactly as in image 2. He is lit by the same light as everything in image 1. Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. character1 is the only person in the frame.
 ```
+
+## Принято с двумя людьми (лавка, эпизод 4)
+
+Пользователь сам поправил промпт агента: люди добавляются одним предложением вместе с местом, а замок не повторяет, что их добавили.
+
+```text
+character1 is image 2: a very tall, slim young man in an off-white jacket. character2 is image 3 and the face from image 4: a slim young woman with long dark brown hair and a black leather jacket.
+Medium shot. Add character1 and character2, both sit on the wooden bench from image 1, on the right of the frame, backs against the backrest, close to the camera, with a small gap of empty seat between them. The bottom edge of the frame cuts them just above the knees, heads in the upper third.
+character2 sits on the left half, leaning back, looking straight ahead along the path, a faint relieved smile. character1 sits on the right half, leaning back, looking straight ahead along the path, very calm, a slight smile. Each holds a waffle cone with vanilla ice cream.
+character2's face exactly as in image 4. character1's clothes exactly as in image 2. character2's clothes exactly as in image 3.
+They are lit by the same light as everything in image 1.
+Keep image 1 exactly as it is, except the dark bin beside the bench is gone, with plain asphalt and leaves where it stood: the same camera position, angle and framing, the same bench with green cast-iron ends in the same place and size, the same lamp posts, hedge and trees, the same light and colours. The only people in the frame are character1 and character2.
+```
+
+Прошлая версия этого промпта говорила `Place them into the park path from image 1`, а потом `Both sit on the bench`: два места для одних и тех же людей и два указания их добавить.
