@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { setFraming, setRefNote } from "@/lib/series/first-frame-settings";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
@@ -67,7 +68,24 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       characterImage?: { name?: string; path?: string | null };
       /** Имя папки в data/locations/. Только этап location. Пишет строку `- location:` в shot.md. */
       location?: string;
+      /** Дальность персонажа до камеры. Только первый кадр. value null — как в сценарии. */
+      framing?: { name?: string; value?: string | null };
+      /** Подпись к файлу refs/ («шлем Лены»). Только первый кадр. Пустой текст — снять. */
+      refNote?: { file?: string; text?: string };
     };
+    if (body.framing || body.refNote) {
+      if (stageId !== "first_frame") throw new Error("Дальность и подписи референсов — только на первом кадре");
+      // Порядок картинок графа зависит от выбора: пока агент или граф работают, его не меняем.
+      assertStageFree(episodeId, shotId, stageId);
+      if (body.framing) {
+        if (typeof body.framing.name !== "string") throw new Error("Не указан персонаж");
+        setFraming(episodeId, shotId, body.framing.name, body.framing.value ?? null);
+      }
+      if (body.refNote) {
+        if (typeof body.refNote.file !== "string") throw new Error("Не указан файл");
+        setRefNote(episodeId, shotId, body.refNote.file, String(body.refNote.text ?? ""));
+      }
+    }
     if (typeof body.location === "string") {
       if (stageId !== "location") throw new Error("Локация кадра меняется на этапе локации");
       assertStageFree(episodeId, shotId, stageId);

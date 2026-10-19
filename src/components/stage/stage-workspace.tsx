@@ -16,6 +16,7 @@ import { CharacterRoster, characterOwnsFile } from "./character-roster";
 import { useAgentProviders } from "./agent-provider";
 import { episodePagePath, errorText, requestJson, shotApiPath } from "./api";
 import { DocFieldLabel, DocTextarea } from "./doc-field";
+import { FramingPicker } from "./framing-picker";
 import { HotkeyHelp } from "./hotkey-help";
 import { ImageEditDialog } from "./image-edit-dialog";
 import { ImageLightbox } from "./image-lightbox";
@@ -278,6 +279,27 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     });
   const excludeToggle = stageBusy || busy ? undefined : toggleExclude;
 
+  // Первый кадр: дальность персонажа и подпись файла refs/ сохраняются сразу, без «Сохранить».
+  const chooseFraming = (name: string, value: string | null) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { framing: { name, value } },
+        fallbackError: t("framing.failed"),
+      });
+      stage.merge(data);
+    });
+  const saveRefNote = (file: MediaFile, text: string) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { refNote: { file: file.name, text } },
+        fallbackError: t("refs.noteFailed"),
+      });
+      stage.merge(data);
+      return t("refs.noteSaved", { name: file.name });
+    });
+
   const approveSelected = (names = selectedOutput) => {
     if (!names.length) {
       setMessage(t("page.pickOutput"));
@@ -534,6 +556,14 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               placeholder: t("page.recommendationPlaceholder"),
               className: "min-h-24",
             })}
+            {detail.firstFrame ? (
+              <FramingPicker
+                characters={detail.expectedCharacters}
+                framing={detail.firstFrame.framing}
+                disabled={busy || stageBusy}
+                onChange={chooseFraming}
+              />
+            ) : null}
             {stage.dirty ? (
               <Button variant="outline" disabled={busy} onClick={() => act(async () => {
                 await saveDocs();
@@ -659,6 +689,8 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               }
               excluded={detail.excluded}
               onToggleExclude={excludeToggle}
+              notes={detail.firstFrame?.refNotes}
+              onSaveNote={detail.firstFrame && !stageBusy && !busy ? saveRefNote : undefined}
             />
             <details className="text-xs text-stone-500">
               <summary className="cursor-pointer">{t("page.refsNoteFile")}</summary>

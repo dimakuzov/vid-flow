@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AgentMode } from "@/lib/contracts/agent-request";
 import { submitAgentRequest } from "@/lib/series/agent-request";
+import { withFramingMessage } from "@/lib/series/first-frame-settings";
 import { parseStageParams, type StageRouteContext } from "@/lib/series/route-params";
 import { stageHasSpeech, writeShotSpeech } from "@/lib/series/speech";
 import { getStageDetail } from "@/lib/series/scanner";
@@ -54,7 +55,8 @@ export async function POST(request: Request, context: StageRouteContext) {
       episodeId,
       shotId,
       stageId,
-      message: body.message || "",
+      // Первый кадр: дальность персонажей и подписи референсов — строками после сообщения.
+      message: stageId === "first_frame" ? withFramingMessage(episodeId, shotId, body.message || "") : body.message || "",
       prompt: body.prompt || "",
       refsNote: body.refs || "",
       workflowNote: body.workflow || "",
