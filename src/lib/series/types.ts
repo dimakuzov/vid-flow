@@ -143,6 +143,11 @@ export interface StageDetail {
   durationRange: DurationRange | null;
   /** Последнее задание очереди этапа (stage_state.jobId). */
   job: JobSummary | null;
+  /**
+   * Только первый кадр (run_settings.json): дальность персонажей до камеры (имя строчными →
+   * background | full | waist | face) и подписи к файлам refs/ (имя файла → текст). Иначе null.
+   */
+  firstFrame: { framing: Record<string, string>; refNotes: Record<string, string> } | null;
   agentRequest: {
     status: AgentRequestStatus;
     createdAt: string;

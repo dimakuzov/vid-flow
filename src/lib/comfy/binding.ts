@@ -22,6 +22,7 @@ import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
 import { chosenCharacterFile, excludedFiles, readRunSettings } from "../series/run-settings";
+import { isNearFraming, readFraming } from "../series/first-frame-settings";
 import { latinToken } from "../series/latin-id";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech, speechPhrases } from "../series/speech";
@@ -107,6 +108,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
         const stage = source.startsWith("approve:") ? source.slice("approve:".length) : null;
         const known =
           source === "refs" ||
+          source === "refs:other" ||
           source === "library:location" ||
           source === "library:faces" ||
           source === "library:faces-or-characters" ||
@@ -124,6 +126,10 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
         if (imageMin(input) > 0) fail(`вход ${name}: вход с whenPrompt должен быть необязательным (min: 0)`);
       }
       if (!["first", "newest", "all"].includes(input.pick)) fail(`вход ${name}: pick ${input.pick}`);
+      if (input.framing !== undefined) {
+        if (input.framing !== "near" && input.framing !== "far") fail(`вход ${name}: framing ${input.framing}`);
+        if (!sources.includes("library:faces")) fail(`вход ${name}: framing только у источника library:faces`);
+      }
     } else if (input.kind === "text") {
       validateTextInput(name, input, inputs, fail);
       if (input.sections !== undefined) {
@@ -462,10 +468,15 @@ function matchName(filename: string, pattern: string, character: string | undefi
   return new RegExp(`^${body}$`, "i").test(filename);
 }
 
-/** Лица по одному на персонажа из approve: `refs/{name}_face.*` этого этапа, иначе библиотека. */
-function faceFiles(ctx: ShotContext): string[] {
+/**
+ * Лица по одному на персонажа из approve: `refs/{name}_face.*` этого этапа, иначе библиотека.
+ * `framing` — только персонажи близко к камере (near: по пояс, лицо, не выбрано) или далеко (far).
+ */
+function faceFiles(ctx: ShotContext, framing?: ImageInput["framing"]): string[] {
   const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
+  const chosen = framing ? readFraming(ctx.episodeId, ctx.shotId) : {};
   return approvedCharacters(ctx)
+    .filter((name) => !framing || isNearFraming(chosen[name.toLowerCase()]) === (framing === "near"))
     .map((name) => findImage(refs, [`${name.toLowerCase()}_face`]) ?? libraryFace(name))
     .filter((file): file is string => Boolean(file));
 }
@@ -515,13 +526,28 @@ function faceOrCharacterFiles(ctx: ShotContext): string[] {
   });
 }
 
-function sourceFiles(ctx: ShotContext, source: ImageSource, kind: ImageInput["kind"]): string[] {
+/**
+ * Файлы refs/ этапа, которые не заняты персонажами кадра: без `{name}_face*`, `{name}_base*`,
+ * `{name}_clothes*` (лист лица — тоже `{name}_face…`). Это вещи, одежда, образцы позы пользователя.
+ */
+function otherRefFiles(ctx: ShotContext): string[] {
+  const names = approvedCharacters(ctx).map((name) => name.toLowerCase());
+  const claimed = (file: string) => {
+    const stem = path.parse(file).name.toLowerCase();
+    return names.some((name) => ["face", "base", "clothes"].some((kind) => stem.startsWith(`${name}_${kind}`)));
+  };
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs")).filter((file) => !claimed(file));
+}
+
+function sourceFiles(ctx: ShotContext, source: ImageSource, input: ImageInput): string[] {
+  const kind = input.kind;
   const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
+  if (source === "refs:other") return kind === "image" ? otherRefFiles(ctx) : [];
   if (source === "library:location") {
     return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
   }
-  if (source === "library:faces") return kind === "image" ? faceFiles(ctx) : [];
+  if (source === "library:faces") return kind === "image" ? faceFiles(ctx, input.framing) : [];
   if (source === "library:faces-or-characters") return kind === "image" ? faceOrCharacterFiles(ctx) : [];
   if (source === "library:face-sheets") return kind === "image" ? faceSheetFiles(ctx) : [];
   if (source === "library:character") return kind === "image" ? libraryCharacter(ctx) : [];
@@ -583,7 +609,7 @@ export function resolveImageInput(ctx: ShotContext, input: ImageInput): string[]
   }
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   for (const source of sources) {
-    let files = sourceFiles(ctx, source, input.kind).filter((file) => !isExcluded(excluded, file));
+    let files = sourceFiles(ctx, source, input).filter((file) => !isExcluded(excluded, file));
     if (source === "refs" && input.match) {
       files = files.filter((file) => matchName(path.basename(file), input.match!, ctx.character));
     }
@@ -597,7 +623,7 @@ export function excludedInputFiles(ctx: ShotContext, input: ImageInput): string[
   const excluded = excludedFiles(ctx.episodeId, ctx.shotId, ctx.stageId);
   if (!excluded.size) return [];
   const sources = Array.isArray(input.from) ? input.from : [input.from];
-  const files = sources.flatMap((source) => sourceFiles(ctx, source, input.kind));
+  const files = sources.flatMap((source) => sourceFiles(ctx, source, input));
   return [...new Set(files)].filter((file) => isExcluded(excluded, file));
 }
 
