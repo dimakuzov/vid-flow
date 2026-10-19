@@ -26,6 +26,10 @@ export interface RunSettings {
    * (output или refs этого кадра, либо персонажи предыдущего кадра).
    */
   characterImage?: Record<string, string>;
+  /** Первый кадр: дальность до камеры по персонажу (ключ — имя строчными). См. first-frame-settings.ts. */
+  framing?: Record<string, string>;
+  /** Первый кадр: что это за файл refs/, со слов пользователя (ключ — имя файла). */
+  refNotes?: Record<string, string>;
   updatedAt?: string;
 }
 
@@ -52,6 +56,8 @@ export function writeRunSettings(
   if (typeof next.durationSec !== "number" || !Number.isFinite(next.durationSec)) delete next.durationSec;
   if (!Array.isArray(next.excluded) || !next.excluded.length) delete next.excluded;
   if (!next.characterImage || !Object.keys(next.characterImage).length) delete next.characterImage;
+  if (!next.framing || !Object.keys(next.framing).length) delete next.framing;
+  if (!next.refNotes || !Object.keys(next.refNotes).length) delete next.refNotes;
   const file = path.join(stageDir(episodeId, shotId, stageId), FILE);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(next, null, 2) + "\n", "utf8");

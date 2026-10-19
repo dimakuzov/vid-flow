@@ -4,7 +4,7 @@
   "graph": "qwen21_character_compositing.json",
   "stage": "first_frame",
   "label": "Первый кадр: персонажи в локации",
-  "description": "Вписать утверждённых персонажей в утверждённую локацию. Если в кадре нет персонажей, в граф идёт только локация, а промпт добавляет лишь то, что написано. Иначе в граф уходят локация (image 1), персонажи и их портреты — до 6 картинок.",
+  "description": "Вписать утверждённых персонажей в утверждённую локацию. Если в кадре нет персонажей, в граф идёт только локация, а промпт добавляет лишь то, что написано. Иначе в граф уходят локация (image 1), персонажи, затем лица тех, кто близко к камере, затем референсы пользователя из refs/, затем лица тех, кто далеко, — до 6 картинок.",
   "playbook": "models/qwen_first_frame.en.md",
   "order": 10,
   "inputs": {
@@ -29,7 +29,27 @@
       "min": 0,
       "max": 5,
       "uploadAs": "{shotId}_face{index}{ext}",
-      "label": "Портреты персонажей"
+      "label": "Портреты персонажей близко к камере",
+      "framing": "near"
+    },
+    "extras": {
+      "kind": "image",
+      "from": "refs:other",
+      "pick": "all",
+      "min": 0,
+      "max": 5,
+      "uploadAs": "{shotId}_ref{index}{ext}",
+      "label": "Референсы пользователя"
+    },
+    "faces_far": {
+      "kind": "image",
+      "from": "library:faces",
+      "framing": "far",
+      "pick": "all",
+      "min": 0,
+      "max": 5,
+      "uploadAs": "{shotId}_farface{index}{ext}",
+      "label": "Портреты персонажей далеко от камеры"
     },
     "text": {
       "kind": "text",
@@ -60,7 +80,9 @@
       "value": {
         "inputs": [
           "people",
-          "faces"
+          "faces",
+          "extras",
+          "faces_far"
         ],
         "index": 0
       },
@@ -86,7 +108,9 @@
       "value": {
         "inputs": [
           "people",
-          "faces"
+          "faces",
+          "extras",
+          "faces_far"
         ],
         "index": 1
       },
@@ -112,7 +136,9 @@
       "value": {
         "inputs": [
           "people",
-          "faces"
+          "faces",
+          "extras",
+          "faces_far"
         ],
         "index": 2
       },
@@ -138,7 +164,9 @@
       "value": {
         "inputs": [
           "people",
-          "faces"
+          "faces",
+          "extras",
+          "faces_far"
         ],
         "index": 3
       },
@@ -164,7 +192,9 @@
       "value": {
         "inputs": [
           "people",
-          "faces"
+          "faces",
+          "extras",
+          "faces_far"
         ],
         "index": 4
       },
