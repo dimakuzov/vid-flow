@@ -12,6 +12,8 @@ export type ImageSource =
   | "refs:other"
   /** approve/ другого этапа этого же кадра */
   | `approve:${StageId}`
+  /** refs/ другого этапа этого же кадра: финал FLF берёт последний кадр, который пользователь дал эскизу. */
+  | `refs:${StageId}`
   /** data/locations/<shot.location>/ — view.png, иначе первая картинка без «copy» в имени */
   | "library:location"
   /**

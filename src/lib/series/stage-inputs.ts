@@ -53,6 +53,10 @@ function dataLabel(absoluteDir: string): string {
 function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): string {
   if (source === "refs") return "refs/ этого этапа";
   if (source === "refs:other") return "refs/ этого этапа, кроме {имя}_face, _base, _clothes";
+  if (source.startsWith("refs:")) {
+    const other = source.slice("refs:".length) as StageId;
+    return `refs/ этапа ${STAGE_LABELS[other] ?? other}`;
+  }
   if (source === "library:location") {
     const folder = files[0]
       ? path.dirname(files[0])

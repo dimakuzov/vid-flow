@@ -75,6 +75,7 @@ playbooks/workflows/comfy/
 |---|---|
 | `refs` | `refs/` этого этапа |
 | `approve:<stage>` | `approve/` другого этапа этого кадра |
+| `refs:<stage>` | `refs/` другого этапа этого кадра (финал FLF берёт последний кадр эскиза из `refs:video_preview`) |
 | `library:location` | `data/locations/<location из shot.md>/`: `view.png`, иначе первая картинка без `copy` в имени |
 | `library:faces` | лица персонажей: по одному на файл в `approve/` этапа characters, в том же порядке (по алфавиту). `refs/{name}_face.*` этого этапа, иначе в `data/characters/{name}/` — `face`, `portrait`, `portret` (в том числе `{name}_portret`, `portret_{name}`), иначе первая картинка с face/portr в имени без side и copy. Персонаж без лица пропускается |
 | `library:faces-or-characters` | по картинке на персонажа из `approve/` этапа characters, в том же порядке: лист лица (`refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`), иначе лицо (как у `library:faces`), иначе сам утверждённый персонаж. Никто не пропадает. В задаче агенту лист помечен «face sheet» |
@@ -256,6 +257,7 @@ playbooks/workflows/comfy/
 | `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema: первый кадр + по картинке на персонажа, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; промпт эскиза из `approve-meta` — только в задаче агенту) |
 | `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (замена головы: утверждённое превью + `library:face-sheets`; вход персонажей с `maxAvailable: 1`; без текста) |
 | `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; запуск только с галочкой на этот раз) |
-| `final_i2v`, `final_flf` | final_render | те же графы, префикс `frameboard/final/` |
+| `final_i2v` | final_render | граф Wan i2v превью, префикс `frameboard/final/` |
+| `final_flf` | final_render | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 к/с, промпт эскиза (`approve-meta`), последний кадр из `refs` финала, иначе `refs:video_preview`; `whenSketch` — нода `98` (последний кадр) в метаданных или `_flf` в имени |
 
 Составлены по `stage-run.ts` на момент контракта: собранный по ним prompt должен совпадать с текущим (кроме случайных seed).

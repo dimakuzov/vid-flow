@@ -105,7 +105,11 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
       const sources = Array.isArray(input.from) ? input.from : [input.from];
       if (!sources.length) fail(`вход ${name}: пустой from`);
       for (const source of sources) {
-        const stage = source.startsWith("approve:") ? source.slice("approve:".length) : null;
+        const stage = source.startsWith("approve:")
+          ? source.slice("approve:".length)
+          : source.startsWith("refs:")
+            ? source.slice("refs:".length)
+            : null;
         const known =
           source === "refs" ||
           source === "refs:other" ||
@@ -544,6 +548,11 @@ function sourceFiles(ctx: ShotContext, source: ImageSource, input: ImageInput): 
   const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
   if (source === "refs:other") return kind === "image" ? otherRefFiles(ctx) : [];
+  // refs/ другого этапа кадра (`refs:video_preview`); `refs:other` выше — это не этап.
+  const refsStage = source.startsWith("refs:") ? (source.slice("refs:".length) as StageId) : null;
+  if (refsStage && STAGES.includes(refsStage)) {
+    return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, refsStage), "refs"), exts);
+  }
   if (source === "library:location") {
     return kind === "image" ? libraryLocation(readShotMeta(ctx.episodeId, ctx.shotId).location) : [];
   }

@@ -16,7 +16,7 @@ A shot with one speaker is made by MiniMax H3 in reference mode with the Cinema 
 | `final_ltx` | 7 | the same graph as `video_ltx` (`ltx25_i2v_api.json`), 1.2 MP (832×1504), 24 fps | default when the approved sketch was made with LTX. This wins over the line rows |
 | `final_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | fallback: repeat the Wan sketch on new seeds |
 | `final_h3_head_swap` | 12 | `minimax_h3_head_swap_api.json`, MiniMax H3 head swap: the approved preview is re-rendered sharper (two passes, ~1 MP) and the head is put from the character's face sheet | only **one** approved character, who has a face sheet (`refs/{name}_face_sheet`, otherwise `*face_sheet*` in the library), and an approved preview. No prompt: the user presses «Запустить». Never the default |
-| `final_flf` | 20 | `wan22_flf_sketch_turbo_api.json` | fallback when the sketch was FLF (last frame in this stage's `refs/`) |
+| `final_flf` | 8 | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 fps (as `final_wan_720`), the approved sketch's prompt (video metadata), first frame and last frame, the preview's length | default when the approved sketch was FLF. The last frame: this stage's `refs/`, otherwise the newest picture in `video_preview/refs/` |
 
 H3 Cinema needs a file in `first_frame/approve/`. The approved preview gives the duration and the motion the agent writes into the text. Character pictures, one per character in the order of `characters/approve/`: this stage's `refs/` if it has files, otherwise the character's face sheet (`refs/{name}_face_sheet`, then `*face_sheet*` in the library), otherwise one face (`refs/{name}_face`, then the library portrait), otherwise the approved character; up to six. The task lists them as `<Picture 2>`, `<Picture 3>`, …
 
@@ -32,10 +32,11 @@ The board looks at the newest file in `video_preview/approve/`: the final follow
 | --- | --- | --- |
 | The approved sketch was made with LTX | `final_ltx` | the board, the default |
 | The approved sketch was made with MiniMax | `final_h3_cinema` | the board, the default |
+| The approved sketch was FLF (Wan, first and last frame) | `final_flf` | the board, the default |
 | Nobody speaks, and the sketch is Wan | `final_wan_720` | the board, the default |
 | One speaker | `final_h3_cinema` | the board, the default |
 | Two or more speakers | `final_heygen` | the board, the default. It runs only after the box «Разрешить платную отправку в Comfy Cloud» is ticked for this run |
-| The sketch was FLF, or a specific end pose is needed | `final_flf` | the agent writes `suggestedWorkflow`. The last frame goes in this stage's `refs/` |
+| A specific end pose is needed, but the sketch was not FLF | `final_flf` | the agent writes `suggestedWorkflow`. The last frame goes in this stage's `refs/` |
 
 How the board knows the sketch graph: the video metadata (the `prompt` key, written by SaveVideo) has non-empty text in node `398:376` / `value` — that is LTX. No metadata — it looks at the file name: the substring `_ltx` (`s01_ltx_00001_.mp4`). It does not look at the name when metadata is present: the file may have been renamed. Details: `docs/contracts/graph-binding.md`.
 

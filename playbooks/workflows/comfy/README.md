@@ -16,7 +16,8 @@
 | `final_h3_cinema` | `final_render` | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema) | доска; `prompt.md` — текст модели целиком, с `subject_definitions ASTROCINEMAV01K2T:` первой строкой; первый кадр — `<Picture 1>`, лица персонажей — `<Picture 2…7>` |
 | `final_h3_head_swap` | `final_render` | `minimax_h3_head_swap_api.json` (MiniMax H3, замена головы по листу лица, без промпта) | доска; доступен только с одним персонажем, его `face_sheet` и утверждённым превью |
 | `final_heygen` | `final_render` | `heygen_video_i2v_api.json` (Comfy Cloud) | доска, только с галочкой на этот запуск |
-| `final_i2v`, `final_flf` | `final_render` | графы Wan превью | доска, запасной вариант |
+| `final_i2v` | `final_render` | граф Wan i2v превью | доска, запасной вариант |
+| `final_flf` | `final_render` | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 к/с | доска; по умолчанию после эскиза FLF; промпт и последний кадр эскиза |
 | — | `characters` | `character_outfit_qwen21.json` (правка одежды, image 1 — персонаж, image 2 — образец) | агент по `characters_comfy.md`; манифест — черновик в `drafts/` |
 
 Черновики, которые ещё не проверены в ComfyUI: `playbooks/workflows/drafts/`.

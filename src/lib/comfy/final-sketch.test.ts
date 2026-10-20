@@ -214,3 +214,36 @@ test("H3 Cinema: агент получает промпт эскиза из ме
   assert.deepEqual(texts.map((item) => item.text), ["Static shot. Lena holds still."]);
   assert.match(texts[0].where, /^метаданные s01_i2v_00001_\.mp4$/);
 });
+
+test("эскиз FLF: по умолчанию финал FLF 720×1280, 24 к/с, промпт и последний кадр эскиза", () => {
+  clearApprove();
+  // Граф FLF: у него есть нода последнего кадра 98, у i2v её нет.
+  const flf = { [WAN_NODE]: { class_type: "CLIPTextEncode", inputs: { text: "Static camera. She sits down on the bench." } }, "98": { class_type: "LoadImage", inputs: { image: "s01_end.png" } } };
+  putApprove("s01_flf_00001_.mp4", mp4WithPrompt(flf, 4000));
+  fs.writeFileSync(path.join(stageDir(EP, "s01", "video_preview"), "prompt.md"), "EDITED AFTER APPROVE.");
+  const end = path.join(stageDir(EP, "s01", "video_preview"), "refs", "end.png");
+  fs.mkdirSync(path.dirname(end), { recursive: true });
+  fs.writeFileSync(end, PNG);
+  assert.equal(defaultFinal(), "final_flf");
+
+  const { prompt, uploads } = buildFinal("final_flf");
+  assert.deepEqual([prompt["129:98"].inputs.width, prompt["129:98"].inputs.height], [720, 1280]);
+  assert.equal(prompt["129:162"].inputs.value, 24);
+  assert.equal(prompt["129:161"].inputs.value, 4, "длина превью");
+  assert.equal(prompt[WAN_NODE].inputs.text, `Static camera. She sits down on the bench. ${BACKGROUND}`);
+  assert.equal(prompt["98"].inputs.image, "s01_end.png");
+  assert.ok(uploads.some((item) => item.path === end), "последний кадр из refs/ эскиза");
+  assert.equal(prompt["108"].inputs.filename_prefix, "frameboard/final/s01_flf720");
+
+  // Свой последний кадр в refs/ финала важнее эскиза.
+  const own = path.join(stageDir(EP, "s01", "final_render"), "refs", "my_end.png");
+  fs.mkdirSync(path.dirname(own), { recursive: true });
+  fs.writeFileSync(own, PNG);
+  assert.ok(buildFinal("final_flf").uploads.some((item) => item.path === own));
+  fs.rmSync(own);
+
+  // Эскиз i2v FLF по умолчанию не выбирает.
+  clearApprove();
+  putApprove("s01_i2v_00001_.mp4", mp4WithPrompt(wanGraph("Static shot. Lena stands.")));
+  assert.equal(defaultFinal(), "final_wan_720");
+});

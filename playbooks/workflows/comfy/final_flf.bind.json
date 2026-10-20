@@ -3,13 +3,23 @@
   "id": "final_flf",
   "graph": "wan22_flf_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал между кадрами (FLF)",
-  "description": "Финал пока = превью: тот же граф FLF, последний кадр из refs/ этого этапа. См. stages/final_render.md.",
+  "label": "Финал Wan между кадрами (FLF), 720×1280",
+  "description": "Тот же промпт, первый и последний кадр, что у утверждённого эскиза FLF, в 720×1280 и 24 к/с. По умолчанию, если утверждённый эскиз — FLF.",
   "playbook": "models/wan_video.en.md",
-  "order": 20,
+  "order": 8,
   "aliases": [
     "flf"
   ],
+  "whenSketch": {
+    "of": "preview",
+    "nodes": [
+      {
+        "node": "98",
+        "field": "image"
+      }
+    ],
+    "filename": "_flf"
+  },
   "inputs": {
     "start": {
       "kind": "image",
@@ -20,23 +30,43 @@
     },
     "end": {
       "kind": "image",
-      "from": "refs",
+      "from": [
+        "refs",
+        "refs:video_preview"
+      ],
       "pick": "newest",
       "uploadAs": "{shotId}_end{ext}",
-      "label": "Последний кадр в refs/"
+      "label": "Последний кадр (refs/ финала, иначе refs/ эскиза)"
+    },
+    "preview": {
+      "kind": "video",
+      "from": "approve:video_preview",
+      "pick": "newest",
+      "min": 0,
+      "label": "Утверждённое превью (длительность и промпт)"
     },
     "text": {
       "kind": "text",
-      "from": "prompt",
+      "from": "approve-meta",
+      "of": "preview",
+      "nodes": [
+        {
+          "node": "129:93",
+          "field": "text"
+        }
+      ],
+      "fallback": "prompt",
+      "stage": "video_preview",
       "required": true,
-      "label": "prompt.md"
+      "label": "Промпт утверждённого эскиза"
     },
     "seconds": {
       "kind": "number",
-      "from": "prompt:seconds",
+      "from": "media:duration",
+      "of": "preview",
       "min": 2,
       "max": 12,
-      "label": "Длительность в prompt.md"
+      "label": "Длительность превью"
     }
   },
   "slots": [
@@ -70,7 +100,15 @@
         }
       ],
       "value": {
-        "input": "text"
+        "input": "text",
+        "steps": [
+          {
+            "ensure": "The background stays exactly as in the first frame for the whole clip: no new people appear, nobody walks or moves in the background, doors, windows and curtains stay as they are, and no new objects appear. Only the movements described above happen.",
+            "at": "end",
+            "unless": "no new people appear",
+            "separator": " "
+          }
+        ]
       }
     },
     {
@@ -103,7 +141,40 @@
         }
       ],
       "value": {
-        "template": "frameboard/final/{shotId}_flf"
+        "template": "frameboard/final/{shotId}_flf720"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "width"
+        }
+      ],
+      "value": {
+        "const": 720
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:98",
+          "field": "height"
+        }
+      ],
+      "value": {
+        "const": 1280
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "129:162",
+          "field": "value"
+        }
+      ],
+      "value": {
+        "const": 24
       }
     }
   ]
