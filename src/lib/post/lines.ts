@@ -4,7 +4,8 @@ import { stageDir } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
 import { readShotSpeech } from "../series/speech";
 import { detectSilences, probeMedia, soundIntervals, type Interval, type MediaProbe } from "./ffmpeg";
-import { activeShotIds, canonicalCharacter, linesFile, readJson, writeJson } from "./paths";
+import { activeShotIds, linesFile, readJson, writeJson } from "./paths";
+import { speakerResolver } from "./speakers";
 
 /*
  * Таблица реплик `post/lines.json`. Текст и персонаж — всегда из speech.md кадров (правятся там),
@@ -19,7 +20,10 @@ export interface PostLine {
   index: number;
   /** Номер реплики в эпизоде, с 1 (порядок кадров — порядок таблицы). */
   order: number;
+  /** Персонаж библиотеки, чей голос и дорожка (по назначению имени, см. speakers.ts). */
   character: string;
+  /** Имя как в speech.md (из сценария): BABUSHKA, MALE VOICE. */
+  speaker: string;
   text: string;
   /** Секунды от начала кадра, где начинается речь. */
   at: number;
@@ -181,6 +185,7 @@ export async function readPostLines(
   } = {},
 ): Promise<{ lines: PostLine[]; finals: Map<string, ShotFinal> }> {
   const stored = readStored(episodeId);
+  const resolveSpeaker = speakerResolver(episodeId);
   const finals = options.finals ?? new Map<string, ShotFinal>();
   const lines: PostLine[] = [];
   let order = 0;
@@ -198,7 +203,8 @@ export async function readPostLines(
         shotId,
         index: item.index,
         order,
-        character: canonicalCharacter(item.character),
+        character: resolveSpeaker(item.character).character,
+        speaker: item.character,
         text: item.text,
         at: finite(saved?.at),
         atManual: Boolean(saved?.atManual),

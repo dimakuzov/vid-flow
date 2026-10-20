@@ -229,6 +229,7 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[] | null>(null);
   const [allowPaid, setAllowPaid] = useState(false);
+  const [rememberSpeaker, setRememberSpeaker] = useState(false);
   const [size, setSize] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const musicInput = useRef<HTMLInputElement>(null);
@@ -367,6 +368,58 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
             >
               {jobText(state.job, t)}
             </p>
+          ) : null}
+
+          {state.speakers.length ? (
+            <>
+              <h4 className="mt-4 text-sm font-medium text-stone-800">{t("post.speakers")}</h4>
+              <p className="mt-1 max-w-3xl text-xs text-stone-500">{t("post.speakersHint")}</p>
+              <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {state.speakers.map((speaker) => (
+                  <li key={speaker.name} className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white/80 px-3 py-1.5 text-sm">
+                    <span className="font-mono text-xs text-stone-800">{speaker.name}</span>
+                    <span className="text-xs text-stone-400">{t("post.lineCount", { n: speaker.lines })}</span>
+                    <span className="text-stone-400">→</span>
+                    <select
+                      className="rounded-md border border-stone-300 bg-white px-1.5 py-0.5 text-xs"
+                      value={speaker.assigned ?? ""}
+                      disabled={busy || jobActive}
+                      onChange={(event) =>
+                        act(() =>
+                          requestJson<PostState>(postApi(episodeId, "/speakers"), {
+                            method: "PUT",
+                            body: { speaker: speaker.name, character: event.target.value || null, remember: rememberSpeaker },
+                          }),
+                        )
+                      }
+                    >
+                      <option value="">
+                        {t("post.speakerAsScript")}
+                        {speaker.assigned ? "" : `: ${speaker.character}`}
+                      </option>
+                      {state.library.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                    {speaker.assigned ? null : (
+                      <span className={`text-xs ${speaker.source === "none" ? "text-amber-800" : "text-stone-400"}`}>
+                        {speaker.source === "alias"
+                          ? t("post.speakerFromAlias")
+                          : speaker.source === "library"
+                            ? t("post.speakerFromLibrary")
+                            : t("post.speakerMissing")}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <label className="mt-1 flex items-center gap-2 text-xs text-stone-600">
+                <input type="checkbox" checked={rememberSpeaker} onChange={(event) => setRememberSpeaker(event.target.checked)} />
+                {t("post.speakerRemember")}
+              </label>
+            </>
           ) : null}
 
           <h4 className="mt-4 text-sm font-medium text-stone-800">{t("post.voices")}</h4>

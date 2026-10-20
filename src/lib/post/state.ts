@@ -6,6 +6,7 @@ import { listTimelines, readManifest, DEFAULT_SIZE } from "./timeline";
 import type { SpeechStatus } from "./speech-detect";
 import { readLatestVoiceJob, type VoiceJob } from "./voice-job";
 import { listMusic, musicDir } from "./music";
+import { listLibraryCharacters, readSpeakerMap, speakerResolver, type SpeakerSource } from "./speakers";
 import { latestProject, readLatestSubtitlesJob, renderDir, subtitleStylePath, type SubtitlesJob } from "./subtitles";
 import fs from "fs";
 import { listVoiceVersions, planCharacterVoice, readVoiceConfig } from "./voices";
@@ -91,6 +92,10 @@ export interface PostState {
   job: VoiceJob | null;
   /** Музыка эпизода (post/music) и куда её класть. */
   music: { dir: string; files: string[] };
+  /** Имена из сценария (speech.md) и кто их озвучивает; `assigned` — назначение эпизода. */
+  speakers: { name: string; lines: number; character: string; source: SpeakerSource; assigned: string | null }[];
+  /** Персонажи библиотеки — варианты назначения. */
+  library: string[];
   /** Субтитры: какой проект возьмёт «Добавить субтитры», есть ли стиль, последнее задание, рендеры. */
   subtitles: {
     project: string | null;
@@ -204,6 +209,23 @@ export async function getPostState(episodeId: string): Promise<PostState> {
     defaultSize: manifest ? { width: manifest.width, height: manifest.height } : DEFAULT_SIZE,
     job: readLatestVoiceJob(episodeId),
     music: { dir: musicDir(episodeId), files: listMusic(episodeId).map((file) => path.basename(file)) },
+    speakers: (() => {
+      const resolve = speakerResolver(episodeId);
+      const assigned = readSpeakerMap(episodeId);
+      const byName = new Map<string, { name: string; lines: number }>();
+      for (const line of lines) {
+        if (!line.speaker) continue;
+        const item = byName.get(line.speaker.toLowerCase()) ?? { name: line.speaker, lines: 0 };
+        item.lines += 1;
+        byName.set(line.speaker.toLowerCase(), item);
+      }
+      return [...byName.values()].map((item) => ({
+        ...item,
+        ...resolve(item.name),
+        assigned: assigned[item.name.toLowerCase()] ?? null,
+      }));
+    })(),
+    library: listLibraryCharacters(),
     subtitles: {
       project: latestProject(episodeId),
       styleFile: subtitleStylePath(),

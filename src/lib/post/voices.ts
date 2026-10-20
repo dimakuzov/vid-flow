@@ -75,7 +75,9 @@ export function writeVoiceConfig(character: string, input: Partial<VoiceConfig>)
     config.seed = seed;
   }
   const dir = libraryCharacterDir(character) ?? path.join(getCharactersRoot(), characterKey(character));
-  writeJson(path.join(dir, VOICE_FILE), config);
+  // Псевдонимы имён из сценария (speakers.ts) — не из формы, их сохраняем.
+  const aliases = readJson<{ aliases?: unknown }>(path.join(dir, VOICE_FILE))?.aliases;
+  writeJson(path.join(dir, VOICE_FILE), Array.isArray(aliases) ? { ...config, aliases } : config);
   return config;
 }
 

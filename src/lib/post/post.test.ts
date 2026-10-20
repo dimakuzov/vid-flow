@@ -23,7 +23,8 @@ import { lineSeparator } from "./align";
 import { collectPost } from "./collect";
 import { probeMedia, synthesizeMedia } from "./ffmpeg";
 import { readPostLines, updatePostLine } from "./lines";
-import { linesFile, manifestFile, timelineDir, voicesDir } from "./paths";
+import { linesFile, manifestFile, postDir, timelineDir, voicesDir } from "./paths";
+import { assignSpeaker, speakerResolver } from "./speakers";
 import { buildProject } from "./build";
 import { insertMusic, MusicTrackMissingError } from "./music-insert";
 import { enqueueSpeechDetect } from "./speech-detect";
@@ -586,6 +587,58 @@ test("скрытый с таблицы кадр не идёт в пост: ни 
     assert.ok(!kd.includes("s02_h3.mp4"), "финал скрытого кадра в проект не попал");
   } finally {
     setShotHidden(EP, "s02", false);
+  }
+});
+
+test("имена из сценария: назначаются персонажу библиотеки, два имени — один голос; можно запомнить для всех эпизодов", async () => {
+  fs.mkdirSync(path.join(getCharactersRoot(), "ba"), { recursive: true });
+  fs.mkdirSync(path.join(getCharactersRoot(), "militsiya_officer_young"), { recursive: true });
+  const speechFile = path.join(shotDir(EP, "s01"), "speech.md");
+  fs.writeFileSync(speechFile, "BABUSHKA: Where are you going?\nMALE VOICE: Stop right there.\nMILITSIONER: Documents, please.\n");
+  try {
+    let { lines } = await readPostLines(EP);
+    let s01 = lines.filter((line) => line.shotId === "s01");
+    assert.deepEqual(s01.map((line) => [line.speaker, line.character]), [
+      ["BABUSHKA", "BABUSHKA"],
+      ["MALE VOICE", "MALE VOICE"],
+      ["MILITSIONER", "MILITSIONER"],
+    ], "без назначения — как в сценарии");
+
+    assignSpeaker(EP, "BABUSHKA", "BA");
+    assignSpeaker(EP, "male voice", "militsiya_officer_young");
+    assignSpeaker(EP, "MILITSIONER", "militsiya_officer_young");
+    ({ lines } = await readPostLines(EP));
+    s01 = lines.filter((line) => line.shotId === "s01");
+    assert.deepEqual(s01.map((line) => line.character), ["ba", "militsiya_officer_young", "militsiya_officer_young"]);
+    assert.deepEqual(s01.map((line) => line.text), ["Where are you going?", "Stop right there.", "Documents, please."], "текст не меняется");
+    const state = await getPostState(EP);
+    const officer = state.characters.find((item) => item.name === "militsiya_officer_young")!;
+    assert.equal(officer.lines, 2, "два имени — один персонаж, одна озвучка");
+    assert.ok(!state.characters.some((item) => item.name === "MALE VOICE"));
+    assert.deepEqual(
+      state.speakers.filter((item) => s01.some((line) => line.speaker === item.name)).map((item) => [item.name, item.character, item.source, item.assigned]),
+      [
+        ["BABUSHKA", "ba", "episode", "ba"],
+        ["MALE VOICE", "militsiya_officer_young", "episode", "militsiya_officer_young"],
+        ["MILITSIONER", "militsiya_officer_young", "episode", "militsiya_officer_young"],
+      ],
+    );
+    assert.throws(() => assignSpeaker(EP, "BABUSHKA", "nobody"), /Нет персонажа «nobody»/);
+
+    // «Запомнить»: псевдоним в voice.json персонажа — без назначения эпизода имя находится само.
+    writeVoiceConfig("ba", { voice_id: "voiceBaba001" });
+    assignSpeaker(EP, "BABUSHKA", "ba", true);
+    assignSpeaker(EP, "BABUSHKA", null);
+    ({ lines } = await readPostLines(EP));
+    assert.equal(lines.find((line) => line.speaker === "BABUSHKA")!.character, "ba");
+    assert.equal(speakerResolver(EP)("Babushka").source, "alias");
+    // Форма голоса не теряет псевдонимы.
+    writeVoiceConfig("ba", { voice_id: "voiceBaba002" });
+    const voice = JSON.parse(fs.readFileSync(path.join(getCharactersRoot(), "ba", "voice.json"), "utf8"));
+    assert.deepEqual([voice.voice_id, voice.aliases], ["voiceBaba002", ["BABUSHKA"]]);
+  } finally {
+    fs.rmSync(speechFile, { force: true });
+    fs.rmSync(path.join(postDir(EP), "speakers.json"), { force: true });
   }
 });
 
