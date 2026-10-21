@@ -127,6 +127,9 @@ How to adapt:
 - Never describe clothes, hair or items, and never take them from the scenario: the references show them. If the scenario's clothes differ from the reference, drop them.
 - Do not add people, objects, weather or light that the pictures do not have, unless a user note asks for it.
 - Do not invent movements, gestures or emotions that neither the scenario nor the notes give.
+- A person with no action in the scenario or the notes stays on their spot for the whole shot. Say so in one short clause. A gesture from the scenario (waving, spreading the arms) stays only when it is the point of the shot.
+- When two people move, say who is faster and whether the distance between them grows or shrinks. Do not make one catch up with the other unless the scenario or a note says so.
+- Nobody looks at the camera unless the scenario or a note says so. Two people who talk look at each other. A person who walks looks ahead, where they are going.
 - Describe only the staging: positions, which way people face and look, what they do, from where they come. Name a place landmark only when a position needs it (at the window, by the railing). Do not describe the light, the colours or the look of the place.
 - Do not mention image numbers, files, prompts or camera technique.
 

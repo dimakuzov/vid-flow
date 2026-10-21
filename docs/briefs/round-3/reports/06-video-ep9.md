@@ -4,7 +4,7 @@ Source: `episode_9`, all 15 shots, `video_preview` and `final_render`, read only
 
 **Numbers.** Preview: 51 runs, 13 notes. About 30 of the runs are «▶ All shots», which runs LTX and then MiniMax on every shot (7 MiniMax runs cancelled). Final: 29 runs, 10 notes, 9 of 15 shots approved on the first final run. Shots whose preview was H3: 6 shots, 7 final runs, 1 note. Shots whose preview was LTX: 7 shots, 17 final runs, 6 notes.
 
-Each block: where the text lives, the exact current text, the replacement, the shots it comes from. Texts are English only. Nothing here is applied yet.
+Each block: where the text lives, the exact current text, the replacement, the shots it comes from. Texts are English only. All of V1–V7 are applied to the `.en.md` playbooks, `ACTION_RULES` and `GENERATION_PROMPT_RULES`, at the user's request. The Russian playbooks `ltx_video.md` and `minimax_h3.md` were not updated: the user does not need them, and the models never read them.
 
 ## V1. A person who should stand still starts moving
 

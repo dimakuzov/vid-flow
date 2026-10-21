@@ -60,11 +60,12 @@ None.
 There is no video to copy the motion from, so the text carries all of it.
 
 1. **Where the motion comes from.** On the video preview: the shot action and the user's notes say what happens; the first frame description says where everyone is at the start. On the final: the task gives the prompt of the approved preview; keep its movements, their order and their timing, written in this form (a MiniMax preview prompt is already in this form). If the current `prompt.md` is in another workflow's form (an LTX `use image as the first frame.` prompt), rewrite it in this form and keep its content.
-2. **The start is `<Picture 1>`.** Describe the positions, poses and gaze as they are in the first frame; the action continues from there.
+2. **The start is `<Picture 1>`.** Describe the positions, poses and gaze as they are in the first frame; the action continues from there. Every person who has no action in the shot gets one sentence that holds them: `<Subject 1> stands on the same spot until the end of the shot, her arms at her sides`. A standing person's place is a spot next to something in the frame, not a part of a route.
 3. **The camera in one or two short sentences**, at the start and at the end: `A static medium shot at seated height.` … `The camera holds unmoving.` If the shot moves the camera, one move and its speed.
-4. **Timing**: `for one second, then…`, `at the same moment…`, `only at the very end…`. The action fills the duration; the last line says how the shot ends: `until the end of the shot both stay seated`.
-5. **Gaze with a target**: `looks along the path at the far lamp post`, `looks at <Subject 2>`.
-6. **Light**: one sentence with the light that is in `<Picture 1>`, taken from the first frame description. No light of your own.
+4. **Timing**: `for one second, then…`, `at the same moment…`, `only at the very end…`. The main movement starts within the first second unless the shot is about a pause. A reaction to a line starts right after the line: `right after her line she stands up`. The action fills the duration; the last line says how the shot ends: `until the end of the shot both stay seated`.
+5. **Gaze with a target**: `looks along the path at the far lamp post`, `looks at <Subject 2>`. Nobody looks into the lens unless the task says so; people who talk look at each other.
+6. **Two people moving**: each one's pace and how the distance between them changes: `<Subject 2> follows at a slow walk, and the gap between them grows until the end`.
+7. **Light**: one sentence with the light that is in `<Picture 1>`, taken from the first frame description. No light of your own.
 
 ### Lines
 
