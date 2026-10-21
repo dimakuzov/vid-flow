@@ -108,6 +108,99 @@ function ShotTitle({
   );
 }
 
+/** Название эпизода в шапке: клик открывает правку. Пишется в заголовок episode.md, id эпизода не меняется. */
+function EpisodeTitle({
+  episodeId,
+  title,
+  onChanged,
+}: {
+  episodeId: string;
+  title: string;
+  onChanged: () => void;
+}) {
+  const t = useT();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(title);
+  const [error, setError] = useState("");
+  const heading =
+    "font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight break-words text-stone-950 sm:text-5xl";
+
+  function cancel() {
+    setValue(title);
+    setError("");
+    setEditing(false);
+  }
+
+  async function commit() {
+    const next = value.trim();
+    if (!next) {
+      setError(t("board.emptyEpisodeTitle"));
+      return;
+    }
+    if (next === title) {
+      cancel();
+      return;
+    }
+    try {
+      await requestJson(`/api/episodes/${encodeURIComponent(episodeId)}`, {
+        method: "PATCH",
+        body: { title: next },
+        fallbackError: t("board.renameEpisodeFailed"),
+      });
+      setError("");
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  function onKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commit();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancel();
+    }
+  }
+
+  if (!editing) {
+    return (
+      <h1 className={`mt-3 ${heading}`}>
+        <button
+          type="button"
+          className="text-left hover:underline"
+          title={t("board.renameEpisodeTitle")}
+          onClick={() => {
+            setValue(title);
+            setError("");
+            setEditing(true);
+          }}
+        >
+          {title}
+        </button>
+      </h1>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <input
+        autoFocus
+        value={value}
+        aria-label={t("board.renameEpisodeTitle")}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={onKey}
+        className={`w-full rounded-lg border border-stone-300 bg-white/90 px-2 py-1 ${heading}`}
+      />
+      {error ? <p className="mt-1 text-sm text-red-700">{error}</p> : null}
+    </div>
+  );
+}
+
 function ShotHeader({
   shot,
   episodeId,
@@ -314,9 +407,13 @@ export function SeriesBoard({
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-teal-900/70">
               Frameboard
             </p>
-            <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight break-words text-stone-950 sm:text-5xl">
-              {series.episodeId ? series.episodeTitle : t("header.noSeries")}
-            </h1>
+            {series.episodeId ? (
+              <EpisodeTitle episodeId={series.episodeId} title={series.episodeTitle} onChanged={onChanged} />
+            ) : (
+              <h1 className="mt-3 font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight break-words text-stone-950 sm:text-5xl">
+                {t("header.noSeries")}
+              </h1>
+            )}
           </div>
           <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
             <LanguageSwitch />

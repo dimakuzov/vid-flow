@@ -112,6 +112,9 @@ const messages = {
   "board.renameTitle": { en: "Click to rename", ru: "Нажмите, чтобы переименовать" },
   "board.shotName": { en: "Shot title {id}", ru: "Название кадра {id}" },
   "board.emptyTitle": { en: "The title cannot be empty", ru: "Название не может быть пустым" },
+  "board.renameEpisodeTitle": { en: "Click to rename the episode", ru: "Нажмите, чтобы переименовать эпизод" },
+  "board.emptyEpisodeTitle": { en: "The episode title cannot be empty", ru: "Название эпизода не может быть пустым" },
+  "board.renameEpisodeFailed": { en: "Could not rename the episode", ru: "Не удалось переименовать эпизод" },
   "board.renameFailed": { en: "Could not rename the shot", ru: "Не удалось переименовать кадр" },
 
   "time.sec": { en: "{n} s", ru: "{n} с" },
