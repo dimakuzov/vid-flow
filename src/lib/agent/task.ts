@@ -52,7 +52,7 @@ prompt.md is the whole instruction for this one run, and the model has not seen 
 
 When the current prompt.md is written in another workflow's form (its opening, its labels, its sections differ from this playbook), rewrite all of it in this playbook's form: keep its content (the action, its order and timing, the spoken lines, the user's corrections) and leave its old form behind.
 
-When the user asks for one change, rebuild prompt.md from the playbook template: keep the lines that still serve the shot and the user's notes, put the change into the line it belongs to, and leave out lines that no longer serve. Every idea appears once. "All good, put a bag in Ivan's hands" becomes the current prompt with the bag in the action line of whichever character Ivan is. "exactly as in image N" is about a reference picture, and that stays.`;
+When the user asks for one change, rebuild prompt.md from the playbook template: keep the lines that still serve the shot and the user's notes, put the change into the line it belongs to, and leave out lines that no longer serve. Every idea appears once. Before writing, find every sentence of the current prompt.md that says the opposite of the new note or keeps the old state (\`does not rise\` when the note asks her to stand up; a walking line when the note says she stays) and take it out. The final prompt.md says each person's state once, as the note wants it. "All good, put a bag in Ivan's hands" becomes the current prompt with the bag in the action line of whichever character Ivan is. "exactly as in image N" is about a reference picture, and that stays.`;
 
 /**
  * Локация — пустое место. Текст кадра часто описывает, кто там потом встанет
