@@ -61,7 +61,7 @@ export function listLibraryLocations(): LibraryLocation[] {
 }
 
 /** Папка локации внутри `data/locations/`. Ошибка на чужой путь и на отсутствующую папку. */
-function locationFolder(locationId: string): string {
+export function locationFolder(locationId: string): string {
   const id = assertSafeSegment(String(locationId ?? "").trim(), "id локации");
   const root = getLocationsRoot();
   const folder = path.join(root, id);

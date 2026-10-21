@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useT } from "@/components/language";
 import { Button } from "@/components/ui/button";
 import type { EarlierApprove } from "@/lib/series/prev-shot";
@@ -54,10 +54,13 @@ export function CharacterApproveTools({
   stageApi,
   disabled,
   onDone,
+  extra,
 }: {
   stageApi: string;
   disabled?: boolean;
   onDone: (stage: StageDetail | null, message: string) => void;
+  /** Ещё кнопки в этой же строке. */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -146,6 +149,7 @@ export function CharacterApproveTools({
         >
           {t("prev.shots")}
         </Button>
+        {extra}
       </div>
       {error && !open ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
       {open ? (

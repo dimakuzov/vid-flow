@@ -311,11 +311,14 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         { method: "POST", body: { filenames: names, from: "output" }, fallbackError: t("page.approveFailed") },
       );
       setSelectedOutput([]);
-      await stage.reload();
       const approved = data.approved.join(", ");
-      return stageId === "characters" && data.stage?.status !== "approved"
-        ? t("page.approvedPartial", { names: approved })
-        : t("page.approved", { names: approved });
+      // Не все персонажи кадра утверждены: остаёмся на странице дорабатывать остальных.
+      if (stageId === "characters" && data.stage?.status !== "approved") {
+        await stage.reload();
+        return t("page.approvedPartial", { names: approved });
+      }
+      // Утверждено: как «← Таблица».
+      keys.current.back();
     });
   };
 
@@ -348,7 +351,15 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         keys.current.approve();
         return;
       }
-      if (event.code === "Backquote" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        !document.querySelector("[role='menu']")
+      ) {
         event.preventDefault();
         keys.current.back();
         return;
@@ -588,6 +599,17 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               takes={stageId === "final_render" ? null : takes}
               onTakes={setTakes}
             />
+            {stageId === "location" ? (
+              <LocationChoice
+                stageApi={stageApi}
+                location={detail.location}
+                disabled={busy || stageBusy}
+                onChanged={(picked, text) => {
+                  stage.merge(picked);
+                  setMessage(text);
+                }}
+              />
+            ) : null}
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
                 <summary className="cursor-pointer">{t("page.runLog")}</summary>
@@ -655,18 +677,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               </div>
             </div>
             {stageId === "location" ? (
-              <>
-                <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
-                <LocationChoice
-                  stageApi={stageApi}
-                  location={detail.location}
-                  disabled={busy || stageBusy}
-                  onChanged={(picked, text) => {
-                    stage.merge(picked);
-                    setMessage(text);
-                  }}
-                />
-              </>
+              <LocationLibrary stageApi={stageApi} location={detail.location} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
             ) : null}
             <RefFiles
               files={

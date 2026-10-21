@@ -49,6 +49,7 @@ function ShotFragment({
   disabled: boolean;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState(text);
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState("");
@@ -69,18 +70,18 @@ function ShotFragment({
         body: JSON.stringify({ fragment: value }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не сохранилось");
+      if (!res.ok) throw new Error(data.error || t("shotform.saveFailed"));
       onSaved();
     } catch (err) {
       pending.current = null;
-      setError(err instanceof Error ? err.message : "Не сохранилось");
+      setError(err instanceof Error ? err.message : t("shotform.saveFailed"));
     }
   }
 
   async function prepare() {
     const source = value.trim();
     if (!source) {
-      setError("Сначала впиши текст кадра");
+      setError(t("shotform.needText"));
       return;
     }
     setPreparing(true);
@@ -95,11 +96,11 @@ function ShotFragment({
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось подготовить кадр");
+      if (!res.ok) throw new Error(data.error || t("shotform.prepareFailed"));
       pending.current = source;
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось подготовить кадр");
+      setError(err instanceof Error ? err.message : t("shotform.prepareFailed"));
     } finally {
       setPreparing(false);
     }
@@ -114,7 +115,7 @@ function ShotFragment({
         onFocus={() => setFocused(true)}
         onBlur={() => void commit()}
         className="mt-2 min-h-28 text-sm leading-relaxed"
-        placeholder="Текст этого кадра"
+        placeholder={t("shotform.textPlaceholder")}
       />
       <Button
         type="button"
@@ -123,10 +124,10 @@ function ShotFragment({
         disabled={disabled || preparing || !value.trim()}
         onClick={() => void prepare()}
       >
-        {preparing ? "Готовлю кадр…" : "Подготовить кадр"}
+        {preparing ? t("shotform.preparing") : t("shotform.prepare")}
       </Button>
       <p className="mt-1 text-xs text-stone-500">
-        По тексту выше заполнит персонажей, локацию, реплики, длительность и действие. Другие кадры не трогает.
+        {t("shotform.prepareNote")}
       </p>
       {error ? <p className="mt-1 text-sm text-red-800">{error}</p> : null}
     </>
@@ -329,10 +330,10 @@ export function BootstrapPanel({
         body: JSON.stringify({ ids: next }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось поменять порядок");
+      if (!res.ok) throw new Error(data.error || t("shotform.orderFailed"));
       onImported();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
       setOrder(shotOrder);
     } finally {
       setBusy(false);
@@ -342,7 +343,7 @@ export function BootstrapPanel({
 
   async function addShot() {
     if (!initialEpisodeId) {
-      setMessage("Сначала выбери или добавь серию в заголовке");
+      setMessage(t("import.needSeries"));
       return;
     }
     setBusy(true);
@@ -354,14 +355,14 @@ export function BootstrapPanel({
         body: JSON.stringify({ id: newId, title: newName }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось добавить кадр");
+      if (!res.ok) throw new Error(data.error || t("shotform.addFailed"));
       setNewId("");
       setNewName("");
       setAdding(false);
-      setMessage(`${data.shotId} добавлен в конец`);
+      setMessage(t("shotform.added", { id: data.shotId }));
       onImported();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Ошибка");
+      setMessage(error instanceof Error ? error.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -406,8 +407,8 @@ export function BootstrapPanel({
                   type="button"
                   draggable
                   disabled={busy}
-                  aria-label="Переместить кадр"
-                  title="Перетащить, чтобы изменить порядок"
+                  aria-label={t("shotform.move")}
+                  title={t("shotform.moveHint")}
                   onDragStart={(event) => {
                     event.dataTransfer.setData("text/plain", shot.id);
                     event.dataTransfer.effectAllowed = "move";
@@ -426,7 +427,7 @@ export function BootstrapPanel({
                   disabled={busy}
                   onChange={() => toggleShot(shot.id)}
                   className="mt-1"
-                  aria-label={checked ? "Скрыть кадр из таблицы" : "Показать кадр в таблице"}
+                  aria-label={checked ? t("shotform.hide") : t("shotform.show")}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-stone-900">
@@ -443,7 +444,7 @@ export function BootstrapPanel({
                   ) : text ? (
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-stone-700">{rawSceneText(raw, shot.id) || shot.summary.trim()}</p>
                   ) : (
-                    <p className="mt-2 text-sm text-stone-400">В исходном сценарии для этого кадра нет текста.</p>
+                    <p className="mt-2 text-sm text-stone-400">{t("shotform.noText")}</p>
                   )}
                 </div>
               </div>
@@ -468,47 +469,46 @@ export function BootstrapPanel({
             />
           </label>
           <label className="block text-sm text-stone-700">
-            Имя
+            {t("shotform.name")}
             <input
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
-              placeholder="Кухня вечером"
+              placeholder={t("shotform.namePlaceholder")}
               className="mt-1 h-9 w-full rounded-md border border-stone-300 bg-white px-3 text-sm"
             />
           </label>
           <p className="text-xs text-stone-500">
-            Потом впиши текст кадра и нажми «Подготовить кадр»: так появятся персонажи, локация, реплики и действие.
+            {t("shotform.afterCreate")}
           </p>
           <div className="flex gap-2">
             <Button type="button" disabled={busy} onClick={() => void addShot()}>
-              Создать кадр
+              {t("shotform.create")}
             </Button>
             <Button type="button" variant="outline" disabled={busy} onClick={() => setAdding(false)}>
-              Отмена
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
       ) : (
         <Button type="button" variant="outline" className="mb-4" disabled={busy} onClick={() => setAdding(true)}>
-          Добавить кадр
+          {t("shotform.add")}
         </Button>
       )}
 
       <details className="mt-2">
-        <summary className="cursor-pointer text-sm font-medium text-stone-800">Размеченный сценарий</summary>
+        <summary className="cursor-pointer text-sm font-medium text-stone-800">{t("import.marked")}</summary>
         <Textarea
           value={scenario}
           onChange={(event) => setScenario(event.target.value)}
           className="mt-2 min-h-48 font-mono text-xs"
-          placeholder={`# Ночная смена\n\n## s01 Вход в кафе\n- characters: lena, mark\n- location: night_cafe\nЛена входит, Марк оборачивается.`}
+          placeholder={t("import.placeholder")}
         />
       </details>
 
       <details className="mt-6">
-        <summary className="cursor-pointer text-sm font-medium text-stone-800">Сырой сценарий</summary>
+        <summary className="cursor-pointer text-sm font-medium text-stone-800">{t("import.raw")}</summary>
         <p className="mt-1 max-w-3xl text-sm text-stone-600">
-          Текст как есть. Кнопка только записывает файл. Агент сам не стартует: после
-          неё попроси Cursor в этой папке разобрать входящие серии.
+          {t("import.rawLead")}
         </p>
         <Textarea
           value={raw}
