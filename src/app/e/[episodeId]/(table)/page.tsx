@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { SeriesBoard } from "@/components/board/series-board";
 import { listEpisodeIds, normalizeEpisodeId } from "@/lib/series/paths";
-import { loadBoard } from "../board-data";
+import { loadBoard } from "../../board-data";
 
 export const dynamic = "force-dynamic";
 

@@ -8,6 +8,7 @@ import { episodePagePath, errorText, requestJson, shotApiPath, stagePagePath } f
 import { stageName } from "@/lib/i18n";
 import { STAGES } from "@/lib/series/constants";
 import type { BootstrapPreview, SeriesSummary, ShotSummary } from "@/lib/series/types";
+import { saveBoardSnapshot } from "./board-snapshot";
 import { BootstrapPanel } from "./bootstrap-panel";
 import { BulkMenu } from "./bulk-menu";
 import { NewEpisodeDialog } from "./new-episode-dialog";
@@ -133,12 +134,15 @@ function ShotHeader({
 
 export function SeriesBoard({
   loadError = "",
+  updating = false,
   initialSeries,
   initialScenario,
   initialRawScenario,
   initialPreview,
 }: {
   loadError?: string;
+  /** Показана прошлая таблица, пока сервер собирает свежую. */
+  updating?: boolean;
   initialSeries: SeriesSummary;
   initialScenario: string;
   initialRawScenario: string;
@@ -154,6 +158,9 @@ export function SeriesBoard({
   const [headerMessage, setHeaderMessage] = useState("");
   const [cell, setCell] = useState<{ shot: number; stage: number } | null>(null);
   const reloadInFlight = useRef(false);
+  // Идёт запрос за свежей таблицей (ручной или фоновый). Плашка появляется, если он длится дольше паузы.
+  const [fetching, setFetching] = useState(false);
+  const [slow, setSlow] = useState(false);
   // Кадр из адреса (?shot=) показываем один раз. Опрос таблицы не возвращает прокрутку.
   const placedShot = useRef<string | null>(null);
   // Эпизод страницы задаётся URL (/e/{episodeId}); на смену эпизода страница монтируется заново.
@@ -186,6 +193,7 @@ export function SeriesBoard({
       const quiet = options?.quiet ?? false;
       if (quiet && reloadInFlight.current) return;
       reloadInFlight.current = true;
+      setFetching(true);
       if (!quiet) setPending(true);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 20000);
@@ -205,6 +213,7 @@ export function SeriesBoard({
         .finally(() => {
           clearTimeout(timer);
           reloadInFlight.current = false;
+          setFetching(false);
           if (!quiet) setPending(false);
         });
     },
@@ -212,6 +221,25 @@ export function SeriesBoard({
   );
 
   const onChanged = useCallback(() => reload(), [reload]);
+
+  useEffect(() => {
+    if (!fetching) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 400);
+    return () => clearTimeout(timer);
+  }, [fetching]);
+
+  useEffect(() => {
+    if (!episodeId || updating) return;
+    saveBoardSnapshot(episodeId, {
+      series,
+      scenario: initialScenario,
+      rawScenario: initialRawScenario,
+      preview: initialPreview,
+    });
+  }, [episodeId, updating, series, initialScenario, initialRawScenario, initialPreview]);
   const withoutAgent = series.shots.filter((shot) => !shot.agent).length;
 
   useEffect(() => {
@@ -271,6 +299,14 @@ export function SeriesBoard({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      {updating || slow ? (
+        <p
+          role="status"
+          className="sticky top-2 z-30 -mb-4 rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-950 shadow-sm"
+        >
+          {t("board.updating")}
+        </p>
+      ) : null}
       <header className="relative overflow-hidden rounded-[28px] border border-teal-900/10 bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.18),_transparent_40%),linear-gradient(135deg,#f7f4ef_0%,#e7eef0_45%,#d9e7e4_100%)] px-5 py-8 sm:px-10">
         <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(28,57,56,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(28,57,56,0.08)_1px,transparent_1px)] [background-size:28px_28px]" />
         <div className="relative flex flex-wrap items-end justify-between gap-6">

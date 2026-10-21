@@ -48,6 +48,7 @@ const messages = {
   "common.loading": { en: "Loading…", ru: "Загрузка…" },
   "common.copying": { en: "Copying…", ru: "Копирую…" },
   "common.selected": { en: "Selected · ", ru: "Выбрано · " },
+  "board.updating": { en: "The table is updating. The data may be out of date.", ru: "Таблица обновляется. Данные могут быть неактуальными." },
   "common.refresh": { en: "Refresh", ru: "Обновить" },
   "common.refreshing": { en: "Refreshing…", ru: "Обновление…" },
   "common.add": { en: "Add", ru: "Добавить" },
