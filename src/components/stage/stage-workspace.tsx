@@ -599,6 +599,17 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               takes={stageId === "final_render" ? null : takes}
               onTakes={setTakes}
             />
+            {stageId === "location" ? (
+              <LocationChoice
+                stageApi={stageApi}
+                location={detail.location}
+                disabled={busy || stageBusy}
+                onChanged={(picked, text) => {
+                  stage.merge(picked);
+                  setMessage(text);
+                }}
+              />
+            ) : null}
             {detail.docs.runLog.trim() ? (
               <details className="text-xs text-stone-500">
                 <summary className="cursor-pointer">{t("page.runLog")}</summary>
@@ -666,18 +677,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               </div>
             </div>
             {stageId === "location" ? (
-              <>
-                <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
-                <LocationChoice
-                  stageApi={stageApi}
-                  location={detail.location}
-                  disabled={busy || stageBusy}
-                  onChanged={(picked, text) => {
-                    stage.merge(picked);
-                    setMessage(text);
-                  }}
-                />
-              </>
+              <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
             ) : null}
             <RefFiles
               files={
