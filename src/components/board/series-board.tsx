@@ -316,12 +316,12 @@ export function SeriesBoard({
   const onChanged = useCallback(() => reload(), [reload]);
 
   useEffect(() => {
-    if (!fetching) {
-      setSlow(false);
-      return;
-    }
+    if (!fetching) return;
     const timer = setTimeout(() => setSlow(true), 400);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
   }, [fetching]);
 
   useEffect(() => {
