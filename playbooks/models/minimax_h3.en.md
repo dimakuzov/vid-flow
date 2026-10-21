@@ -2,7 +2,7 @@
 
 English copy for the agent. Russian original: `playbooks/models/minimax_h3.md`.
 
-Two variants use this playbook: `video_minimax` on the video preview (graph `minimax_h3_preview_api.json`, one pass at 0.5 MP) and `final_h3_cinema` on the final render (graph `minimax_h3_cinema_api.json`, a second pass with the latent upscale to 1.5 MP). Both are MiniMax H3 **reference to video** with the Cinema LoRA. There is no video reference: the model gets the approved first frame, one picture per character and the text. All the motion comes from the text. The user chose this graph because it keeps the quality and the likeness of the people stable; the old H3 graph with the low-res video as a reference often failed.
+Two variants use this playbook: `video_minimax` on the video preview (graph `minimax_h3_preview_api.json`, one pass at 0.5 MP) and `final_h3_cinema` on the final render (graph `minimax_h3_cinema_api.json`, a second pass with the latent upscale to 1.5 MP). Both are MiniMax H3 **reference to video** with the Cinema LoRA. There is no video reference: the model gets the approved first frame, one picture per character, the references the user gave the shot and the text. All the motion comes from the text. The user chose this graph because it keeps the quality and the likeness of the people stable; the old H3 graph with the low-res video as a reference often failed.
 
 ---
 
@@ -12,6 +12,7 @@ Two variants use this playbook: `video_minimax` on the video preview (graph `min
 | --- | --- | --- |
 | `<Picture 1>` | the approved first frame: the place, the camera, the people in their clothes | `first_frame/approve/` (newest) |
 | `<Picture 2>`, `<Picture 3>`, … | one picture per character, in the order of the task list: the face sheet (several views of the same face on one picture), otherwise one face, otherwise the approved figure | this stage's `refs/` (`{name}_face_sheet`, then `{name}_face`), otherwise the library (`*face_sheet*`, then the portrait), otherwise `characters/approve/` |
+| the next pictures, after the faces | a reference the user gave the shot: a car, an item, a detail of the place; not a person | this stage's `refs/` apart from the characters' files; otherwise, on the final, the preview's `refs/`; otherwise the first frame's `refs/`. Faces and references together: at most 6 pictures |
 | duration | preview: the stage menu (otherwise `N sec` in `prompt.md`); final: the length of the approved preview | the board |
 | the text | `prompt.md`, as written | this stage |
 
@@ -51,7 +52,8 @@ None.
 3. **Each person is bound once**, in `subject_definitions`, to their own picture. For a face sheet (the list says «face sheet»): `Use <Picture N> for her face: it shows the same face from several angles.` The sheet is one person, never several. For a single face: `Use <Picture N> for her face`. For an approved figure (the list says «approved figure and clothes»): `<Subject N> is the young man defined by <Picture N>: his face and hair as in <Picture N>`. The clothes always come from `<Picture 1>`, because that is what the people already wear in the opening frame.
 4. **A few identifying words per person** (hair, face), as the picture shows them. Do not list clothes: `<Picture 1>` shows them.
 5. **`<N>`** is the clip duration from the task, in `summary` and in `detailed_description`.
-6. **`summary`** names every picture once: the first frame, then whose face each picture is.
+6. **`summary`** names every picture once: the first frame, then whose face each picture is, then what each reference shows: `<Picture 4> is the patrol car.`
+   A reference (the list says «a reference the user gave this shot») is not a person and gets no `<Subject N>`. Bind it once, in `subject_definitions` after the people, to the object it shows: `The patrol car is the one in <Picture 4>: its colour, shape and markings exactly as in <Picture 4>.` In `detailed_description` it is then simply `the patrol car`. What the object is comes from the user's message and notes; its colour comes from the picture, so write a colour for it only as the picture and `<Picture 1>` show it.
 7. **`retention_analysis`** says `fully_preserved`. `partially_preserved` or «adapted» lets the model change the people.
 8. **`non_diegetic_music:`** stays `None.` unless the user asks for music.
 

@@ -113,6 +113,7 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
         const known =
           source === "refs" ||
           source === "refs:other" ||
+          otherRefsStage(source) !== null ||
           source === "library:location" ||
           source === "library:faces" ||
           source === "library:faces-or-characters" ||
@@ -534,13 +535,21 @@ function faceOrCharacterFiles(ctx: ShotContext): string[] {
  * Файлы refs/ этапа, которые не заняты персонажами кадра: без `{name}_face*`, `{name}_base*`,
  * `{name}_clothes*` (лист лица — тоже `{name}_face…`). Это вещи, одежда, образцы позы пользователя.
  */
-function otherRefFiles(ctx: ShotContext): string[] {
+function otherRefFiles(ctx: ShotContext, stage: StageId = ctx.stageId): string[] {
   const names = approvedCharacters(ctx).map((name) => name.toLowerCase());
   const claimed = (file: string) => {
     const stem = path.parse(file).name.toLowerCase();
     return names.some((name) => ["face", "base", "clothes"].some((kind) => stem.startsWith(`${name}_${kind}`)));
   };
-  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs")).filter((file) => !claimed(file));
+  return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, stage), "refs")).filter((file) => !claimed(file));
+}
+
+/** Этап из `refs:other:<stage>`; null — источник другой. */
+function otherRefsStage(source: string): StageId | null {
+  const prefix = "refs:other:";
+  if (!source.startsWith(prefix)) return null;
+  const stage = source.slice(prefix.length) as StageId;
+  return STAGES.includes(stage) ? stage : null;
 }
 
 function sourceFiles(ctx: ShotContext, source: ImageSource, input: ImageInput): string[] {
@@ -548,6 +557,8 @@ function sourceFiles(ctx: ShotContext, source: ImageSource, input: ImageInput): 
   const exts = kind === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (source === "refs") return listFiles(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs"), exts);
   if (source === "refs:other") return kind === "image" ? otherRefFiles(ctx) : [];
+  const otherStage = otherRefsStage(source);
+  if (otherStage) return kind === "image" ? otherRefFiles(ctx, otherStage) : [];
   // refs/ другого этапа кадра (`refs:video_preview`); `refs:other` выше — это не этап.
   const refsStage = source.startsWith("refs:") ? (source.slice("refs:".length) as StageId) : null;
   if (refsStage && STAGES.includes(refsStage)) {

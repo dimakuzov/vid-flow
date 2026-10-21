@@ -27,6 +27,18 @@
       "uploadAs": "{shotId}_preview_ref{index}{ext}",
       "label": "Лица персонажей: лист лица, иначе лицо, иначе утверждённый персонаж (refs/{имя}_face_sheet или {имя}_face — свои на кадр)"
     },
+    "extras": {
+      "kind": "image",
+      "from": [
+        "refs:other",
+        "refs:other:first_frame"
+      ],
+      "pick": "all",
+      "min": 0,
+      "max": 6,
+      "uploadAs": "{shotId}_preview_extra{index}{ext}",
+      "label": "Референсы пользователя (машина, вещь, деталь места): refs/ этого этапа, иначе refs/ первого кадра. Идут после лиц, всего 6 картинок"
+    },
     "text": {
       "kind": "text",
       "from": "prompt",
@@ -63,7 +75,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 0
       },
@@ -88,7 +101,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 1
       },
@@ -113,7 +127,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 2
       },
@@ -138,7 +153,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 3
       },
@@ -163,7 +179,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 4
       },
@@ -188,7 +205,8 @@
       ],
       "value": {
         "inputs": [
-          "people"
+          "people",
+          "extras"
         ],
         "index": 5
       },

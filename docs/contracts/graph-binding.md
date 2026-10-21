@@ -76,6 +76,8 @@ playbooks/workflows/comfy/
 | `refs` | `refs/` этого этапа |
 | `approve:<stage>` | `approve/` другого этапа этого кадра |
 | `refs:<stage>` | `refs/` другого этапа этого кадра (финал FLF берёт последний кадр эскиза из `refs:video_preview`) |
+| `refs:other` | `refs/` этого этапа без файлов персонажей кадра (`{name}_face*`, `{name}_base*`, `{name}_clothes*`): вещи, одежда, образцы позы пользователя |
+| `refs:other:<stage>` | то же из `refs/` другого этапа кадра. MiniMax H3: `refs:other`, на финале иначе `refs:other:video_preview`, иначе `refs:other:first_frame`; слоты 301–306 — сначала лица, потом эти референсы |
 | `library:location` | `data/locations/<location из shot.md>/`: `view.png`, иначе первая картинка без `copy` в имени |
 | `library:faces` | лица персонажей: по одному на файл в `approve/` этапа characters, в том же порядке (по алфавиту). `refs/{name}_face.*` этого этапа, иначе в `data/characters/{name}/` — `face`, `portrait`, `portret` (в том числе `{name}_portret`, `portret_{name}`), иначе первая картинка с face/portr в имени без side и copy. Персонаж без лица пропускается |
 | `library:faces-or-characters` | по картинке на персонажа из `approve/` этапа characters, в том же порядке: лист лица (`refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`), иначе лицо (как у `library:faces`), иначе сам утверждённый персонаж. Никто не пропадает. В задаче агенту лист помечен «face sheet» |

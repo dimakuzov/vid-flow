@@ -88,9 +88,12 @@ function personOnImage(
   input: ImageInput,
   file: string,
   shotId: string,
-): { role: "location" | "first" | "figure" | "face" | "sheet" | "other"; name: string } {
+): { role: "location" | "first" | "figure" | "face" | "sheet" | "reference" | "other"; name: string } {
   const sources = Array.isArray(input.from) ? input.from : [input.from];
   const stem = path.parse(file).name;
+  if (sources.some((source) => source === "refs:other" || source.startsWith("refs:other:"))) {
+    return { role: "reference", name: "" };
+  }
   // Лист лица, лицо или сам персонаж: утверждённый файл лежит в characters/approve, лица — нет.
   if (sources.includes("library:faces-or-characters")) {
     const approved = path.basename(path.dirname(file)) === "approve";
@@ -177,12 +180,23 @@ export function renderGraphImages(
       lines.push(
         `- ${label(number)}: ${person(characterFor(who.name))} ${kind} (${who.name} in the task; do not write that name) (${fileName})`,
       );
+    } else if (who.role === "reference" && binding.imageLabel) {
+      lines.push(
+        `- ${label(number)}: a reference the user gave this shot, not a person: an object, a vehicle or a detail of the place; the user's message and notes say what it is (${fileName})`,
+      );
     } else {
       lines.push(`- ${label(number)}: ${found.input.label} (${fileName})`);
     }
   }
   if (!lines.length) return "";
-  const left = Object.entries(images).flatMap(([name, files]) =>
+  // Ролик превью у финала — только длительность: в слоты картинок он не идёт и в «не отправлено» не попадает.
+  const slotted = new Set(
+    binding.slots.flatMap((slot) => {
+      const value = slot.value as { input?: string; inputs?: string[] };
+      return value.inputs ?? (value.input ? [value.input] : []);
+    }),
+  );
+  const left = Object.entries(images).filter(([name]) => slotted.has(name)).flatMap(([name, files]) =>
     files.filter((_, index) => !sent.has(`${name}:${index}`)).map((file) => path.basename(file)),
   );
   const bind = binding.imageLabel
