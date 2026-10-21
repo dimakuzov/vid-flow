@@ -232,7 +232,7 @@ test("реплики в задаче агенту: llm_task.md и text-режи�
   assert.match(buildTextParts(request).user, /\(none: nobody speaks in this shot; take any spoken line out of the prompt\)/);
 
   fs.writeFileSync(path.join(shotDir(EP, "s08"), "speech.md"), "Катя: Мама, я дома.\n");
-  assert.match(buildTextParts(request).user, /## Lines \(speech\.md[^\n]*\n\nКатя: Мама, я дома\./);
+  assert.match(buildTextParts(request).user, /## Lines \(speech\.md[\s\S]*Катя: Мама, я дома\./);
   cancelAgentRequest(EP, "s08", STAGE);
   setIdle(EP, "s08", STAGE);
   submit();
@@ -240,4 +240,6 @@ test("реплики в задаче агенту: llm_task.md и text-режи�
   assert.match(readLlmTask(EP, "s08", STAGE), /## Правила prompt\.md/);
   assert.match(buildTextParts(request).system, /character1, character2, character3/);
   assert.match(buildTextParts(request).system, /No Cyrillic/);
+  assert.match(buildTextParts(request).system, /Before every new agent run, check the lines again/);
+  assert.match(readLlmTask(EP, "s08", STAGE), /Перед каждым новым проходом агента заново проверь реплики/);
 });

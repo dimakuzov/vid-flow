@@ -742,6 +742,17 @@ export function assertSpeechInText(text: string, speech: string, where = "prompt
 const FILE_REFERENCE =
   /(?:^|[\s"'(`])(?:data|shots|refs|approve|output|characters|locations)\/|[\w-]+\.(?:png|jpe?g|webp|mp4|webm)\b/i;
 
+/**
+ * Сравнение с прошлым результатом. Модель тот кадр не видела, фраза для неё пустая
+ * («much closer to the camera than before»).
+ */
+const PREVIOUS_RESULT =
+  /\b(?:than before|as before|like before|same as before|last time|than previously|than earlier|than the (?:previous|last|earlier)|much closer|even closer|closer than)\b/i;
+
+export function previousResultPhrase(text: string): string | null {
+  return text.match(PREVIOUS_RESULT)?.[0] ?? null;
+}
+
 export function assertModelText(text: string, where = "prompt.md", names: string[] = []): void {
   const file = text.match(FILE_REFERENCE);
   if (file) {
@@ -759,6 +770,12 @@ export function assertModelText(text: string, where = "prompt.md", names: string
     const preview = russian.length > 80 ? `${russian.slice(0, 80)}…` : russian;
     throw new Error(
       `${where} содержит русский текст («${preview}»). Модель читает только текст на её языке: перепиши промпт или отправь агенту.`,
+    );
+  }
+  const previous = previousResultPhrase(text);
+  if (previous) {
+    throw new Error(
+      `${where} сравнивает кадр с прошлым результатом («${previous}»). Напиши, какой кадр нужен сейчас. «Ещё ближе» — это крупный план целиком, а не «closer than before».`,
     );
   }
 }

@@ -101,7 +101,7 @@ When the location description shows more than one space, put each person in the 
 
 ### Shot size
 
-Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план`, `much closer` mean a close-up. Rewrite the size sentences to the close-up block below, as the frame should be now: `very close: her face and shoulders fill most of the frame`. The model has not seen the earlier picture, so `closer than before` gives it nothing to measure against. Each size has its own size block. The lock is the same for all of them (see «Lock»).
+Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` and `much closer` mean a close-up. Rewrite the size sentences to the close-up block below. Never compare with the previous picture: `much closer to the camera than before`, `closer than before`, `than before`, `as before` are forbidden, and the board will not run a prompt that contains them. The model has not seen that picture. Say how close the person is now. If prompt.md already has such a comparison, delete it. Each size has its own size block. The lock is the same for all of them (see «Lock»).
 
 The camera and the location never move, whatever the shot size. The size comes only from how close to the camera the person stands.
 

@@ -1,26 +1,8 @@
 import fs from "fs";
 import path from "path";
-import {
-  cancelComfyPrompt,
-  ComfyRejectedError,
-  downloadComfyImage,
-  historyError,
-  listHistoryImages,
-  listHistoryTexts,
-  queuePositionOf,
-  readComfyHistory,
-  readComfyQueue,
-  submitComfyPrompt,
-  uploadComfyImage,
-} from "./client";
-import {
-  cancelCloudJob,
-  downloadCloudFile,
-  readCloudJob,
-  renameUploads,
-  submitCloudPrompt,
-  uploadCloudImage,
-} from "./cloud";
+import { ComfyRejectedError, historyError, listHistoryImages, listHistoryTexts, queuePositionOf } from "./client";
+import { renameUploads } from "./cloud";
+import { transport } from "./transport";
 import { registerLoop } from "../background";
 import { getComfyQueueRoot, getDataRoot, getPlaybooksRoot } from "../series/paths";
 
@@ -195,12 +177,12 @@ async function submitCloudJob(job: ComfyJob): Promise<void> {
   for (const upload of job.uploads || []) {
     const source = resolveReadable(upload.path);
     const filename = upload.filename || path.basename(source);
-    names.set(filename, await uploadCloudImage(fs.readFileSync(source), filename));
+    names.set(filename, await transport().uploadCloudImage(fs.readFileSync(source), filename));
   }
   if (cancelledMeanwhile(job.id)) return;
-  const promptId = await submitCloudPrompt(renameUploads(job.prompt, names));
+  const promptId = await transport().submitCloudPrompt(renameUploads(job.prompt, names));
   if (cancelledMeanwhile(job.id)) {
-    await cancelCloudJob(promptId);
+    await transport().cancelCloudJob(promptId);
     return;
   }
   job.promptId = promptId;
@@ -218,9 +200,9 @@ async function finishCloudJob(job: ComfyJob): Promise<void> {
   if (Date.now() - last < CLOUD_POLL_MS) return;
   lastCloudPoll.set(job.id, Date.now());
   // Сбой сети или облака при опросе — не провал: прогон уже оплачен, спросим снова.
-  let cloud: Awaited<ReturnType<typeof readCloudJob>>;
+  let cloud: Awaited<ReturnType<ReturnType<typeof transport>["readCloudJob"]>>;
   try {
-    cloud = await readCloudJob(job.promptId);
+    cloud = await transport().readCloudJob(job.promptId);
   } catch {
     return;
   }
@@ -241,7 +223,7 @@ async function finishCloudJob(job: ComfyJob): Promise<void> {
   let downloaded: { name: string; bytes: Buffer }[];
   try {
     downloaded = await Promise.all(
-      files.map(async (file) => ({ name: path.basename(file.filename), bytes: await downloadCloudFile(file) })),
+      files.map(async (file) => ({ name: path.basename(file.filename), bytes: await transport().downloadCloudFile(file) })),
     );
   } catch {
     return;
@@ -264,13 +246,13 @@ async function submitJob(job: ComfyJob): Promise<void> {
   for (const upload of job.uploads || []) {
     const source = resolveReadable(upload.path);
     const filename = upload.filename || path.basename(source);
-    await uploadComfyImage(fs.readFileSync(source), filename);
+    await transport().uploadComfyImage(fs.readFileSync(source), filename);
   }
   if (cancelledMeanwhile(job.id)) return;
-  const promptId = await submitComfyPrompt(job.prompt);
+  const promptId = await transport().submitComfyPrompt(job.prompt);
   // «Отменить» могли нажать, пока шёл запрос: не затираем cancelled и снимаем prompt из ComfyUI.
   if (cancelledMeanwhile(job.id)) {
-    await cancelComfyPrompt(promptId);
+    await transport().cancelComfyPrompt(promptId);
     return;
   }
   job.promptId = promptId;
@@ -302,7 +284,7 @@ type QueueSnapshot = { running: string[]; pending: string[] } | null;
 async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
   if (isCloud(job)) return finishCloudJob(job);
   if (!job.promptId) return;
-  const history = await readComfyHistory(job.promptId);
+  const history = await transport().readComfyHistory(job.promptId);
   if (!history) {
     const position = queue ? queuePositionOf(queue, job.promptId) : (job.queuePosition ?? null);
     if (position != null || !queue) {
@@ -347,7 +329,7 @@ async function finishJob(job: ComfyJob, queue: QueueSnapshot): Promise<void> {
   fs.mkdirSync(saveDir, { recursive: true });
   const saved: string[] = [];
   for (const image of listHistoryImages(history)) {
-    const bytes = await downloadComfyImage(image);
+    const bytes = await transport().downloadComfyImage(image);
     saved.push(writeUnique(saveDir, path.basename(image.filename), bytes));
   }
   if (job.saveText) {
@@ -390,8 +372,8 @@ export async function cancelComfyJob(id: string): Promise<void> {
   const job = readComfyJob(id);
   if (!job || job.status === "done" || job.status === "error" || job.status === "cancelled") return;
   if (job.promptId) {
-    if (isCloud(job)) await cancelCloudJob(job.promptId);
-    else await cancelComfyPrompt(job.promptId);
+    if (isCloud(job)) await transport().cancelCloudJob(job.promptId);
+    else await transport().cancelComfyPrompt(job.promptId);
   }
   job.status = "cancelled";
   job.error = undefined;
@@ -471,7 +453,7 @@ export async function drainComfyQueue(): Promise<void> {
     let queue: QueueSnapshot = null;
     if (sent.some((job) => !isCloud(job))) {
       try {
-        queue = await readComfyQueue();
+        queue = await transport().readComfyQueue();
       } catch {
         queue = null;
       }
