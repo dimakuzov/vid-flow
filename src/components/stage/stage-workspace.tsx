@@ -311,11 +311,14 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         { method: "POST", body: { filenames: names, from: "output" }, fallbackError: t("page.approveFailed") },
       );
       setSelectedOutput([]);
-      await stage.reload();
       const approved = data.approved.join(", ");
-      return stageId === "characters" && data.stage?.status !== "approved"
-        ? t("page.approvedPartial", { names: approved })
-        : t("page.approved", { names: approved });
+      // Не все персонажи кадра утверждены: остаёмся на странице дорабатывать остальных.
+      if (stageId === "characters" && data.stage?.status !== "approved") {
+        await stage.reload();
+        return t("page.approvedPartial", { names: approved });
+      }
+      // Утверждено: как «← Таблица».
+      keys.current.back();
     });
   };
 
@@ -348,7 +351,15 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
         keys.current.approve();
         return;
       }
-      if (event.code === "Backquote" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        !document.querySelector("[role='menu']")
+      ) {
         event.preventDefault();
         keys.current.back();
         return;

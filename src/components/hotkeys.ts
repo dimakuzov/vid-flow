@@ -13,8 +13,8 @@ export const HOTKEYS: HotkeyItem[] = [
   { keys: "A", action: "hotkey.stage.approve", scope: "stage" },
   { keys: "← →", action: "hotkey.stage.arrows", scope: "stage" },
   { keys: "Esc", action: "hotkey.stage.esc", scope: "stage" },
+  { keys: "Esc", action: "hotkey.stage.back", scope: "stage" },
   { keys: "?", action: "hotkey.stage.help", scope: "stage" },
-  { keys: "` / ё", action: "hotkey.stage.back", scope: "stage" },
   { keys: "← → ↑ ↓", action: "hotkey.board.arrows", scope: "board" },
   { keys: "Enter", action: "hotkey.board.enter", scope: "board" },
 ];

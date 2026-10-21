@@ -131,7 +131,7 @@ const messages = {
   "hotkey.stage.arrows": { en: "Step through pictures in the viewer", ru: "Листать картинки в просмотре" },
   "hotkey.stage.esc": { en: "Close the viewer or a menu", ru: "Закрыть просмотр или меню" },
   "hotkey.stage.help": { en: "Show this list", ru: "Показать этот список" },
-  "hotkey.stage.back": { en: "Back to the table, to this shot", ru: "Назад к таблице, к этому кадру" },
+  "hotkey.stage.back": { en: "Back to the table, to this shot (no viewer or menu open)", ru: "Назад к таблице, к этому кадру (если нет окон и меню)" },
   "hotkey.board.arrows": { en: "Select a cell", ru: "Выбрать клетку" },
   "hotkey.board.enter": { en: "Open the stage of the selected cell", ru: "Открыть этап выбранной клетки" },
   "hotkey.button": { en: "Keys ?", ru: "Клавиши ?" },
