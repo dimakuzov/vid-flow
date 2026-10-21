@@ -131,6 +131,11 @@ export function readComfyJob(id: string): ComfyJob | null {
   return JSON.parse(fs.readFileSync(file, "utf8")) as ComfyJob;
 }
 
+/** Есть задание, которое уже ушло в ComfyUI или облако: транспорт менять нельзя. */
+export function comfyBusy(): boolean {
+  return listJobs().some((job) => job.status === "running");
+}
+
 export function enqueueComfyJob(job: ComfyJob): ComfyJob {
   if (!job.prompt || typeof job.prompt !== "object") throw new Error("prompt обязателен");
   resolveSaveDir(job.saveTo);

@@ -129,3 +129,71 @@ test("download находит выход по имени и id задания, c
 test("readComfyQueue в SDK-режиме явно не поддержан", async () => {
   await assert.rejects(sdk.readComfyQueue(), /не отдаёт очередь/);
 });
+
+test("выбор в интерфейсе хранится в data/ и важнее COMFY_TRANSPORT; без него работает переменная", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { readTransportSetting, writeTransportSetting } = await import("./transport");
+  const saved = { root: process.env.DATA_ROOT, mode: process.env.COMFY_TRANSPORT };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "fb-transport-"));
+  process.env.DATA_ROOT = root;
+  try {
+    delete process.env.COMFY_TRANSPORT;
+    assert.equal(readTransportSetting(), null);
+    assert.equal(transportName(), "legacy");
+    process.env.COMFY_TRANSPORT = "sdk";
+    assert.equal(transportName(), "sdk");
+    writeTransportSetting("legacy");
+    assert.equal(transportName(), "legacy");
+    writeTransportSetting("sdk");
+    delete process.env.COMFY_TRANSPORT;
+    assert.equal(transportName(), "sdk");
+    assert.equal(transport().submitComfyPrompt, sdk.submitComfyPrompt);
+    fs.writeFileSync(path.join(root, "comfy_transport.txt"), "мусор\n");
+    assert.equal(readTransportSetting(), null);
+  } finally {
+    if (saved.root === undefined) delete process.env.DATA_ROOT;
+    else process.env.DATA_ROOT = saved.root;
+    if (saved.mode === undefined) delete process.env.COMFY_TRANSPORT;
+    else process.env.COMFY_TRANSPORT = saved.mode;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("переключение блокируется, пока есть задание в статусе running (API отвечает 409)", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { GET, POST } = await import("../../app/api/comfy/transport/route");
+  const saved = process.env.DATA_ROOT;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "fb-transport-"));
+  process.env.DATA_ROOT = root;
+  const post = (transport: string) =>
+    POST(new Request("http://x/api/comfy/transport", { method: "POST", body: JSON.stringify({ transport }) }));
+  try {
+    assert.deepEqual(await (await GET()).json(), { transport: "legacy", locked: false });
+    assert.equal((await post("sdk")).status, 200);
+    assert.deepEqual(await (await GET()).json(), { transport: "sdk", locked: false });
+    assert.equal((await post("bogus")).status, 400);
+    const queue = path.join(root, "comfy_queue");
+    fs.mkdirSync(queue, { recursive: true });
+    fs.writeFileSync(
+      path.join(queue, "busy.json"),
+      JSON.stringify({ id: "busy", status: "running", promptId: "p1", prompt: {}, saveTo: root }),
+    );
+    assert.deepEqual(await (await GET()).json(), { transport: "sdk", locked: true });
+    const blocked = await post("legacy");
+    assert.equal(blocked.status, 409);
+    assert.equal((await blocked.json()).transport, "sdk");
+    fs.writeFileSync(
+      path.join(queue, "busy.json"),
+      JSON.stringify({ id: "busy", status: "done", prompt: {}, saveTo: root }),
+    );
+    assert.equal((await post("legacy")).status, 200);
+  } finally {
+    if (saved === undefined) delete process.env.DATA_ROOT;
+    else process.env.DATA_ROOT = saved;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

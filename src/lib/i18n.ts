@@ -31,6 +31,14 @@ type Entry = { en: string; ru: string };
 
 const messages = {
   "lang.label": { en: "Language", ru: "Язык" },
+  "transport.label": { en: "ComfyUI connection", ru: "Подключение к ComfyUI" },
+  "transport.legacy": { en: "Direct", ru: "Напрямую" },
+  "transport.sdk": { en: "SDK", ru: "SDK" },
+  "transport.locked": {
+    en: "A generation is running. Switch after it finishes.",
+    ru: "Идёт генерация. Переключите после её завершения.",
+  },
+  "transport.failed": { en: "Could not switch the connection", ru: "Не удалось переключить подключение" },
 
   "common.close": { en: "Close", ru: "Закрыть" },
   "common.cancel": { en: "Cancel", ru: "Отмена" },

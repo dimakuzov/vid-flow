@@ -14,6 +14,7 @@ import { NewEpisodeDialog } from "./new-episode-dialog";
 import { PostPanel } from "./post-panel";
 import { ShotAgentLine } from "./shot-agent-menu";
 import { StageCell } from "./stage-cell";
+import { TransportSwitch } from "./transport-switch";
 
 /** Название кадра прямо в таблице. Пишется в заголовок shot.md, остальной текст не трогается. */
 function ShotTitle({
@@ -283,6 +284,7 @@ export function SeriesBoard({
           </div>
           <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
             <LanguageSwitch />
+            <TransportSwitch />
             <label className="flex w-full min-w-0 flex-col gap-1 text-xs font-medium text-stone-600 sm:w-auto sm:min-w-48">
               {t("header.series")}
               <select
