@@ -2,6 +2,7 @@
 
 import { Trash2Icon } from "lucide-react";
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { useT } from "@/components/language";
 import type { MediaFile } from "@/lib/series/types";
 
@@ -49,6 +50,7 @@ export function MediaCard({
   compact,
   excluded,
   onToggleExclude,
+  footer,
 }: {
   file: MediaFile;
   selected?: boolean;
@@ -69,6 +71,8 @@ export function MediaCard({
   excluded?: boolean;
   /** Убрать из графа / вернуть. Нет — переключателя нет (этап занят). */
   onToggleExclude?: () => void;
+  /** Строка действий под карточкой, например «добавить в библиотеку». */
+  footer?: ReactNode;
 }) {
   const t = useT();
   const shownCaption = [excluded ? t("media.excluded") : "", caption ?? ""].filter(Boolean).join(" · ");
@@ -153,6 +157,7 @@ export function MediaCard({
           {t("media.approveOne")}
         </button>
       ) : null}
+      {footer}
     </div>
   );
 }

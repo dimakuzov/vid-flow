@@ -4,8 +4,10 @@ import { useT } from "@/components/language";
 import type { Translate } from "@/lib/i18n";
 import type { ImageEditRecord } from "@/lib/series/mutations";
 import type { MediaFile, StageDetail } from "@/lib/series/types";
+import { LibraryAddButton } from "./library-add-button";
 import { MediaCard } from "./media-card";
 import { CharacterApproveTools } from "./prev-shot-buttons";
+import { StyledApprovePicker } from "./styled-approve-picker";
 
 /** Подпись «из чего сделан» для файла в output/. */
 function madeFrom(name: string, edits: ImageEditRecord[], tr: Translate): { caption?: string; title?: string } {
@@ -46,13 +48,31 @@ export function OutputPanel({
   onStage: (stage: StageDetail | null, message: string) => void;
 }) {
   const t = useT();
+  const libraryKind = detail.stageId === "characters" ? "character" : detail.stageId === "location" ? "location" : null;
+  const libraryButton = (file: MediaFile, folder: "output" | "approve") =>
+    libraryKind && file.kind === "image" ? (
+      <LibraryAddButton
+        stageApi={stageApi}
+        kind={libraryKind}
+        folder={folder}
+        file={file}
+        characters={detail.expectedCharacters}
+        disabled={libraryKind === "location" && !detail.location.trim()}
+        onDone={(text) => onStage(null, text)}
+      />
+    ) : null;
   return (
     <section className="min-w-0 rounded-2xl border border-stone-200 bg-white/90 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">Output</h2>
       <div className="mt-4">
         <h3 className="text-sm font-medium text-stone-800">approve/</h3>
         {detail.stageId === "characters" ? (
-          <CharacterApproveTools stageApi={stageApi} disabled={disabled} onDone={onStage} />
+          <CharacterApproveTools
+            stageApi={stageApi}
+            disabled={disabled}
+            onDone={onStage}
+            extra={<StyledApprovePicker stageApi={stageApi} disabled={disabled} onDone={onStage} />}
+          />
         ) : null}
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {detail.approve.length ? (
@@ -63,6 +83,7 @@ export function OutputPanel({
                 onOpen={() => onOpen(detail.approve, file, "approve")}
                 onRemove={disabled ? undefined : () => onRemoveApproved(file.name)}
                 onEdit={() => onEdit(file, "approve")}
+                footer={libraryButton(file, "approve")}
               />
             ))
           ) : (
@@ -91,6 +112,7 @@ export function OutputPanel({
                 onEdit={() => onEdit(file, "output")}
                 caption={origin.caption}
                 captionTitle={origin.title}
+                footer={libraryButton(file, "output")}
               />
               );
             })
