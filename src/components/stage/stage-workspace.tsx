@@ -677,7 +677,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               </div>
             </div>
             {stageId === "location" ? (
-              <LocationLibrary stageApi={stageApi} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
+              <LocationLibrary stageApi={stageApi} location={detail.location} disabled={busy} onPicked={(picked, text) => { stage.merge(picked); setMessage(text); }} />
             ) : null}
             <RefFiles
               files={

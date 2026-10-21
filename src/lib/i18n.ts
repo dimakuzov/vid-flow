@@ -614,7 +614,9 @@ const messages = {
 
   "loc.library": { en: "From the library", ru: "Из библиотеки" },
   "loc.libraryLabel": { en: "Locations from the library", ru: "Локации из библиотеки" },
-  "loc.libraryLead": { en: "data/locations/ — the shared view goes into refs/ and becomes a graph input.", ru: "data/locations/ — общий вид ляжет в refs/ и станет входом графа." },
+  "loc.libraryLead": { en: "Every picture in data/locations/. The one you click goes into refs/ and becomes a graph input.", ru: "Все картинки из data/locations/. Выбранная ляжет в refs/ и станет входом графа." },
+  "loc.libCurrent": { en: "Shot location: {id}", ru: "Локация кадра: {id}" },
+  "loc.libOthers": { en: "Other locations", ru: "Остальные локации" },
   "loc.libraryEmpty": { en: "data/locations/ has no folders.", ru: "В data/locations/ нет папок." },
   "loc.noImage": { en: "{id}: no picture", ru: "{id}: нет картинки" },
   "loc.none": { en: "none", ru: "нет" },
