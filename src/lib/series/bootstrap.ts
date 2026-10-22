@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
+import { parseFramingLine, seedFraming } from "./first-frame-settings";
 import { createEpisode, ensureStageDirs, episodeRoot, stageDir } from "./paths";
 import { readRunSettings, writeRunSettings } from "./run-settings";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
@@ -71,6 +72,8 @@ export function parseScenario(content: string): BootstrapPreview {
       } else if (key.startsWith("duration") || key.includes("длительн")) {
         const seconds = Number(value.replace(",", ".").match(/\d+(?:\.\d+)?/)?.[0]);
         if (Number.isFinite(seconds) && seconds > 0) current.durationSec = Math.round(seconds);
+      } else if (key.startsWith("framing") || key.includes("дальност")) {
+        current.framing = { ...(current.framing ?? {}), ...parseFramingLine(value) };
       }
       continue;
     }
@@ -224,6 +227,7 @@ export function applyBootstrap(options: {
     };
     writeShotMeta(episodeId, meta);
     seedShotSpeechAndDuration(episodeId, shot, options.overwriteDocs === true);
+    seedFraming(episodeId, shot.id, shot.characters, shot.framing ?? {}, shot.summary, options.overwriteDocs === true);
 
     for (const stageId of STAGES) {
       const promptPath = path.join(stageDir(episodeId, shot.id, stageId), "prompt.md");

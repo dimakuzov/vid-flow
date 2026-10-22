@@ -201,6 +201,8 @@ export interface BootstrapShotDraft {
   speech?: string[];
   /** Длительность клипа в секундах (`- duration:` в scenario.md). Нет — по умолчанию графа. */
   durationSec?: number;
+  /** Дальность до камеры на первом кадре по персонажам (`- framing:` в scenario.md). */
+  framing?: Record<string, "background" | "full" | "waist" | "face">;
 }
 
 export interface BootstrapPreview {

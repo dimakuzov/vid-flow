@@ -68,7 +68,7 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       characterImage?: { name?: string; path?: string | null };
       /** Имя папки в data/locations/. Только этап location. Пишет строку `- location:` в shot.md. */
       location?: string;
-      /** Дальность персонажа до камеры. Только первый кадр. value null — как в сценарии. */
+      /** Дальность персонажа до камеры. Только первый кадр. value null — снова план из текста кадра. */
       framing?: { name?: string; value?: string | null };
       /** Подпись к файлу refs/ («шлем Лены»). Только первый кадр. Пустой текст — снять. */
       refNote?: { file?: string; text?: string };

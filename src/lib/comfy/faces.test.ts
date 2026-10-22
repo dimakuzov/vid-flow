@@ -33,7 +33,7 @@ function shot(shotId: string, characters: string[]) {
   fs.mkdirSync(shotDir(EP, shotId), { recursive: true });
   fs.writeFileSync(
     path.join(shotDir(EP, shotId), "shot.md"),
-    `# ${shotId}\n\n- characters: ${characters.join(", ")}\n- location: hall\n`,
+    `# ${shotId}\n\n- characters: ${characters.join(", ")}\n- location: hall\n\n## Summary\nСредний план.\n`,
   );
   ensureStageDirs(EP, shotId);
   put(path.join(stageDir(EP, shotId, "location"), "approve", "hall.png"));

@@ -8,7 +8,8 @@ import { DocFieldLabel } from "./doc-field";
 const FRAMINGS = ["background", "full", "waist", "face"] as const;
 
 /**
- * Первый кадр: на каждого персонажа кадра — дальность до камеры. Пусто — «как в сценарии».
+ * Первый кадр: на каждого персонажа кадра — дальность до камеры. Значение есть всегда: при создании
+ * кадра его ставит разметка сценария, дальше — выбор пользователя.
  * Выбор сохраняется сразу и не сбрасывается при отправке агенту.
  */
 export function FramingPicker({
@@ -35,11 +36,10 @@ export function FramingPicker({
               <span className="min-w-0 truncate">{name}</span>
               <select
                 className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-800 disabled:opacity-60"
-                value={framing[key] ?? ""}
+                value={framing[key] ?? "full"}
                 disabled={disabled}
-                onChange={(event) => onChange(key, event.target.value || null)}
+                onChange={(event) => onChange(key, event.target.value)}
               >
-                <option value="">{t("framing.default")}</option>
                 {FRAMINGS.map((value) => (
                   <option key={value} value={value}>
                     {t(`framing.${value}` as MessageKey)}

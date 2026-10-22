@@ -39,7 +39,7 @@ const ctx = (stageId: StageId) => ({ episodeId: EP, shotId: "s01", stageId });
 before(() => {
   createEpisode(EP);
   fs.mkdirSync(shotDir(EP, "s01"), { recursive: true });
-  fs.writeFileSync(path.join(shotDir(EP, "s01"), "shot.md"), "# s01\n\n- characters: julia, lena\n- location: hall\n");
+  fs.writeFileSync(path.join(shotDir(EP, "s01"), "shot.md"), "# s01\n\n- characters: julia, lena\n- location: hall\n\n## Summary\nСредний план.\n");
   ensureStageDirs(EP, "s01");
   put(path.join(stageDir(EP, "s01", "location"), "approve", "hall.png"));
   put(path.join(stageDir(EP, "s01", "characters"), "approve", "julia_s01.png"));

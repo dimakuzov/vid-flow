@@ -526,10 +526,9 @@ const messages = {
   "refs.noteFailed": { en: "Could not save the caption", ru: "Не удалось сохранить подпись" },
   "framing.title": { en: "Distance from the camera", ru: "Дальность до камеры" },
   "framing.note": {
-    en: "stays for the shot; goes to the agent with every request, and close faces get the portrait first",
-    ru: "сохраняется для кадра; уходит агенту с каждым запросом, лицам близко к камере портрет важнее референсов",
+    en: "set from the scenario when the shot is created; stays for the shot, goes to the agent with every request, and close faces get the portrait first",
+    ru: "ставится по сценарию при создании кадра; сохраняется для кадра, уходит агенту с каждым запросом, лицам близко к камере портрет важнее референсов",
   },
-  "framing.default": { en: "as in the scenario", ru: "как в сценарии" },
   "framing.background": { en: "in the background", ru: "на заднем плане" },
   "framing.full": { en: "full figure", ru: "в полный рост" },
   "framing.waist": { en: "waist up", ru: "по пояс" },

@@ -65,6 +65,7 @@ after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 test("референс из refs/ уходит в граф после лица, файлы персонажа в refs/ — нет", () => {
   shot("s01", ["lena"], ["helmet.jpg", "lena_face.png", "lena_base.png"]);
+  setFraming(EP, "s01", "lena", "waist");
   assert.deepEqual(slots("s01"), ["lena_s01.png", "s01_face0.png", "s01_ref0.jpg"]);
   const images = renderGraphImages(EP, "s01", "first_frame", WORKFLOW);
   assert.match(images, /image 3: character1 face/);
@@ -73,13 +74,16 @@ test("референс из refs/ уходит в граф после лица, 
 
 test("убранный кнопкой «Убрать» референс в граф не идёт", () => {
   shot("s02", ["lena"], ["helmet.jpg", "bike.jpg"]);
+  setFraming(EP, "s02", "lena", "waist");
   setExcluded(EP, "s02", "first_frame", `episodes/${EP}/shots/s02/first_frame/refs/bike.jpg`, true);
   assert.deepEqual(slots("s02"), ["lena_s02.png", "s02_face0.png", "s02_ref0.jpg"]);
 });
 
 test("лицо дальнего персонажа — после референсов, ближнего — до", () => {
   shot("s03", ["lena", "misha"], ["helmet.jpg"]);
-  // Не выбрано — как близко: оба лица до референса, как было раньше.
+  // Оба близко: оба лица до референса.
+  setFraming(EP, "s03", "lena", "waist");
+  setFraming(EP, "s03", "misha", "waist");
   assert.deepEqual(slots("s03"), ["lena_s03.png", "misha_s03.png", "s03_face0.png", "s03_face1.png", "s03_ref0.jpg"]);
   setFraming(EP, "s03", "misha", "background");
   assert.deepEqual(slots("s03"), [
@@ -103,8 +107,8 @@ test("мест не хватает: лицо дальнего персонажа
 
 test("агенту: дальность и подписи референсов строками после сообщения", () => {
   shot("s05", ["lena", "misha"], ["helmet.jpg", "old.jpg"]);
-  assert.equal(framingMessage(EP, "s05"), "");
-  assert.equal(withFramingMessage(EP, "s05", "ещё раз"), "ещё раз");
+  // Не выбрано на доске — план из текста кадра, здесь его нет: в полный рост. Пустых значений нет.
+  assert.match(framingMessage(EP, "s05"), /- lena: full figure.*\n- misha: full figure/);
   setFraming(EP, "s05", "lena", "face");
   setRefNote(EP, "s05", "helmet.jpg", "шлем Лены");
   setRefNote(EP, "s05", "old.jpg", "старый шлем");
@@ -112,7 +116,7 @@ test("агенту: дальность и подписи референсов с
   const text = withFramingMessage(EP, "s05", "крупнее");
   assert.match(text, /^крупнее\n\nDistance from the camera/);
   assert.match(text, /- lena: face close-up: the face is about three quarters of the frame width/);
-  assert.doesNotMatch(text, /misha/);
+  assert.match(text, /- misha: full figure/);
   assert.match(text, /- helmet\.jpg: шлем Лены/);
   assert.doesNotMatch(text, /old\.jpg/);
   // Пустое сообщение: только строки доски.

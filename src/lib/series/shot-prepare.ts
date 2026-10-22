@@ -4,6 +4,7 @@ import type { AgentRequestFile, AgentResult } from "../contracts/agent-request";
 import { FORMAT_CLAUDE_MODEL, formatMinutes, modeTimeoutMs } from "../agent/config";
 import { cleanPromptText, getAgentProvider } from "../agent/providers";
 import { parseScenario } from "./bootstrap";
+import { seedFraming } from "./first-frame-settings";
 import { readTextIfExists, writeText } from "./media";
 import { getCharactersRoot, getLocationsRoot, shotDir } from "./paths";
 import { readRunSettings, writeRunSettings } from "./run-settings";
@@ -83,6 +84,7 @@ export function applyPreparedShot(episodeId: string, shotId: string, markdown: s
   writePlaceAndAction(episodeId, shotId, location, action);
   setShotCharacters(episodeId, shotId, characters);
   writeShotSpeech(episodeId, shotId, (shot.speech ?? []).join("\n"));
+  seedFraming(episodeId, shotId, characters, shot.framing ?? {}, action, false);
   const seconds = Math.min(12, Math.max(2, shot.durationSec ?? 5));
   const settings = readRunSettings(episodeId, shotId, "video_preview");
   writeRunSettings(episodeId, shotId, "video_preview", { ...settings, durationSec: seconds });
@@ -99,6 +101,7 @@ function promptFor(shotId: string, title: string, source: string): { system: str
 - characters: имена из библиотеки, строчная латиница, пробел — \`_\`. Нет в кадре — пусто.
 - location: id папки локации из библиотеки, так же латиницей. Нет места — пусто.
 - duration: целое от 2 до 12. Реплике нужно примерно 1 секунда на 2–3 слова плюс секунда на начало и конец. Нет оснований — 5.
+- framing: как далеко от камеры каждый персонаж в первом кадре, \`имя: слово\` через запятую: background — на заднем плане, full — в полный рост, waist — по пояс, face — крупно лицо. «Крупный план» — face, «средний» — waist, «общий» — full. Нет оснований — full.
 - speech: прямая речь дословно и в том же порядке, одна реплика — одна строка \`- speech: Имя: текст\`. Голос за кадром и ремарки — не реплики. Никто не говорит — строк speech нет.
 Текст действия реплики не повторяет.`;
   const user = [
