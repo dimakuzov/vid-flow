@@ -1,5 +1,6 @@
 import { Comfy, ComfyError, InsufficientCredits, InvalidWorkflow, QueueFull, Unauthorized } from "@comfyorg/sdk";
 import type { ApiPrompt } from "../contracts/comfy-job";
+import * as legacyLocal from "./client";
 import { ComfyRejectedError, parseNodeErrors, type ComfyHistory, type ComfyImageRef } from "./client";
 import { cloudKey, type CloudJob } from "./cloud";
 
@@ -225,8 +226,30 @@ export const submitComfyPrompt = local.submit;
 export const downloadComfyImage = local.download;
 export const cancelComfyPrompt = local.cancel;
 
+/**
+ * Текстовые выходы нод (PreviewAny: слова Whisper) SDK не отдаёт: у задания `outputs` пуст.
+ * Берём их из истории самого ComfyUI: id задания в SDK равен его prompt_id. Файлы остаются за SDK.
+ */
+export function mergeTexts(history: ComfyHistory, source: ComfyHistory | null): ComfyHistory {
+  if (!source?.outputs) return history;
+  const outputs = { ...history.outputs };
+  for (const [node, output] of Object.entries(source.outputs)) {
+    if (output.text === undefined) continue;
+    outputs[node] = { ...outputs[node], text: output.text };
+  }
+  return { ...history, outputs };
+}
+
 export async function readComfyHistory(promptId: string): Promise<ComfyHistory | null> {
-  return historyFromJob(await local.readJob(promptId));
+  const history = await historyFromJob(await local.readJob(promptId));
+  if (!history || history.status?.status_str !== "success") return history;
+  let source: ComfyHistory | null = null;
+  try {
+    source = await legacyLocal.readComfyHistory(promptId);
+  } catch {
+    // ComfyUI напрямую недоступен: остаются только файлы SDK.
+  }
+  return mergeTexts(history, source);
 }
 
 /**

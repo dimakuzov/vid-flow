@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { InvalidWorkflow } from "@comfyorg/sdk";
 import { ComfyRejectedError, historyError, listHistoryImages, listHistoryTexts } from "./client";
-import { bindUploads, createOps, historyFromJob, translateSdkError, type SdkClientLike, type SdkJobLike } from "./sdk";
+import { bindUploads, createOps, historyFromJob, mergeTexts, translateSdkError, type SdkClientLike, type SdkJobLike } from "./sdk";
 import { transport, transportName } from "./transport";
 import * as legacyLocal from "./client";
 import * as legacyCloud from "./cloud";
@@ -196,4 +196,16 @@ test("переключение блокируется, пока есть зад�
     else process.env.DATA_ROOT = saved;
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("mergeTexts добавляет текст PreviewAny из истории ComfyUI и не трогает файлы SDK", () => {
+  const history = {
+    outputs: { "9": { images: [{ filename: "a.png", subfolder: "job-1", type: "output" }] } },
+    status: { status_str: "success", completed: true },
+  };
+  const source = { outputs: { "93": { text: ["[]"] }, "9": { images: [{ filename: "other.png" }] } } };
+  const merged = mergeTexts(history, source);
+  assert.deepEqual(listHistoryTexts(merged), [{ node: "93", text: "[]" }]);
+  assert.deepEqual(listHistoryImages(merged).map((file) => file.filename), ["a.png"]);
+  assert.equal(mergeTexts(history, null), history);
 });
