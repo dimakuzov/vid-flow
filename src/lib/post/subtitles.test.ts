@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { MUSIC_DUCK_DB, MUSIC_GAIN_DB, musicLevelKeyframes } from "./music";
 import { assDocument, buildWordCues, patchProjectSubtitles } from "./subtitles";
 import { ensureMusicTrack } from "./music-insert";
+import { ensureKdenliveRenderPreset, RENDER_PRESET_NAME, setProjectRenderSettings } from "./render-preset";
 import { parseMltTime, projectVoiceLines } from "./project-read";
 import fs from "node:fs";
 import os from "node:os";
@@ -183,4 +184,36 @@ test("дорожка «Музыка» в старом проекте: внизу
   assert.ok(out.indexOf('<tractor id="frameboard_music_tractor"') < out.indexOf('<tractor id="tractor6"'), "дорожка определена до последовательности");
   assert.match(out, /"kdenlive:track_name">Музыка</);
   assert.equal(ensureMusicTrack(out, 100), out, "второй раз — без изменений");
+});
+
+test("пресет рендера «Frameboard» в пресетах Kdenlive: создаётся, чужие пресеты остаются, повтор не дублирует", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "frameboard-preset-"));
+  const file = path.join(dir, "kdenlive", "export", "customprofiles.xml");
+  ensureKdenliveRenderPreset(file);
+  let text = fs.readFileSync(file, "utf8");
+  assert.match(text, /^<\?xml version="1.0"\?>\n<profiles version="1">/);
+  assert.match(text, new RegExp(`<profile name="${RENDER_PRESET_NAME}" category="custom" extension="mp4"`));
+  assert.match(text, /defaultbitrate="1600"[\s\S]*defaultaudiobitrate="192"[\s\S]*args="f=mp4 movflags=\+faststart vcodec=libx264 vb=%bitrate\+'k' pix_fmt=yuv420p g=48 acodec=aac ab=%audiobitrate\+'k' ar=48000 ac=2"/);
+  fs.writeFileSync(file, text.replace("</profiles>", ' <profile name="Mine" category="custom" extension="mov" args="f=mov"/>\n</profiles>'));
+  ensureKdenliveRenderPreset(file);
+  ensureKdenliveRenderPreset(file);
+  text = fs.readFileSync(file, "utf8");
+  assert.equal(text.match(new RegExp(`name="${RENDER_PRESET_NAME}"`, "g"))!.length, 1);
+  assert.match(text, /<profile name="Mine"/, "свой пресет пользователя на месте");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("в проекте — выбор пресета и путь вывода; существующие свойства заменяются", () => {
+  const project = `<mlt><playlist id="main_bin">
+  <property name="kdenlive:docproperties.renderprofile">MP4-H264/AAC</property>
+  <property name="kdenlive:docproperties.rendercategory">generic</property>
+  <entry producer="chain0" in="0" out="9"/>
+</playlist></mlt>`;
+  const out = setProjectRenderSettings(project, "C:\\data\\post\\render\\ep2_v5_kdenlive.mp4");
+  assert.match(out, new RegExp(`docproperties\\.renderprofile">${RENDER_PRESET_NAME}<`));
+  assert.match(out, /docproperties\.rendercategory">custom</);
+  assert.match(out, /docproperties\.renderurl">C:\/data\/post\/render\/ep2_v5_kdenlive\.mp4</);
+  assert.equal(out.match(/docproperties\.renderprofile/g)!.length, 1);
+  assert.match(out, /<entry producer="chain0"/);
+  assert.equal(setProjectRenderSettings("<mlt></mlt>", "x.mp4"), "<mlt></mlt>");
 });

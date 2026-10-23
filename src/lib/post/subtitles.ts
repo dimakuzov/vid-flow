@@ -11,6 +11,7 @@ import { readSpeechGraph, speechGraphNodes, type SpeechWord } from "./speech-det
 import { tokens } from "./speech-fit";
 import { readManifest } from "./timeline";
 import { projectVoiceLines } from "./project-read";
+import { ensureKdenliveRenderPreset, kdenliveRenderFile, setProjectRenderSettings } from "./render-preset";
 import { listMusic, musicLevelKeyframes } from "./music";
 import { insertMusic, MusicTrackMissingError, speechFromWords } from "./music-insert";
 
@@ -553,6 +554,12 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
         if (!(error instanceof MusicTrackMissingError)) throw error;
         musicNote = error.message;
       }
+    }
+    patched = setProjectRenderSettings(patched, kdenliveRenderFile(episodeId, project));
+    try {
+      ensureKdenliveRenderPreset();
+    } catch (error) {
+      console.error("[frameboard] пресет рендера Kdenlive:", error);
     }
     fs.writeFileSync(`${project}.tmp`, patched, "utf8");
     fs.renameSync(`${project}.tmp`, project);

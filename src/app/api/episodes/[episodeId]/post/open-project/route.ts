@@ -11,7 +11,7 @@ export async function POST(_request: Request, context: { params: Promise<{ episo
     const episodeId = normalizeEpisodeId((await context.params).episodeId);
     const project = latestProject(episodeId);
     if (!project) throw new Error("Нет проекта Kdenlive — сначала «Собрать проект»");
-    openInKdenlive(project);
+    openInKdenlive(episodeId, project);
     return NextResponse.json({ project });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Не удалось открыть Kdenlive";

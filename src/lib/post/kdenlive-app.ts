@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
+import { applyRenderSettings } from "./render-preset";
 import { findMelt } from "./subtitles";
 
 /*
@@ -23,9 +24,13 @@ export function findKdenlive(): string {
   throw new Error("Не нашёл Kdenlive: впишите KDENLIVE=C:\\Programs\\kdenlive-…\\bin\\kdenlive.exe в .env.local");
 }
 
-/** Отдельный процесс, не ждём его и не держим: доска продолжает работать. */
-export function openInKdenlive(project: string): void {
+/**
+ * Отдельный процесс, не ждём его и не держим: доска продолжает работать. Перед открытием — пресет рендера
+ * «Frameboard» в Kdenlive и его выбор с путём вывода в проекте (render-preset.ts).
+ */
+export function openInKdenlive(episodeId: string, project: string): void {
   if (!fs.existsSync(project)) throw new Error(`Нет файла проекта: ${project}`);
+  applyRenderSettings(episodeId, project);
   const child = spawn(findKdenlive(), [project], { detached: true, stdio: "ignore", windowsHide: false });
   child.on("error", (error) => console.error("[frameboard] Kdenlive:", error));
   child.unref();

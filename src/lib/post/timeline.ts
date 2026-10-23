@@ -4,6 +4,7 @@ import { pathToFileURL } from "url";
 import { collectPost, type CollectedLine } from "./collect";
 import { probeMedia } from "./ffmpeg";
 import { writeKdenliveProject } from "./kdenlive";
+import { applyRenderSettings } from "./render-preset";
 import { readShotFinal, writePostLines, type ShotFinal } from "./lines";
 import { activeShotIds, manifestFile, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from "./paths";
 
@@ -349,6 +350,8 @@ ${spineXml}
     warnings,
   };
   manifest.kdenlive = await writeKdenliveProject(episodeId, manifest, timelineDir(episodeId), project);
+  // Рендер в Kdenlive — сразу с настройками доски (пресет «Frameboard», вывод в post/render).
+  applyRenderSettings(episodeId, path.join(postDir(episodeId), manifest.kdenlive));
   writeJson(manifestFile(episodeId), manifest);
   writePostLines(episodeId, lines);
   return manifest;

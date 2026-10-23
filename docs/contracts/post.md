@@ -126,6 +126,10 @@ data/episodes/{ep}/post/
 
 Задание `post/jobs/subs-*.json`: `{ id, kind: subtitles, episodeId, project, status, progress, ass, backup, render, words, lines, linesFrom, missing, cut, music, musicNote, error }`. Проект в Kdenlive перед запуском должен быть сохранён и закрыт.
 
+## Рендер в Kdenlive — с настройками доски
+
+`src/lib/post/render-preset.ts`. Пресет «Frameboard MP4 H264 1600k» (категория Custom) — в пользовательских пресетах Kdenlive `%LOCALAPPDATA%/kdenlive/export/customprofiles.xml` (там их читает RenderPresetRepository; другие пресеты файла не трогаются; `KDENLIVE_DATA` — другая папка, для тестов): H.264 `vb=%bitrate+'k'` (по умолчанию 1600), yuv420p, g=48, AAC `%audiobitrate` (192) 48 кГц стерео, скорость medium. В проекте — выбор пресета и путь вывода (`kdenlive:docproperties.rendercategory/renderprofile/renderurl…` в корзине), вывод — `post/render/{проект}_kdenlive.mp4`. Пишется при «Собрать проект», «Добавить субтитры» и «Открыть в Kdenlive». Kdenlive читает пресеты при запуске.
+
 ## Таймлайн (FCPXML 1.9)
 
 Resolve: File → Import → Timeline. Секвенция 24 fps, размер кадра — выбор на доске (720×1280 по умолчанию).

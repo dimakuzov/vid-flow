@@ -14,6 +14,8 @@ process.env.FRAMEBOARD_LOOPS = "off";
 process.env.COMFY_URL = "http://127.0.0.1:9";
 process.env.ELEVENLABS_API_KEY = "test-key";
 process.env.POST_TTS_CHUNK_CHARS = "60";
+// Пресет рендера Kdenlive — во временную папку, не в настоящий AppData.
+process.env.KDENLIVE_DATA = tmp;
 delete process.env.SERIES_ROOT;
 
 import { readComfyJob } from "../comfy/queue";
