@@ -900,6 +900,8 @@ export function PostPanel({ episodeId }: { episodeId: string }) {
                         ? t(state.subtitles.job.linesFrom === "manifest" ? "post.subLinesBuild" : "post.subLinesProject", { n: state.subtitles.job.lines })
                         : ""
                     }${state.subtitles.job.cut?.length ? t("post.subCut", { words: state.subtitles.job.cut.join(" ") }) : ""}${
+                      state.subtitles.job.extra?.length ? t("post.subExtra", { n: state.subtitles.job.extra.length }) : ""
+                    }${
                       state.subtitles.job.missing?.length ? t("post.subMissing", { words: state.subtitles.job.missing.join(", ") }) : ""
                     }${state.subtitles.job.music?.length ? t("post.subMusic", { names: state.subtitles.job.music.join(", ") }) : ""}${
                       state.subtitles.job.musicNote ? t("post.subMusicNote", { note: state.subtitles.job.musicNote }) : ""

@@ -838,6 +838,7 @@ const messages = {
   "post.subMissing": { en: " (Whisper did not hear: {words} — the time was placed between the neighbors)", ru: " (Whisper не услышал: {words} — время поставлено между соседями)" },
   "post.subLinesProject": { en: ", lines from the project: {n}", ru: ", реплик из проекта: {n}" },
   "post.subLinesBuild": { en: ", lines from the build (none found in the project): {n}", ru: ", реплики из сборки (в проекте не нашлись): {n}" },
+  "post.subExtra": { en: " (speech outside the lines, in Whisper's words: {n})", ru: " (речь вне реплик, словами Whisper: {n})" },
   "post.subCut": { en: " (cut in the project, left out: {words})", ru: " (вырезано в проекте, не вошло: {words})" },
   "post.subMusic": { en: ", music: {names}", ru: ", музыка: {names}" },
   "post.subMusicNote": { en: ". Music was not added: {note}", ru: ". Музыка не добавлена: {note}" },

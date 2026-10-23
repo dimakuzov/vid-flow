@@ -251,3 +251,56 @@ test("подложка под словом: стиль «Box» из стиля �
   assert.equal(plain.split("[Events]")[1].split("\n").filter((line) => line.startsWith("Dialogue")).length, 1);
 });
 
+test("реплики из проекта со временем слов: сопоставление только рядом; речь вне реплик — текстом Whisper, по порядку, до конца звука", () => {
+  const lines = [
+    { text: "And he never did.", words: [w("And", 32.2, 0), w("he", 32.8, 0), w("never", 33.0, 0), w("did.", 33.3, 0)].map((x) => ({ text: x.value, time: x.start })) },
+    { text: "This hole?", words: [{ text: "This", time: 11.0 }, { text: "hole?", time: 11.3 }] },
+  ];
+  const words = [
+    w("And", 32.2, 32.5), w("he", 32.8, 32.9), w("never", 33.0, 33.2), w("did.", 33.3, 33.6),
+    w("He", 58.0, 58.3), w("didn't", 58.3, 58.6), w("do", 58.6, 58.9), w("it,", 58.9, 59.1), w("did", 61.0, 61.3), w("he?", 61.3, 61.6),
+    w("Are", 66.2, 66.2), w("you", 66.2, 66.2), w("sure?", 66.2, 66.2),
+  ];
+  const { cues, missing, extra } = buildWordCues(lines, words, { duration: 66.5 });
+  // «did» на 61 с — не «did.» реплики на 33 с: слишком далеко от её места.
+  assert.equal(cues.find((cue) => cue.text === "did.")!.start, 33.3);
+  assert.deepEqual(missing, ["This", "hole?"]);
+  const hole = cues.find((cue) => cue.text === "This")!;
+  assert.equal(hole.start, 11.0, "не услышанная реплика проекта — на своё место");
+  assert.deepEqual(extra, ["He", "didn't", "do", "it,", "did", "he?", "Are", "you", "sure?"]);
+  const tail = cues.filter((cue) => cue.start >= 66);
+  assert.deepEqual(tail.map((cue) => cue.text), ["Are", "you", "sure?"], "порядок как у Whisper");
+  assert.ok(tail.every((cue, index) => index === 0 || cue.start > tail[index - 1].start), "слова в одной точке разведены");
+  assert.ok(tail[tail.length - 1].start < 66.5, "до конца звука");
+});
+
+test("клип с куском реплики: только слова, попавшие в отрезок файла", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "frameboard-words-"));
+  const voices = path.join(dir, "voices", "mom");
+  fs.mkdirSync(voices, { recursive: true });
+  fs.writeFileSync(path.join(voices, "v1.json"), JSON.stringify({
+    lines: [{ id: "s02-1", text: "Because of me? How dare you say that!", speechStart: 0, speechEnd: 4 }],
+    chunks: [{ file: "v1.part1.mp3", offset: 0, lineIds: ["s02-1"] }],
+  }));
+  const text = "[accent] Because of me? How dare you say that!";
+  const chars = [...text];
+  // Таймстемпы: «[accent] » — 0 с, дальше по 0.1 с на символ.
+  const starts = chars.map((_, i) => Math.max(0, (i - 9) * 0.1));
+  fs.writeFileSync(path.join(voices, "v1.part1.json"), JSON.stringify({
+    alignment: { characters: chars, character_start_times_seconds: starts, character_end_times_seconds: starts.map((t) => t + 0.1) },
+  }));
+  const file = path.join(voices, "v1.wav").split(path.sep).join("/");
+  // Два клипа: «Because of me?» (файл 0–1.4 с) и «say that!» (файл 2.8–3.8 с), «How dare you» вырезано.
+  const xml = `<mlt root="${dir.split(path.sep).join("/")}">
+ <chain id="c0" out="200"><property name="resource">${file}</property></chain>
+ <playlist id="p0"><entry in="0" out="33" producer="c0"/><blank length="24"/><entry in="67" out="90" producer="c0"/></playlist>
+</mlt>`;
+  const lines = projectVoiceLines(xml, 24);
+  assert.deepEqual(lines.map((line) => [line.id, line.text]), [
+    ["s02-1", "Because of me?"],
+    ["s02-1", "say that!"],
+  ]);
+  assert.equal(lines[1].words[0].text, "say");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+

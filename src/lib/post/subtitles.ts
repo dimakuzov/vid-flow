@@ -139,6 +139,10 @@ function similar(a: string, b: string): boolean {
   return 1 - levenshtein(x, y) / Math.max(x.length, y.length) >= 0.75;
 }
 
+/** Насколько слово Whisper может быть далеко от своего места в проекте, чтобы считаться им (секунды). */
+const MATCH_WINDOW_SEC = 2;
+/** Слово Whisper дальше этого от реплик — речь вне реплик (не «лишнее слово» внутри реплики). */
+const EXTRA_MARGIN_SEC = 0.5;
 /** Подряд не услышанных слов на краю реплики — столько и больше считаются вырезанными в проекте. */
 const CUT_EDGE_WORDS = 2;
 
@@ -147,14 +151,24 @@ const CUT_EDGE_WORDS = 2;
  * время — от Whisper. Не услышанные слова внутри фразы делят время между соседями; два и больше подряд на краю
  * реплики (или вся реплика) — вырезаны в проекте и в титры не идут (`cut`).
  */
-export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues: WordCue[]; missing: string[]; cut: string[] } {
-  let a: { token: string; shown: string; line: number; start?: number; end?: number }[] = [];
-  lineTexts.forEach((text, line) => {
-    for (const piece of text.split(/\s+/)) {
+export type CueLine = string | { text: string; words?: { text: string; time: number }[] };
+
+export function buildWordCues(
+  lineInputs: CueLine[],
+  words: SpeechWord[],
+  options: { duration?: number } = {},
+): { cues: WordCue[]; missing: string[]; cut: string[]; extra: string[] } {
+  const lineTexts = lineInputs.map((line) => (typeof line === "string" ? line : line.text));
+  let a: { token: string; shown: string; line: number; expected?: number; start?: number; end?: number }[] = [];
+  lineInputs.forEach((input, line) => {
+    const known = typeof input === "string" ? undefined : input.words;
+    (typeof input === "string" ? input : input.text).split(/\s+/).forEach((piece, index) => {
       const parts = tokens(piece);
-      if (!parts.length) continue;
-      a.push({ token: parts.join(""), shown: piece.replace(/^[.…]+/, ""), line });
-    }
+      if (!parts.length) return;
+      // Время слова в проекте (по таймстемпам озвучки) — если Whisper его не услышит.
+      const expected = known?.[index]?.text === piece ? known[index].time : undefined;
+      a.push({ token: parts.join(""), shown: piece.replace(/^[.…]+/, ""), line, expected });
+    });
   });
   const b = words.map((word) => tokens(word.value).join(""));
   const n = a.length;
@@ -167,7 +181,9 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
   }
   for (let i = 1; i <= n; i += 1) {
     for (let j = 1; j <= m; j += 1) {
-      const diagonal = similar(a[i - 1].token, b[j - 1]) ? score[i - 1][j - 1] + 2 : Number.NEGATIVE_INFINITY;
+      // Слово с известным временем в проекте сопоставляется только с тем, что Whisper слышит рядом.
+      const near = a[i - 1].expected === undefined || Math.abs(words[j - 1].start - a[i - 1].expected!) <= MATCH_WINDOW_SEC;
+      const diagonal = near && similar(a[i - 1].token, b[j - 1]) ? score[i - 1][j - 1] + 2 : Number.NEGATIVE_INFINITY;
       const up = score[i - 1][j] - 1;
       const left = score[i][j - 1];
       const best = Math.max(diagonal, up, left);
@@ -177,10 +193,12 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
   }
   let i = n;
   let j = m;
+  const usedWords = new Set<number>();
   while (i > 0) {
     if (j > 0 && move[i][j] === 0) {
       a[i - 1].start = words[j - 1].start;
       a[i - 1].end = words[j - 1].end;
+      usedWords.add(j - 1);
       i -= 1;
       j -= 1;
     } else if (j > 0 && move[i][j] === 2) {
@@ -189,10 +207,11 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
       i -= 1;
     }
   }
-  // Края реплик, которых не слышно, — вырезаны.
+  // Края реплик, которых не слышно, — вырезаны. Реплики из проекта (со временем слов) уже обрезаны по клипам — не трогаем.
   const cut: string[] = [];
   const drop = new Set<number>();
   for (let line = 0; line < lineTexts.length; line += 1) {
+    if (typeof lineInputs[line] !== "string" && (lineInputs[line] as { words?: unknown[] }).words?.length) continue;
     const indices = a.map((item, index) => (item.line === line ? index : -1)).filter((index) => index >= 0);
     const heard = indices.filter((index) => a[index].start !== undefined);
     if (!heard.length) {
@@ -209,6 +228,12 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
     a = a.filter((_, index) => !drop.has(index));
   }
   const missing = a.filter((item) => item.start === undefined).map((item) => item.shown);
+  // Не услышанное слово с известным временем в проекте — на это время.
+  for (const item of a) {
+    if (item.start !== undefined || item.expected === undefined) continue;
+    item.start = item.expected;
+    item.end = item.expected + MIN_WORD_SEC;
+  }
   for (let k = 0; k < a.length; ) {
     if (a[k].start !== undefined) {
       k += 1;
@@ -226,17 +251,51 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
     }
     k = runEnd;
   }
-  const cues = a.map((item, index) => {
-    const start = item.start!;
-    const next = a[index + 1]?.start;
-    let end = Math.max(item.end!, start + MIN_WORD_SEC);
+  // Речь вне реплик (кадр, вставленный в Kdenlive со своим звуком): слова Whisper, которые не легли ни на одну реплику
+  // и звучат вне отрезков реплик, — в титры его текстом.
+  const spans = lineTexts
+    .map((_, line) => a.filter((item) => item.line === line))
+    .filter((items) => items.length)
+    .map((items) => ({ start: Math.min(...items.map((item) => item.start!)), end: Math.max(...items.map((item) => item.end!)) }));
+  const outside = (time: number) => spans.every((span) => time < span.start - EXTRA_MARGIN_SEC || time > span.end + EXTRA_MARGIN_SEC);
+  const raw = words
+    .map((word, index) => ({ start: word.start, end: word.end, shown: word.value.trim(), index }))
+    .filter((word) => !usedWords.has(word.index) && word.shown && tokens(word.shown).length && outside(word.start));
+  // Порядок — как слышит Whisper; в конце звука он иногда ставит много слов в одну точку. Каждое следующее слово —
+  // не раньше предыдущего + MIN_WORD_SEC; хвост, не влезающий до конца звука, сжимается равномерно.
+  const extras: { start: number; end: number; shown: string }[] = [];
+  let pushedFrom = -1;
+  raw.forEach((word, index) => {
+    const previous = extras[extras.length - 1];
+    const close = previous && word.start - previous.start < MIN_WORD_SEC && word.start - previous.start < 5;
+    const start = close ? previous.start + MIN_WORD_SEC : word.start;
+    if (close && pushedFrom < 0) pushedFrom = index - 1;
+    if (!close) pushedFrom = -1;
+    extras.push({ start, end: Math.max(word.end, start + MIN_WORD_SEC), shown: word.shown });
+  });
+  const limit = options.duration !== undefined ? options.duration - 0.05 : undefined;
+  if (limit !== undefined && extras.length && extras[extras.length - 1].end > limit && pushedFrom >= 0) {
+    const from = extras[pushedFrom].start;
+    const step = Math.max(0.06, (limit - from) / (extras.length - pushedFrom));
+    for (let index = pushedFrom; index < extras.length; index += 1) {
+      extras[index].start = from + step * (index - pushedFrom);
+      extras[index].end = extras[index].start + step;
+    }
+  }
+
+  // По времени: слово со своим временем из проекта может стоять не там, где его поставил порядок реплик.
+  const items = [...a.map((item) => ({ start: item.start!, end: item.end!, shown: item.shown })), ...extras].sort((x, y) => x.start - y.start);
+  const cues = items.map((item, index) => {
+    const start = item.start;
+    const next = items[index + 1]?.start;
+    let end = Math.max(item.end, start + MIN_WORD_SEC);
     if (next !== undefined) {
-      if (next - item.end! < FILL_GAP_SEC) end = Math.max(end, next);
+      if (next - item.end < FILL_GAP_SEC) end = Math.max(end, next);
       end = Math.min(end, next);
     }
     return { start, end: Math.max(end, start + 0.04), text: item.shown };
   });
-  return { cues, missing, cut };
+  return { cues, missing, cut, extra: extras.map((item) => item.shown) };
 }
 
 function assTime(seconds: number): string {
@@ -421,6 +480,8 @@ export interface SubtitlesJob {
   linesFrom?: "project" | "manifest";
   /** Слова на краях реплик, которых нет в звуке проекта: вырезаны, в субтитры не пошли. */
   cut?: string[];
+  /** Речь вне реплик (вставленные в Kdenlive куски со своим звуком): в субтитрах текстом Whisper. */
+  extra?: string[];
   /** Музыка, положенная в проект (имена файлов из post/music), или почему её нет. */
   music?: string[];
   musicNote?: string;
@@ -585,7 +646,9 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
     const lineTexts = inProject.length
       ? inProject.map((line) => line.text)
       : [...manifest.lines].sort((x, y) => x.timelineStart - y.timelineStart).map((line) => line.text);
-    const { cues, missing, cut } = buildWordCues(lineTexts, words);
+    const { cues, missing, cut, extra } = buildWordCues(inProject.length ? inProject : lineTexts, words, {
+      duration: totalFrames / TIMELINE_FPS,
+    });
     const template = fs.existsSync(subtitleStylePath()) ? fs.readFileSync(subtitleStylePath(), "utf8") : null;
     const ass = `${project}.ass`;
     const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -637,6 +700,7 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
       linesFrom,
       missing,
       cut,
+      extra,
       music,
       musicNote,
     });

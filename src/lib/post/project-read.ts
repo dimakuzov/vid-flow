@@ -9,11 +9,13 @@ import { readJson } from "./paths";
  */
 
 export interface ProjectLine {
-  /** id реплики (`s05-2`) и её текст — как при озвучке (`vN.json`). */
+  /** id реплики (`s05-2`) и её текст — как при озвучке (`vN.json`); у куска реплики — только его слова. */
   id: string;
   text: string;
-  /** Где речь реплики начинается на таймлайне, секунды. */
+  /** Где речь реплики (куска) начинается на таймлайне, секунды. */
   time: number;
+  /** Слова и где они звучат на таймлайне (по таймстемпам озвучки): запасное время, если Whisper слово не услышал. */
+  words: { text: string; time: number }[];
 }
 
 /** Время Kdenlive/MLT в кадрах: целое — кадры, `ЧЧ:ММ:СС.ммм` — время. */
@@ -52,19 +54,98 @@ function voiceProducers(xml: string, root: string): Map<string, VoiceSource> {
   return result;
 }
 
+/** Запас по краю клипа, секунды: слово на самой границе ещё считается сыгранным. */
+const EDGE_SLACK_SEC = 0.08;
+
+interface WordTime {
+  text: string;
+  /** Начало и середина слова в файле озвучки, секунды. */
+  start: number;
+  middle: number;
+}
+
+/** Слова реплики по доле символов внутри её речи — если таймстемпов озвучки нет. */
+export function estimateWordTimes(line: { text: string; speechStart: number; speechEnd: number }): WordTime[] {
+  const length = Math.max(1, line.text.length);
+  const span = Math.max(0.01, line.speechEnd - line.speechStart);
+  return [...line.text.matchAll(/\S+/g)].map((match) => {
+    const at = match.index ?? 0;
+    return {
+      text: match[0],
+      start: line.speechStart + (span * at) / length,
+      middle: line.speechStart + (span * (at + match[0].length / 2)) / length,
+    };
+  });
+}
+
+/** Слова, звучащие в отрезке файла [srcIn, srcOut] (по середине слова, с небольшим запасом на краю). */
+export function wordsInRange(words: WordTime[], srcIn: number, srcOut: number): WordTime[] {
+  return words.filter((word) => word.middle >= srcIn - EDGE_SLACK_SEC && word.middle <= srcOut + EDGE_SLACK_SEC);
+}
+
+interface VersionChunk {
+  file: string;
+  offset: number;
+  lineIds: string[];
+}
+
+interface PartAlignment {
+  alignment?: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };
+}
+
+/**
+ * Точное время слов реплик по таймстемпам ElevenLabs (`vN.partK.json` рядом с озвучкой, сдвиг куска — `offset`
+ * в `vN.json`). Реплика ищется в тексте куска по порядку (перед ней может быть аудиотег персонажа).
+ */
+function alignedWordTimes(dir: string, version: VersionLines): Map<string, WordTime[]> {
+  const result = new Map<string, WordTime[]>();
+  for (const chunk of version.chunks ?? []) {
+    const part = readJson<PartAlignment>(path.join(dir, chunk.file.replace(/\.mp3$/i, ".json")));
+    const alignment = part?.alignment;
+    if (!alignment?.characters?.length) continue;
+    const joined = alignment.characters.join("");
+    const index: number[] = [];
+    alignment.characters.forEach((char, i) => {
+      for (let k = 0; k < char.length; k += 1) index.push(i);
+    });
+    let cursor = 0;
+    for (const id of chunk.lineIds) {
+      const line = version.lines.find((item) => item.id === id);
+      if (!line) continue;
+      const at = joined.indexOf(line.text, cursor);
+      if (at < 0) continue;
+      cursor = at + line.text.length;
+      const times: WordTime[] = [];
+      for (const match of line.text.matchAll(/\S+/g)) {
+        const first = index[at + (match.index ?? 0)];
+        const last = index[at + (match.index ?? 0) + match[0].length - 1];
+        const start = alignment.character_start_times_seconds[first] + chunk.offset;
+        const end = alignment.character_end_times_seconds[last] + chunk.offset;
+        times.push({ text: match[0], start, middle: (start + end) / 2 });
+      }
+      result.set(id, times);
+    }
+  }
+  return result;
+}
+
 interface VersionLines {
   lines: { id: string; text: string; speechStart: number; speechEnd: number }[];
+  chunks?: VersionChunk[];
 }
 
 /** Реплики, которые играют клипы озвучки проекта, по времени на таймлайне. */
 export function projectVoiceLines(xml: string, fps: number): ProjectLine[] {
   const root = xml.match(/<mlt [^>]*\broot="([^"]*)"/)?.[1] ?? "";
   const producers = voiceProducers(xml, root);
-  const versions = new Map<string, VersionLines | null>();
+  const versions = new Map<string, { version: VersionLines; words: Map<string, WordTime[]> } | null>();
   const versionOf = (file: string) => {
     const number = file.match(VOICE_FILE)?.[1];
     const json = path.join(path.dirname(file), `v${number}.json`);
-    if (!versions.has(json)) versions.set(json, fs.existsSync(json) ? readJson<VersionLines>(json) : null);
+    if (!versions.has(json)) {
+      const version = fs.existsSync(json) ? readJson<VersionLines>(json) : null;
+      versions.set(json, version ? { version, words: alignedWordTimes(path.dirname(file), version) } : null);
+    }
     return versions.get(json) ?? null;
   };
 
@@ -88,17 +169,22 @@ export function projectVoiceLines(xml: string, fps: number): ProjectLine[] {
       cursor += outFrame - inFrame + 1;
       const source = producers.get(attr("producer") ?? "");
       if (!source) continue;
-      const version = versionOf(source.file);
-      if (!version) continue;
+      const known = versionOf(source.file);
+      if (!known) continue;
       // Кадры timewarp — уже со скоростью: в секунды файла — умножить на скорость.
       const srcIn = (inFrame * source.speed) / fps;
       const srcOut = ((outFrame + 1) * source.speed) / fps;
-      for (const line of version.lines) {
-        const length = Math.max(0.01, line.speechEnd - line.speechStart);
-        const overlap = Math.min(srcOut, line.speechEnd) - Math.max(srcIn, line.speechStart);
-        if (overlap < length * 0.5) continue;
-        const time = start / fps + (Math.max(srcIn, line.speechStart) - srcIn) / source.speed;
-        found.push({ id: line.id, text: line.text, time: Math.round(time * 1000) / 1000 });
+      // Клип может играть кусок реплики (её резали в Kdenlive): берём только слова, которые попадают в отрезок файла.
+      const toTimeline = (sourceTime: number) => Math.round((start / fps + (Math.max(srcIn, sourceTime) - srcIn) / source.speed) * 1000) / 1000;
+      for (const line of known.version.lines) {
+        const words = wordsInRange(known.words.get(line.id) ?? estimateWordTimes(line), srcIn, srcOut);
+        if (!words.length) continue;
+        found.push({
+          id: line.id,
+          text: words.map((word) => word.text).join(" "),
+          time: toTimeline(words[0].start),
+          words: words.map((word) => ({ text: word.text, time: toTimeline(word.start) })),
+        });
       }
     }
   }
