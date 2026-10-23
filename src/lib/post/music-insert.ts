@@ -37,9 +37,102 @@ function elementEnd(text: string, start: number, tag: string): number {
   return text.indexOf(`</${tag}>`, headEnd) + `</${tag}>`.length;
 }
 
+/**
+ * Дорожка «Музыка» в проекте, где её нет (собран до того, как сборка стала её оставлять): новая нижняя аудиодорожка
+ * сразу над чёрной. Номера остальных дорожек сдвигаются на 1: в переходах последовательности (`a_track`, `b_track` —
+ * номера MLT, чёрная — 0) и в группах и целях Kdenlive (`groups`, `audioTarget`, `videoTarget`, `activeTrack` — номера
+ * без чёрной, первая дорожка — 0; так в tests/dataset/test-nesting.kdenlive).
+ */
+export function ensureMusicTrack(project: string, totalFrames: number): string {
+  if (project.includes(`<property name="kdenlive:track_name">${xml(MUSIC_TRACK_NAME)}</property>`)) return project;
+  const active = project.match(/<property name="kdenlive:docproperties\.activetimeline">([^<]+)<\/property>/)?.[1];
+  if (!active) throw new MusicTrackMissingError();
+  let open = project.indexOf(`<tractor id="${active}"`);
+  if (open < 0) {
+    const marker = project.indexOf(`<property name="kdenlive:uuid">${active}</property>`);
+    if (marker >= 0) open = project.lastIndexOf("<tractor ", marker);
+  }
+  if (open < 0) throw new MusicTrackMissingError();
+  const close = project.indexOf("</tractor>", open);
+  let block = project.slice(open, close);
+
+  const firstTrack = block.match(/<track [^>]*\/>/);
+  if (!firstTrack) throw new MusicTrackMissingError();
+  const shiftFrom = (from: number) => (value: string) => {
+    const number = Number(value);
+    return Number.isInteger(number) && number >= from ? String(number + 1) : value;
+  };
+  const shiftMlt = shiftFrom(1);
+  const shiftKdenlive = shiftFrom(0);
+  // Переходы последовательности: номера дорожек ≥ 1 — на 1 выше.
+  block = block.replace(/(<property name="(?:a_track|b_track)">)(\d+)(<\/property>)/g, (_, a: string, n: string, b: string) => `${a}${shiftMlt(n)}${b}`);
+  for (const name of ["audioTarget", "videoTarget", "activeTrack"]) {
+    block = block.replace(
+      new RegExp(`(<property name="kdenlive:sequenceproperties\\.${name}">)(-?\\d+)(</property>)`),
+      (_, a: string, n: string, b: string) => `${a}${shiftKdenlive(n)}${b}`,
+    );
+  }
+  for (const name of ["tracksCount", "tracks"]) {
+    block = block.replace(
+      new RegExp(`(<property name="kdenlive:sequenceproperties\\.${name}">)(\\d+)(</property>)`),
+      (_, a: string, n: string, b: string) => `${a}${Number(n) + 1}${b}`,
+    );
+  }
+  // Группы: "data": "дорожка:позиция:…" — все дорожки сдвигаются (дорожка субтитров — отрицательная, не трогаем).
+  block = block.replace(/(&quot;|")data\1:\s*\1(\d+):/g, (whole, quote: string, n: string) => whole.replace(`${quote}${n}:`, `${quote}${shiftKdenlive(n)}:`));
+
+  const trackRef = `<track producer="frameboard_music_tractor"/>`;
+  block = block.replace(firstTrack[0], `${firstTrack[0]}\n  ${trackRef}`);
+  const mix = `  <transition id="frameboard_music_mix">
+   ${prop("a_track", 0)}
+   ${prop("b_track", 1)}
+   ${prop("mlt_service", "mix")}
+   ${prop("kdenlive_id", "mix")}
+   ${prop("internal_added", 237)}
+   ${prop("always_active", 1)}
+   ${prop("accepts_blanks", 1)}
+   ${prop("sum", 1)}
+  </transition>`;
+  block = `${block.trimEnd()}\n${mix}\n `;
+
+  const last = Math.max(0, totalFrames - 1);
+  const track = `<playlist id="frameboard_music_playlist">
+  ${prop("kdenlive:audio_track", 1)}
+ </playlist>
+ <playlist id="frameboard_music_playlist_mix">
+  ${prop("kdenlive:audio_track", 1)}
+ </playlist>
+ <tractor id="frameboard_music_tractor" in="0" out="${last}">
+  ${prop("kdenlive:audio_track", 1)}
+  ${prop("kdenlive:track_name", MUSIC_TRACK_NAME)}
+  ${prop("kdenlive:trackheight", 67)}
+  ${prop("kdenlive:timeline_active", 1)}
+  ${prop("kdenlive:collapsed", 0)}
+  <track hide="video" producer="frameboard_music_playlist"/>
+  <track hide="video" producer="frameboard_music_playlist_mix"/>
+  <filter id="frameboard_music_volume">
+   ${prop("window", 75)}
+   ${prop("max_gain", "20dB")}
+   ${prop("mlt_service", "volume")}
+   ${prop("internal_added", 237)}
+   ${prop("disable", 1)}
+  </filter>
+  <filter id="frameboard_music_panner">
+   ${prop("channel", -1)}
+   ${prop("mlt_service", "panner")}
+   ${prop("internal_added", 237)}
+   ${prop("start", 0.5)}
+   ${prop("disable", 1)}
+  </filter>
+ </tractor>
+ `;
+  // Определения дорожки — до последовательности, которая на них ссылается.
+  return project.slice(0, open) + track + block + project.slice(close);
+}
+
 export function insertMusic(project: string, sources: MusicSource[], totalFrames: number, level: string): string {
   if (!sources.length) return project;
-  let text = project;
+  let text = ensureMusicTrack(project, totalFrames);
 
   // Прошлая своя музыка: определения клипов и записи в корзине.
   text = text.replace(/\s*<chain id="frameboard_music\d+(?:_audio)?"[\s\S]*?<\/chain>/g, "");

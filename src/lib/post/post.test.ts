@@ -562,8 +562,12 @@ test("музыка: сборка оставляет пустую дорожку 
   assert.match(tractor2, /"level">0=-60;24=-20</);
   assert.equal(twice.match(/<tractor id="tractor_music"/g)!.length, 1);
 
-  // Нет дорожки «Музыка» (старый проект) — понятная ошибка.
-  assert.throws(() => insertMusic(built.replace(/Музыка/g, "Music"), [theme], total, "0=-18"), MusicTrackMissingError);
+  // Нет дорожки «Музыка» (старый проект) — создаётся внизу и заполняется.
+  const old = insertMusic(built.replace(/Музыка/g, "Music"), [theme], total, "0=-18");
+  assertWellFormed(old);
+  assert.match(old, /<track producer="black_track"\/>\s*<track producer="frameboard_music_tractor"\/>/);
+  assert.match(old.match(/<playlist id="frameboard_music_playlist">[\s\S]*?<\/playlist>/)![0], /<entry producer="frameboard_music0_audio"/);
+  assert.ok(MusicTrackMissingError);
 });
 
 test("скрытый с таблицы кадр не идёт в пост: ни реплик, ни распознавания, ни кадра, ни пустоты", async () => {

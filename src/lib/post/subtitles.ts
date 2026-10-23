@@ -10,6 +10,7 @@ import { jobsDir, postDir, readJson, TIMELINE_FPS, timelineDir, writeJson } from
 import { readSpeechGraph, speechGraphNodes, type SpeechWord } from "./speech-detect";
 import { tokens } from "./speech-fit";
 import { readManifest } from "./timeline";
+import { projectVoiceLines } from "./project-read";
 import { listMusic, musicLevelKeyframes } from "./music";
 import { insertMusic, MusicTrackMissingError, speechFromWords } from "./music-insert";
 
@@ -137,19 +138,23 @@ function similar(a: string, b: string): boolean {
   return 1 - levenshtein(x, y) / Math.max(x.length, y.length) >= 0.75;
 }
 
+/** Подряд не услышанных слов на краю реплики — столько и больше считаются вырезанными в проекте. */
+const CUT_EDGE_WORDS = 2;
+
 /**
  * Пословные титры: слова реплик (с пунктуацией, как в speech.md) выравниваются со словами Whisper по порядку;
- * время — от Whisper. Слова, которых Whisper не услышал, делят время между соседями.
+ * время — от Whisper. Не услышанные слова внутри фразы делят время между соседями; два и больше подряд на краю
+ * реплики (или вся реплика) — вырезаны в проекте и в титры не идут (`cut`).
  */
-export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues: WordCue[]; missing: string[] } {
-  const a: { token: string; shown: string; start?: number; end?: number }[] = [];
-  for (const text of lineTexts) {
+export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues: WordCue[]; missing: string[]; cut: string[] } {
+  let a: { token: string; shown: string; line: number; start?: number; end?: number }[] = [];
+  lineTexts.forEach((text, line) => {
     for (const piece of text.split(/\s+/)) {
       const parts = tokens(piece);
       if (!parts.length) continue;
-      a.push({ token: parts.join(""), shown: piece.replace(/^[.…]+/, "") });
+      a.push({ token: parts.join(""), shown: piece.replace(/^[.…]+/, ""), line });
     }
-  }
+  });
   const b = words.map((word) => tokens(word.value).join(""));
   const n = a.length;
   const m = b.length;
@@ -183,6 +188,25 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
       i -= 1;
     }
   }
+  // Края реплик, которых не слышно, — вырезаны.
+  const cut: string[] = [];
+  const drop = new Set<number>();
+  for (let line = 0; line < lineTexts.length; line += 1) {
+    const indices = a.map((item, index) => (item.line === line ? index : -1)).filter((index) => index >= 0);
+    const heard = indices.filter((index) => a[index].start !== undefined);
+    if (!heard.length) {
+      indices.forEach((index) => drop.add(index));
+      continue;
+    }
+    const leading = indices.filter((index) => index < heard[0]);
+    const trailing = indices.filter((index) => index > heard[heard.length - 1]);
+    if (leading.length >= CUT_EDGE_WORDS) leading.forEach((index) => drop.add(index));
+    if (trailing.length >= CUT_EDGE_WORDS) trailing.forEach((index) => drop.add(index));
+  }
+  if (drop.size) {
+    cut.push(...[...drop].sort((x, y) => x - y).map((index) => a[index].shown));
+    a = a.filter((_, index) => !drop.has(index));
+  }
   const missing = a.filter((item) => item.start === undefined).map((item) => item.shown);
   for (let k = 0; k < a.length; ) {
     if (a[k].start !== undefined) {
@@ -211,7 +235,7 @@ export function buildWordCues(lineTexts: string[], words: SpeechWord[]): { cues:
     }
     return { start, end: Math.max(end, start + 0.04), text: item.shown };
   });
-  return { cues, missing };
+  return { cues, missing, cut };
 }
 
 function assTime(seconds: number): string {
@@ -325,6 +349,11 @@ export interface SubtitlesJob {
   backup?: string;
   render?: string;
   words?: number;
+  /** Реплик в субтитрах и откуда тексты: из клипов проекта или (если не нашлись) из сборки. */
+  lines?: number;
+  linesFrom?: "project" | "manifest";
+  /** Слова на краях реплик, которых нет в звуке проекта: вырезаны, в субтитры не пошли. */
+  cut?: string[];
   /** Музыка, положенная в проект (имена файлов из post/music), или почему её нет. */
   music?: string[];
   musicNote?: string;
@@ -483,8 +512,13 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
 
     // 3. Пословные титры со стилем шаблона.
     save({ progress: "субтитры" });
-    const lineTexts = [...manifest.lines].sort((x, y) => x.timelineStart - y.timelineStart).map((line) => line.text);
-    const { cues, missing } = buildWordCues(lineTexts, words);
+    // Реплики — те, что реально лежат в проекте (вырезанные в Kdenlive не попадут), по месту на таймлайне.
+    const inProject = projectVoiceLines(fs.readFileSync(project, "utf8"), TIMELINE_FPS);
+    const linesFrom: "project" | "manifest" = inProject.length ? "project" : "manifest";
+    const lineTexts = inProject.length
+      ? inProject.map((line) => line.text)
+      : [...manifest.lines].sort((x, y) => x.timelineStart - y.timelineStart).map((line) => line.text);
+    const { cues, missing, cut } = buildWordCues(lineTexts, words);
     const template = fs.existsSync(subtitleStylePath()) ? fs.readFileSync(subtitleStylePath(), "utf8") : null;
     const ass = `${project}.ass`;
     const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -522,7 +556,17 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
     }
     fs.writeFileSync(`${project}.tmp`, patched, "utf8");
     fs.renameSync(`${project}.tmp`, project);
-    save({ ass: fromPost(episodeId, ass), backup: fromPost(episodeId, backup), words: cues.length, missing, music, musicNote });
+    save({
+      ass: fromPost(episodeId, ass),
+      backup: fromPost(episodeId, backup),
+      words: cues.length,
+      lines: lineTexts.length,
+      linesFrom,
+      missing,
+      cut,
+      music,
+      musicNote,
+    });
 
     // 5. Рендер проекта с субтитрами.
     if (!options.skipRender) {
