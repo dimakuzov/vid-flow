@@ -247,8 +247,40 @@ function assTime(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
 }
 
-/** ASS с шапкой и стилем из шаблона (всё до `[Events]`); нет шаблона — простой белый стиль. */
-export function assDocument(template: string | null, cues: WordCue[], size: { width: number; height: number }): string {
+/**
+ * Мягкая подложка под каждым словом: стиль «Box» (BorderStyle 3 — плашка, Outline — отступ вокруг букв, цвет — с
+ * прозрачностью), текст в нём прозрачный; края размыты `\\blur`. Нет «Box» в шаблоне — из стиля текста с этими числами.
+ * Затемнение 55 % (alpha 0x73), отступ 10 px, мягкость 16 — выбор пользователя по пробе на ep2.
+ */
+export const SUBTITLE_BOX_ALPHA = "73";
+export const SUBTITLE_BOX_PAD = 10;
+export const SUBTITLE_BOX_BLUR = 16;
+export const SUBTITLE_BOX_STYLE = "Box";
+
+/** Стиль «Box» из стиля текста: та же гарнитура и место, плашка вместо букв. */
+export function boxStyleFrom(textStyle: string[]): string[] {
+  const box = [...textStyle];
+  box[0] = SUBTITLE_BOX_STYLE;
+  box[3] = "&HFF000000";
+  box[5] = `&H${SUBTITLE_BOX_ALPHA}000000`;
+  box[6] = `&H${SUBTITLE_BOX_ALPHA}000000`;
+  box[15] = "3";
+  box[16] = SUBTITLE_BOX_PAD.toFixed(2);
+  box[17] = "0.00";
+  return box;
+}
+
+/**
+ * ASS с шапкой и стилями из шаблона (всё до `[Events]`); нет шаблона — простой белый стиль. На каждое слово — два
+ * события в одной точке: слой 0 — подложка (стиль «Box», размытые края), слой 1 — чёткий текст. Точка — из выравнивания
+ * и отступов стиля текста; подложка сдвинута на свой отступ, чтобы стоять ровно под буквами.
+ */
+export function assDocument(
+  template: string | null,
+  cues: WordCue[],
+  size: { width: number; height: number },
+  options: { box?: boolean } = {},
+): string {
   const fallback = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${size.width}
@@ -261,9 +293,43 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Default,Arial,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,0,2,40,40,230,1
 `;
   const source = (template ?? fallback).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
-  const head = source.split(/^\[Events\]/m)[0].trimEnd();
-  const style = head.match(/^Style:\s*([^,]+),/m)?.[1]?.trim() || "Default";
-  const events = cues.map((cue) => `Dialogue: 0,${assTime(cue.start)},${assTime(cue.end)},${style},,0,0,0,,${cue.text.replace(/\n/g, " ")}`);
+  let head = source.split(/^\[Events\]/m)[0].trimEnd();
+  const styles = [...head.matchAll(/^Style:\s*(.+)$/gm)].map((match) => match[1].split(",").map((field) => field.trim()));
+  const textStyle = styles.find((fields) => fields[0] !== SUBTITLE_BOX_STYLE) ?? styles[0];
+  const style = textStyle?.[0] || "Default";
+  const text = (cue: WordCue) => cue.text.replace(/\n/g, " ");
+  const line = (layer: number, cue: WordCue, name: string, tags: string) =>
+    `Dialogue: ${layer},${assTime(cue.start)},${assTime(cue.end)},${name},,0,0,0,,${tags}${text(cue)}`;
+
+  if (options.box === false || !textStyle || textStyle.length < 22) {
+    const events = cues.map((cue) => line(0, cue, style, ""));
+    return `${head}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${events.join("\n")}\n`;
+  }
+
+  let boxStyle = styles.find((fields) => fields[0] === SUBTITLE_BOX_STYLE);
+  if (!boxStyle) {
+    boxStyle = boxStyleFrom(textStyle);
+    head = head.replace(/^(Style:\s*.+)$/m, `$1\nStyle: ${boxStyle.join(",")}`);
+  }
+  // Kdenlive показывает столько слоёв субтитров, сколько записано в MaxLayer.
+  head = /^MaxLayer:/m.test(head) ? head.replace(/^MaxLayer:\s*\d+/m, "MaxLayer: 1") : head;
+
+  const playX = Number(head.match(/^PlayResX:\s*(\d+)/m)?.[1] ?? size.width);
+  const playY = Number(head.match(/^PlayResY:\s*(\d+)/m)?.[1] ?? size.height);
+  const alignment = Number(textStyle[18]) || 2;
+  const [marginL, marginR, marginV] = [Number(textStyle[19]) || 0, Number(textStyle[20]) || 0, Number(textStyle[21]) || 0];
+  const column = (alignment - 1) % 3; // 0 — слева, 1 — по центру, 2 — справа
+  const row = Math.floor((alignment - 1) / 3); // 0 — снизу, 1 — посередине, 2 — сверху
+  const x = column === 0 ? marginL : column === 2 ? playX - marginR : Math.round(playX / 2);
+  const y = row === 0 ? playY - marginV : row === 2 ? marginV : Math.round(playY / 2);
+  const pad = Number(boxStyle[16]) || SUBTITLE_BOX_PAD;
+  const boxX = column === 0 ? x - pad : column === 2 ? x + pad : x;
+  const boxY = row === 0 ? y + pad : row === 2 ? y - pad : y;
+
+  const events = cues.flatMap((cue) => [
+    line(0, cue, SUBTITLE_BOX_STYLE, `{\\an${alignment}\\pos(${boxX},${boxY})\\blur${SUBTITLE_BOX_BLUR}}`),
+    line(1, cue, style, `{\\an${alignment}\\pos(${x},${y})}`),
+  ]);
   return `${head}\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n${events.join("\n")}\n`;
 }
 

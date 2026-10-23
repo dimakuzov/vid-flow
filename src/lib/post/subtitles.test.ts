@@ -217,3 +217,37 @@ test("в проекте — выбор пресета и путь вывода; 
   assert.match(out, /<entry producer="chain0"/);
   assert.equal(setProjectRenderSettings("<mlt></mlt>", "x.mp4"), "<mlt></mlt>");
 });
+
+test("подложка под словом: стиль «Box» из стиля текста, слой 0 — размытая плашка, слой 1 — чёткий текст в той же точке", () => {
+  const template = [
+    "[Script Info]",
+    "PlayResX: 720",
+    "PlayResY: 1280",
+    "",
+    "[Kdenlive Extradata]",
+    "MaxLayer: 0",
+    "DefaultStyles: Default",
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+    "Style: Default,Impact,120.00,&H002FBCFE,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100.00,100.00,0.00,0.00,1,0.00,0.00,2,40,40,230,1",
+    "",
+    "[Events]",
+  ].join("\n");
+  const ass = assDocument(template, [{ start: 1, end: 1.5, text: "attention." }], { width: 720, height: 1280 });
+  assert.match(ass, /^Style: Box,Impact,120\.00,&HFF000000,&H00FFFFFF,&H73000000,&H73000000,0,0,0,0,100\.00,100\.00,0\.00,0\.00,3,10\.00,0\.00,2,40,40,230,1$/m);
+  assert.match(ass, /^MaxLayer: 1$/m, "Kdenlive покажет оба слоя");
+  const events = ass.split("[Events]")[1].split("\n").filter((line) => line.startsWith("Dialogue"));
+  assert.deepEqual(events, [
+    "Dialogue: 0,0:00:01.00,0:00:01.50,Box,,0,0,0,,{\\an2\\pos(360,1060)\\blur16}attention.",
+    "Dialogue: 1,0:00:01.00,0:00:01.50,Default,,0,0,0,,{\\an2\\pos(360,1050)}attention.",
+  ]);
+  // Свой «Box» в шаблоне — берётся он (его отступ), не добавляется второй.
+  const own = assDocument(template.replace("\n\n[Events]", "\nStyle: Box,Impact,120.00,&HFF000000,&H00FFFFFF,&H40000000,&H40000000,0,0,0,0,100.00,100.00,0.00,0.00,3,24.00,0.00,2,40,40,230,1\n\n[Events]"), [{ start: 1, end: 2, text: "I" }], { width: 720, height: 1280 });
+  assert.equal(own.match(/^Style: Box,/gm)!.length, 1);
+  assert.match(own, /\{\\an2\\pos\(360,1074\)\\blur16\}I$/m);
+  // Без подложки — одно событие на слово, как раньше.
+  const plain = assDocument(template, [{ start: 1, end: 2, text: "I" }], { width: 720, height: 1280 }, { box: false });
+  assert.equal(plain.split("[Events]")[1].split("\n").filter((line) => line.startsWith("Dialogue")).length, 1);
+});
+
