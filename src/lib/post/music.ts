@@ -13,7 +13,7 @@ export const MUSIC_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".m4a", ".ogg"
 /** Имя дорожки в проекте Kdenlive: сборка создаёт её пустой, «Добавить субтитры» заполняет. */
 export const MUSIC_TRACK_NAME = "Музыка";
 /** Громкость музыки без речи и под репликами, дБ. */
-export const MUSIC_GAIN_DB = -12;
+export const MUSIC_GAIN_DB = -6;
 export const MUSIC_DUCK_DB = -22;
 /** Появление в начале и затухание в конце, секунды; переход приглушения, секунды. */
 export const MUSIC_FADE_IN_SEC = 1;
