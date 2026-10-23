@@ -11,6 +11,7 @@ import { readSpeechGraph, speechGraphNodes, type SpeechWord } from "./speech-det
 import { tokens } from "./speech-fit";
 import { readManifest } from "./timeline";
 import { projectVoiceLines } from "./project-read";
+import { lostAudio } from "./audible";
 import { ensureKdenliveRenderPreset, kdenliveRenderFile, setProjectRenderSettings } from "./render-preset";
 import { listMusic, musicLevelKeyframes } from "./music";
 import { insertMusic, MusicTrackMissingError, speechFromWords } from "./music-insert";
@@ -692,7 +693,8 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
     // 4. Ссылка на субтитры в проекте; до правки — копия проекта.
     const backup = path.join(path.dirname(project), `${base}.before-subs-${stamp}.kdenlive`);
     fs.copyFileSync(project, backup);
-    let patched = patchProjectSubtitles(fs.readFileSync(project, "utf8"), ass);
+    const original = fs.readFileSync(project, "utf8");
+    let patched = patchProjectSubtitles(original, ass);
 
     // Музыка из post/music — в дорожку «Музыка»; тише там, где Whisper услышал речь в этом проекте.
     const musicFiles = listMusic(episodeId);
@@ -723,6 +725,11 @@ export async function runSubtitlesJob(episodeId: string, id: string, options: Su
       ensureKdenliveRenderPreset();
     } catch (error) {
       console.error("[frameboard] пресет рендера Kdenlive:", error);
+    }
+    // Что звучало после правок пользователя, звучит и после доски — на любой дорожке, с репликами или без.
+    const lost = lostAudio(original, patched, TIMELINE_FPS);
+    if (lost.length) {
+      throw new Error(`проект не записан: после правки доски перестали бы звучать клипы (${lost.length}): ${lost.slice(0, 5).join("; ")}`);
     }
     fs.writeFileSync(`${project}.tmp`, patched, "utf8");
     fs.renameSync(`${project}.tmp`, project);

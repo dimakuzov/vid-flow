@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { MUSIC_DUCK_DB, MUSIC_GAIN_DB, musicLevelKeyframes } from "./music";
 import { assDocument, buildWordCues, patchProjectSubtitles } from "./subtitles";
 import { ensureMusicTrack } from "./music-insert";
+import { audibleClips, lostAudio } from "./audible";
 import { ensureKdenliveRenderPreset, RENDER_PRESET_NAME, setProjectRenderSettings } from "./render-preset";
 import { parseMltTime, projectVoiceLines } from "./project-read";
 import fs from "node:fs";
@@ -318,5 +319,39 @@ test("чужая фраза рядом с репликой (Whisper ставит
   assert.deepEqual(extra, ["Oh", "dude,", "let's", "take", "it", "easy."]);
   const tail = cues.filter((cue) => cue.start > 65).map((cue) => cue.text);
   assert.deepEqual(tail, ["Oh", "dude,", "let's", "take", "it", "easy.", "This", "is", "my", "turn."], "фраза целиком до реплики");
+});
+
+test("что звучит после правок пользователя — звучит и после доски: любая дорожка, с репликами и без", () => {
+  // Kdenlive: звук кадра 5 перенесён пользователем на свою дорожку «Свой голос» и включён; дорожка «Звук финалов» выключена.
+  const xml = `<mlt producer="main_bin">
+ <chain id="chain4"><property name="resource">shots/s05/final_render/approve/s05.mp4</property></chain>
+ <chain id="chain9"><property name="resource">voices/Lena/v1.wav</property></chain>
+ <playlist id="playlist2"><entry in="0" out="50" producer="chain4"/></playlist>
+ <playlist id="playlist3"><blank length="261"/><entry in="00:00:00.000" out="00:00:02.000" producer="chain4"/></playlist>
+ <playlist id="playlist4"><entry in="0" out="40" producer="chain9"/></playlist>
+ <tractor id="tractor1"><property name="kdenlive:track_name">Звук финалов (выкл.)</property><track hide="both" producer="playlist2"/></tractor>
+ <tractor id="tractor2"><property name="kdenlive:track_name">Свой голос</property><track hide="video" producer="playlist3"/></tractor>
+ <tractor id="tractor3"><property name="kdenlive:track_name">Lena</property><track hide="video" producer="playlist4"/></tractor>
+ <tractor id="tractor6">
+  <property name="kdenlive:uuid">{seq}</property>
+  <property name="kdenlive:sequenceproperties.tracksCount">3</property>
+  <track producer="producer0"/>
+  <track producer="tractor1"/>
+  <track producer="tractor2"/>
+  <track producer="tractor3"/>
+  <transition id="t1"><property name="a_track">0</property><property name="b_track">1</property><property name="mlt_service">mix</property></transition>
+  <transition id="t2"><property name="a_track">0</property><property name="b_track">2</property><property name="mlt_service">mix</property></transition>
+  <transition id="t3"><property name="a_track">0</property><property name="b_track">3</property><property name="mlt_service">mix</property></transition>
+ </tractor>
+ <playlist id="main_bin"><property name="kdenlive:docproperties.activetimeline">{seq}</property></playlist>
+</mlt>`;
+  const before = audibleClips(xml, 24);
+  assert.deepEqual(before, ["Lena | voices/Lena/v1.wav | 0–40 | 0", "Свой голос | shots/s05/final_render/approve/s05.mp4 | 0–48 | 261"]);
+  // Новая дорожка «Музыка» сдвигает номера — всё звучит по-прежнему.
+  const withMusic = ensureMusicTrack(patchProjectSubtitles(xml, "C:/ep/timeline/ep_v1.kdenlive.ass"), 400);
+  assert.deepEqual(lostAudio(xml, withMusic, 24), []);
+  // Выключить дорожку или убрать её из сведения — это потеря.
+  assert.deepEqual(lostAudio(xml, xml.replace('<track hide="video" producer="playlist3"/>', '<track hide="both" producer="playlist3"/>'), 24), [before[1]]);
+  assert.deepEqual(lostAudio(xml, xml.replace(/<transition id="t2">[\s\S]*?<\/transition>/, ""), 24), [before[1]]);
 });
 
