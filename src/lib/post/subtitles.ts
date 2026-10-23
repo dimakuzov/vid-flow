@@ -143,6 +143,8 @@ function similar(a: string, b: string): boolean {
 const MATCH_WINDOW_SEC = 2;
 /** Слово Whisper дальше этого от реплик — речь вне реплик (не «лишнее слово» внутри реплики). */
 const EXTRA_MARGIN_SEC = 0.5;
+/** Столько несопоставленных слов Whisper подряд — фраза вне реплик, даже рядом с репликой (не одно-два слова, услышанных иначе). */
+const EXTRA_PHRASE_WORDS = 3;
 /** Подряд не услышанных слов на краю реплики — столько и больше считаются вырезанными в проекте. */
 const CUT_EDGE_WORDS = 2;
 
@@ -194,11 +196,13 @@ export function buildWordCues(
   let i = n;
   let j = m;
   const usedWords = new Set<number>();
+  const wordLine = new Map<number, number>();
   while (i > 0) {
     if (j > 0 && move[i][j] === 0) {
       a[i - 1].start = words[j - 1].start;
       a[i - 1].end = words[j - 1].end;
       usedWords.add(j - 1);
+      wordLine.set(j - 1, a[i - 1].line);
       i -= 1;
       j -= 1;
     } else if (j > 0 && move[i][j] === 2) {
@@ -258,29 +262,59 @@ export function buildWordCues(
     .filter((items) => items.length)
     .map((items) => ({ start: Math.min(...items.map((item) => item.start!)), end: Math.max(...items.map((item) => item.end!)) }));
   const outside = (time: number) => spans.every((span) => time < span.start - EXTRA_MARGIN_SEC || time > span.end + EXTRA_MARGIN_SEC);
-  const raw = words
+  // Слово Whisper между сопоставленными словами одной реплики — её слово, услышанное иначе («wanna» → «want to»).
+  const ranges = new Map<number, { from: number; to: number }>();
+  for (const [index, line] of wordLine) {
+    const range = ranges.get(line);
+    ranges.set(line, { from: Math.min(range?.from ?? index, index), to: Math.max(range?.to ?? index, index) });
+  }
+  const inLine = (index: number) => [...ranges.values()].some((range) => index > range.from && index < range.to);
+  const candidates = words
     .map((word, index) => ({ start: word.start, end: word.end, shown: word.value.trim(), index }))
-    .filter((word) => !usedWords.has(word.index) && word.shown && tokens(word.shown).length && outside(word.start));
-  // Порядок — как слышит Whisper; в конце звука он иногда ставит много слов в одну точку. Каждое следующее слово —
-  // не раньше предыдущего + MIN_WORD_SEC; хвост, не влезающий до конца звука, сжимается равномерно.
-  const extras: { start: number; end: number; shown: string }[] = [];
-  let pushedFrom = -1;
-  raw.forEach((word, index) => {
+    .filter((word) => !usedWords.has(word.index) && word.shown && tokens(word.shown).length && !inLine(word.index));
+  // Рядом с репликой Whisper может поставить чужую фразу в ту же точку («Oh dude, let's take it easy. This is my turn» —
+  // всё на 66.5 с): EXTRA_PHRASE_WORDS и больше подряд идущих несопоставленных слов — речь вне реплик, где бы ни стояли.
+  const phrase = new Set<number>();
+  for (let k = 0; k < candidates.length; ) {
+    let runEnd = k + 1;
+    while (runEnd < candidates.length && candidates[runEnd].index === candidates[runEnd - 1].index + 1) runEnd += 1;
+    if (runEnd - k >= EXTRA_PHRASE_WORDS) for (let index = k; index < runEnd; index += 1) phrase.add(candidates[index].index);
+    k = runEnd;
+  }
+  const raw = candidates.filter((word) => phrase.has(word.index) || outside(word.start));
+  // Порядок — как слышит Whisper; он иногда ставит много слов в одну точку. Каждое следующее слово — не раньше
+  // предыдущего + MIN_WORD_SEC; кусок, не влезающий до следующего услышанного слова реплики (или конца звука),
+  // сжимается равномерно — чужая фраза не перемешивается с репликой.
+  const extras: { start: number; end: number; shown: string; index: number; pushed: boolean }[] = [];
+  raw.forEach((word) => {
     const previous = extras[extras.length - 1];
-    const close = previous && word.start - previous.start < MIN_WORD_SEC && word.start - previous.start < 5;
-    const start = close ? previous.start + MIN_WORD_SEC : word.start;
-    if (close && pushedFrom < 0) pushedFrom = index - 1;
-    if (!close) pushedFrom = -1;
-    extras.push({ start, end: Math.max(word.end, start + MIN_WORD_SEC), shown: word.shown });
+    const pushed = Boolean(previous) && word.start < previous.start + MIN_WORD_SEC;
+    const start = pushed ? previous.start + MIN_WORD_SEC : word.start;
+    extras.push({ start, end: Math.max(word.end, start + MIN_WORD_SEC), shown: word.shown, index: word.index, pushed });
   });
-  const limit = options.duration !== undefined ? options.duration - 0.05 : undefined;
-  if (limit !== undefined && extras.length && extras[extras.length - 1].end > limit && pushedFrom >= 0) {
-    const from = extras[pushedFrom].start;
-    const step = Math.max(0.06, (limit - from) / (extras.length - pushedFrom));
-    for (let index = pushedFrom; index < extras.length; index += 1) {
-      extras[index].start = from + step * (index - pushedFrom);
-      extras[index].end = extras[index].start + step;
+  const used = [...usedWords].sort((x, y) => x - y);
+  const end = options.duration !== undefined ? options.duration - 0.05 : Number.POSITIVE_INFINITY;
+  for (let k = 0; k < extras.length; ) {
+    const nextUsed = used.find((index) => index > extras[k].index);
+    let runEnd = k + 1;
+    while (runEnd < extras.length && used.find((index) => index > extras[runEnd].index) === nextUsed) runEnd += 1;
+    const limit = Math.min(nextUsed !== undefined ? words[nextUsed].start : end, end);
+    if (extras[runEnd - 1].end > limit) {
+      // Сжимается только хвост, сдвинутый из одной точки, — с последнего слова, стоящего на своём времени.
+      let first = runEnd - 1;
+      while (first > k && extras[first].pushed) first -= 1;
+      // Мало места — и на слитную речь перед ним (слово Whisper тянется до следующего).
+      while (first > k && (limit - extras[first].start) / (runEnd - first) < MIN_WORD_SEC && extras[first - 1].end >= extras[first].start - 0.1) {
+        first -= 1;
+      }
+      const from = Math.min(extras[first].start, limit - 0.06 * (runEnd - first));
+      const step = Math.max(0.06, (limit - from) / (runEnd - first));
+      for (let index = first; index < runEnd; index += 1) {
+        extras[index].start = from + step * (index - first);
+        extras[index].end = extras[index].start + step;
+      }
     }
+    k = runEnd;
   }
 
   // По времени: слово со своим временем из проекта может стоять не там, где его поставил порядок реплик.

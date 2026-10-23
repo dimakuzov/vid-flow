@@ -304,3 +304,19 @@ test("клип с куском реплики: только слова, попа
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("чужая фраза рядом с репликой (Whisper ставит её в ту же точку) — в титры; слова реплики, услышанные иначе, — нет", () => {
+  const lines = [
+    { text: "Maybe you wanna ride home?", words: [{ text: "Maybe", time: 43.2 }, { text: "you", time: 43.4 }, { text: "wanna", time: 43.6 }, { text: "ride", time: 43.9 }, { text: "home?", time: 44.1 }] },
+    { text: "This is my turn.", words: [{ text: "This", time: 66.5 }, { text: "is", time: 66.7 }, { text: "my", time: 66.9 }, { text: "turn.", time: 67.1 }] },
+  ];
+  const words = [
+    w("Maybe", 43.16, 43.4), w("you", 43.4, 43.5), w("want", 43.5, 43.7), w("to", 43.7, 43.8), w("ride", 43.9, 44.1), w("home?", 44.1, 44.5),
+    w("Oh", 65.74, 66.5), w("dude,", 66.54, 66.54), w("let's", 66.54, 66.54), w("take", 66.54, 66.54), w("it", 66.54, 66.54), w("easy.", 66.54, 66.54),
+    w("This", 66.54, 66.7), w("is", 66.7, 66.9), w("my", 66.9, 67.1), w("turn.", 67.1, 67.42),
+  ];
+  const { cues, extra } = buildWordCues(lines, words, { duration: 70 });
+  assert.deepEqual(extra, ["Oh", "dude,", "let's", "take", "it", "easy."]);
+  const tail = cues.filter((cue) => cue.start > 65).map((cue) => cue.text);
+  assert.deepEqual(tail, ["Oh", "dude,", "let's", "take", "it", "easy.", "This", "is", "my", "turn."], "фраза целиком до реплики");
+});
+
