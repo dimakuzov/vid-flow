@@ -289,6 +289,15 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       });
       stage.merge(data);
     });
+  const chooseBackView = (name: string, value: boolean) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { backView: { name, value } },
+        fallbackError: t("framing.failed"),
+      });
+      stage.merge(data);
+    });
   // Превью и финал: галка кадра «Строго первый кадр», сохраняется сразу и действует на оба этапа.
   const chooseStrict = (value: boolean) =>
     act(async () => {
@@ -581,8 +590,10 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               <FramingPicker
                 characters={detail.expectedCharacters}
                 framing={detail.firstFrame.framing}
+                backView={detail.firstFrame.backView}
                 disabled={busy || stageBusy}
                 onChange={chooseFraming}
+                onBackView={chooseBackView}
               />
             ) : null}
             {detail.strictFirstFrame !== null ? (

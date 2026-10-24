@@ -147,7 +147,7 @@ export interface StageDetail {
    * Только первый кадр (run_settings.json): дальность персонажей до камеры (имя строчными →
    * background | full | waist | face) и подписи к файлам refs/ (имя файла → текст). Иначе null.
    */
-  firstFrame: { framing: Record<string, string>; refNotes: Record<string, string> } | null;
+  firstFrame: { framing: Record<string, string>; backView: string[]; refNotes: Record<string, string> } | null;
   /** Галка кадра «Строго первый кадр» (shot_settings.json). null — этап не превью и не финал. */
   strictFirstFrame: boolean | null;
   agentRequest: {
@@ -205,6 +205,8 @@ export interface BootstrapShotDraft {
   durationSec?: number;
   /** Дальность до камеры на первом кадре по персонажам (`- framing:` в scenario.md). */
   framing?: Record<string, "background" | "full" | "waist" | "face">;
+  /** Кто в первом кадре стоит спиной к камере (слово `back` в строке `- framing:`). */
+  backView?: string[];
 }
 
 export interface BootstrapPreview {

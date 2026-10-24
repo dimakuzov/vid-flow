@@ -10,18 +10,23 @@ const FRAMINGS = ["background", "full", "waist", "face"] as const;
 /**
  * Первый кадр: на каждого персонажа кадра — дальность до камеры. Значение есть всегда: при создании
  * кадра его ставит разметка сценария, дальше — выбор пользователя.
- * Выбор сохраняется сразу и не сбрасывается при отправке агенту.
+ * Выбор сохраняется сразу и не сбрасывается при отправке агенту. Галка «Спиной»: лица не видно,
+ * портрет в граф не идёт; по сценарию она ставится сама.
  */
 export function FramingPicker({
   characters,
   framing,
+  backView,
   disabled,
   onChange,
+  onBackView,
 }: {
   characters: string[];
   framing: Record<string, string>;
+  backView: string[];
   disabled: boolean;
   onChange: (name: string, value: string | null) => void;
+  onBackView: (name: string, value: boolean) => void;
 }) {
   const t = useT();
   if (!characters.length) return null;
@@ -32,9 +37,19 @@ export function FramingPicker({
         {characters.map((name) => {
           const key = name.toLowerCase();
           return (
-            <label key={key} className="flex items-center justify-between gap-3 text-sm text-stone-800">
-              <span className="min-w-0 truncate">{name}</span>
+            <div key={key} className="flex items-center justify-between gap-3 text-sm text-stone-800">
+              <span className="min-w-0 flex-1 truncate">{name}</span>
+              <label className="flex shrink-0 items-center gap-1 text-xs text-stone-600" title={t("framing.backTitle")}>
+                <input
+                  type="checkbox"
+                  checked={backView.includes(key)}
+                  disabled={disabled}
+                  onChange={(event) => onBackView(key, event.target.checked)}
+                />
+                {t("framing.back")}
+              </label>
               <select
+                aria-label={name}
                 className="h-8 rounded-md border border-stone-300 bg-white px-2 text-sm text-stone-800 disabled:opacity-60"
                 value={framing[key] ?? "full"}
                 disabled={disabled}
@@ -46,7 +61,7 @@ export function FramingPicker({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           );
         })}
       </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { setFraming, setRefNote } from "@/lib/series/first-frame-settings";
+import { setBackView, setFraming, setRefNote } from "@/lib/series/first-frame-settings";
 import { setStrictFirstFrame } from "@/lib/series/shot-settings";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
@@ -71,6 +71,8 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       location?: string;
       /** Дальность персонажа до камеры. Только первый кадр. value null — снова план из текста кадра. */
       framing?: { name?: string; value?: string | null };
+      /** Персонаж стоит спиной: портрет в граф не идёт. Только первый кадр. */
+      backView?: { name?: string; value?: boolean };
       /** Подпись к файлу refs/ («шлем Лены»). Только первый кадр. Пустой текст — снять. */
       refNote?: { file?: string; text?: string };
       /** Галка кадра «Строго первый кадр». Ставится на превью или финале и действует на оба этапа. */
@@ -84,13 +86,17 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       assertStageFree(episodeId, shotId, stageId);
       setStrictFirstFrame(episodeId, shotId, body.strictFirstFrame);
     }
-    if (body.framing || body.refNote) {
+    if (body.framing || body.refNote || body.backView) {
       if (stageId !== "first_frame") throw new Error("Дальность и подписи референсов — только на первом кадре");
       // Порядок картинок графа зависит от выбора: пока агент или граф работают, его не меняем.
       assertStageFree(episodeId, shotId, stageId);
       if (body.framing) {
         if (typeof body.framing.name !== "string") throw new Error("Не указан персонаж");
         setFraming(episodeId, shotId, body.framing.name, body.framing.value ?? null);
+      }
+      if (body.backView) {
+        if (typeof body.backView.name !== "string") throw new Error("Не указан персонаж");
+        setBackView(episodeId, shotId, body.backView.name, body.backView.value === true);
       }
       if (body.refNote) {
         if (typeof body.refNote.file !== "string") throw new Error("Не указан файл");

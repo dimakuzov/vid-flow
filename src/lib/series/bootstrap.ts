@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
-import { parseFramingLine, seedFraming } from "./first-frame-settings";
+import { parseBackLine, parseFramingLine, seedFraming } from "./first-frame-settings";
 import { createEpisode, ensureStageDirs, episodeRoot, stageDir } from "./paths";
 import { readRunSettings, writeRunSettings } from "./run-settings";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
@@ -74,6 +74,7 @@ export function parseScenario(content: string): BootstrapPreview {
         if (Number.isFinite(seconds) && seconds > 0) current.durationSec = Math.round(seconds);
       } else if (key.startsWith("framing") || key.includes("дальност")) {
         current.framing = { ...(current.framing ?? {}), ...parseFramingLine(value) };
+        current.backView = [...(current.backView ?? []), ...parseBackLine(value)];
       }
       continue;
     }
@@ -227,7 +228,9 @@ export function applyBootstrap(options: {
     };
     writeShotMeta(episodeId, meta);
     seedShotSpeechAndDuration(episodeId, shot, options.overwriteDocs === true);
-    seedFraming(episodeId, shot.id, shot.characters, shot.framing ?? {}, shot.summary, options.overwriteDocs === true);
+    // «Спиной» из разметки — только если в ней есть строка framing; иначе доска берёт это из текста кадра.
+    const back = shot.framing ? (shot.backView ?? []) : undefined;
+    seedFraming(episodeId, shot.id, shot.characters, shot.framing ?? {}, shot.summary, options.overwriteDocs === true, back);
 
     for (const stageId of STAGES) {
       const promptPath = path.join(stageDir(episodeId, shot.id, stageId), "prompt.md");

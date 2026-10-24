@@ -526,13 +526,18 @@ const messages = {
   "refs.noteFailed": { en: "Could not save the caption", ru: "Не удалось сохранить подпись" },
   "framing.title": { en: "Distance from the camera", ru: "Дальность до камеры" },
   "framing.note": {
-    en: "set from the scenario when the shot is created; stays for the shot, goes to the agent with every request, and close faces get the portrait first",
-    ru: "ставится по сценарию при создании кадра; сохраняется для кадра, уходит агенту с каждым запросом, лицам близко к камере портрет важнее референсов",
+    en: "set from the scenario when the shot is created; stays for the shot and goes to the agent with every request. Close faces get the portrait first; a person seen from behind gets no portrait",
+    ru: "ставится по сценарию при создании кадра; сохраняется для кадра и уходит агенту с каждым запросом. Лицам близко к камере портрет важнее референсов; у того, кто спиной, портрета нет",
   },
   "framing.background": { en: "in the background", ru: "на заднем плане" },
   "framing.full": { en: "full figure", ru: "в полный рост" },
   "framing.waist": { en: "waist up", ru: "по пояс" },
   "framing.face": { en: "face close-up (75% of the width)", ru: "крупный план лица (75% ширины)" },
+  "framing.back": { en: "seen from behind", ru: "спиной" },
+  "framing.backTitle": {
+    en: "The face is not visible: the portrait does not go to the graph",
+    ru: "Лица не видно: портрет в граф не идёт",
+  },
   "framing.failed": { en: "Could not save the distance", ru: "Не удалось сохранить дальность" },
   "strict.title": { en: "Strict first frame (MiniMax)", ru: "Строго первый кадр (MiniMax)" },
   "strict.note": {

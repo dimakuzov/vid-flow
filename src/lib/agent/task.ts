@@ -16,6 +16,7 @@ import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
 import { getPlaybooksRoot, stageDir } from "../series/paths";
 import { excludedFiles, readRunSettings } from "../series/run-settings";
+import { framingBlock } from "../series/first-frame-settings";
 import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
 import { LLM_TASK, readAgentDispatch, readBaseline } from "./files";
@@ -103,7 +104,7 @@ function personOnImage(
       return { role: "figure", name: name.toLowerCase() };
     }
     if (FACE_SHEET.test(stem)) {
-      const owner = stem.replace(/[_ -]?face[_ -]?sheet.*$/i, "") || path.basename(path.dirname(file));
+      const owner = stem.replace(/[_ -]?(face[_ -]?)?sheet.*$/i, "") || path.basename(path.dirname(file));
       return { role: "sheet", name: owner.toLowerCase() };
     }
     const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
@@ -395,6 +396,9 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   }
   const images = renderGraphImages(episodeId, shotId, stageId, workflow?.id);
   if (images) lines.push("", images);
+  // Первый кадр: дальность, «спиной» и подписи референсов — текущий выбор на доске, отдельным блоком.
+  const framing = stageId === "first_frame" ? framingBlock(episodeId, shotId) : "";
+  if (framing) lines.push("", framing);
   const excluded = [...excludedFiles(episodeId, shotId, stageId)];
   if (excluded.length) {
     lines.push(

@@ -22,7 +22,7 @@ import { STAGES, type StageId } from "../series/constants";
 import { mediaUrlPath, readTextIfExists } from "../series/media";
 import { getCharactersRoot, getLocationsRoot, getPlaybooksRoot, stageDir } from "../series/paths";
 import { chosenCharacterFile, excludedFiles, readRunSettings } from "../series/run-settings";
-import { isNearFraming, readFraming } from "../series/first-frame-settings";
+import { isNearFraming, readBackView, readFraming } from "../series/first-frame-settings";
 import { latinToken } from "../series/latin-id";
 import { readShotMeta } from "../series/shot-meta";
 import { shotSettingOn } from "../series/shot-settings";
@@ -439,7 +439,8 @@ export function libraryFace(name: string): string | null {
 }
 
 /** Лист лица: несколько видов одного лица на одной картинке (`lena_face_sheet.png`). */
-export const FACE_SHEET = /face[_ -]?sheet/i;
+/** Лист лица: `{имя}_face_sheet` или `{имя}_sheet` (так назван лист Ивана). */
+export const FACE_SHEET = /(^|[_ -])(face[_ -]?)?sheet/i;
 
 /** Лист лица персонажа в библиотеке: первая картинка с face_sheet в имени, кроме копий. */
 export function libraryFaceSheet(name: string): string | null {
@@ -492,7 +493,10 @@ function matchName(filename: string, pattern: string, character: string | undefi
 function faceFiles(ctx: ShotContext, framing?: ImageInput["framing"]): string[] {
   const refs = path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "refs");
   const chosen = framing ? readFraming(ctx.episodeId, ctx.shotId) : {};
+  // Первый кадр: у того, кто стоит спиной, лица не видно — портрет только добавил бы лишнего человека.
+  const back = ctx.stageId === "first_frame" ? readBackView(ctx.episodeId, ctx.shotId) : new Set<string>();
   return approvedCharacters(ctx)
+    .filter((name) => !back.has(name.toLowerCase()))
     .filter((name) => !framing || isNearFraming(chosen[name.toLowerCase()]) === (framing === "near"))
     .map((name) => findImage(refs, [`${name.toLowerCase()}_face`]) ?? libraryFace(name))
     .filter((file): file is string => Boolean(file));
@@ -506,7 +510,7 @@ function faceSheetFiles(ctx: ShotContext): string[] {
     const stem = path.parse(file).name;
     const name = stem.toLowerCase().endsWith(suffix) ? stem.slice(0, -suffix.length) : stem;
     const id = name.toLowerCase();
-    const sheet = findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`]) ?? libraryFaceSheet(name);
+    const sheet = findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`, `${id}_sheet`]) ?? libraryFaceSheet(name);
     return sheet ? [sheet] : [];
   });
 }
@@ -532,7 +536,7 @@ function faceOrCharacterFiles(ctx: ShotContext): string[] {
     const name = stem.toLowerCase().endsWith(suffix) ? stem.slice(0, -suffix.length) : stem;
     const id = name.toLowerCase();
     const candidates = [
-      findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`]),
+      findImage(refs, [`${id}_face_sheet`, `${id}_facesheet`, `${id}_sheet`]),
       libraryFaceSheet(name),
       findImage(refs, [`${id}_face`]),
       libraryFace(name),
