@@ -1,71 +1,74 @@
+English · [Русский](README.ru.md)
+
 # Frameboard
 
-Локальный пульт для структурирования генерации видео.
+A local board for structuring video generation.
 
-Один project root = одна серия. Таблица показывает статус каждого shot по этапам:
+One project root is one series. The table shows the status of every shot, stage by stage:
 
 `characters → location → first_frame → video_preview → final_render`
 
-Файлы — источник правды. UI читает и пишет в директорию серии, поэтому при сбое интерфейса можно работать напрямую с папками.
+Files are the source of truth. The UI reads and writes the series directory, so if the interface fails you can work directly in the folders.
 
-## Запуск
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Открой [http://127.0.0.1:3456](http://127.0.0.1:3456). `/` ведёт на открытый эпизод (`data/current_episode.txt`), таблица эпизода — `/e/{episodeId}`, этап — `/e/{episodeId}/shots/{shotId}/{stage}`. Переключатель в шапке меняет адрес и запоминает выбор как эпизод по умолчанию.
+Open [http://127.0.0.1:3456](http://127.0.0.1:3456). `/` leads to the open episode (`data/current_episode.txt`), the episode table is `/e/{episodeId}`, a stage is `/e/{episodeId}/shots/{shotId}/{stage}`. The switch in the header changes the address and remembers the choice as the default episode.
 
-Один сериал на репозиторий. Общие папки: `data/characters`, `data/locations`, `data/references`, `data/scenarios`. Эпизоды — в `data/episodes/<имя>/`. Глобальные playbooks — в `playbooks/`.
+One series per repository. Shared folders: `data/characters`, `data/locations`, `data/references`, `data/scenarios`. Episodes live in `data/episodes/<name>/`. Global playbooks are in `playbooks/`.
 
-### Переменные окружения
+### Environment variables
 
-| Переменная | По умолчанию | Что |
+| Variable | Default | What it does |
 |---|---|---|
-| `DATA_ROOT` | `data/` | папка данных (для проб — временная папка) |
-| `SERIES_ROOT` | — | папка одного эпизода вместо `data/episodes/*` |
-| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. Мёртвый порт (`http://127.0.0.1:9`) — задания висят в «Ожидает очереди», на GPU ничего не уходит |
-| `COMFY_TRANSPORT` | `legacy` | `legacy` — прямые HTTP-вызовы (`COMFY_URL`, cloud.comfy.org). `sdk` — официальный `@comfyorg/sdk`, см. [docs/COMFY_SDK.md](docs/COMFY_SDK.md) |
-| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | только при `COMFY_TRANSPORT=sdk`: comfy-api-proxy перед локальным ComfyUI |
-| `FRAMEBOARD_AGENT_PROVIDER` | `manual` | кто выполняет «Отправить агенту»: `manual`, `ollama`, `claude` |
+| `DATA_ROOT` | `data/` | data folder (use a temporary folder for trials) |
+| `SERIES_ROOT` | — | folder of a single episode instead of `data/episodes/*` |
+| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. A dead port (`http://127.0.0.1:9`) leaves jobs waiting in the queue and nothing goes to the GPU |
+| `COMFY_TRANSPORT` | `legacy` | `legacy`: direct HTTP calls (`COMFY_URL`, cloud.comfy.org). `sdk`: the official `@comfyorg/sdk`, see [docs/COMFY_SDK.md](docs/COMFY_SDK.md) (in Russian) |
+| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | only with `COMFY_TRANSPORT=sdk`: comfy-api-proxy in front of a local ComfyUI |
+| `COMFY_CLOUD_API_KEY` | — | Comfy Cloud key. Put it in `.env.local` in the project root, never in git |
+| `FRAMEBOARD_AGENT_PROVIDER` | `manual` | who runs "Send to agent": `manual`, `ollama`, `claude` |
 | `FRAMEBOARD_OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama |
-| `FRAMEBOARD_OLLAMA_MODEL` | — | без неё `ollama` недоступен |
-| `FRAMEBOARD_CLAUDE_BIN` | `claude` | путь к CLI `claude` (подписка, без API-ключа) |
-| `FRAMEBOARD_AGENT_TEXT_TIMEOUT_MIN` / `_RUN_TIMEOUT_MIN` / `_TIMEOUT_MIN` | 5 / 30 / 60 | таймауты text, agent и ручного режима |
-| `FRAMEBOARD_LOOPS` | — | `off` выключает фоновые циклы (тесты) |
+| `FRAMEBOARD_OLLAMA_MODEL` | — | without it `ollama` is unavailable |
+| `FRAMEBOARD_CLAUDE_BIN` | `claude` | path to the `claude` CLI (subscription, no API key) |
+| `FRAMEBOARD_AGENT_TEXT_TIMEOUT_MIN` / `_RUN_TIMEOUT_MIN` / `_TIMEOUT_MIN` | 5 / 30 / 60 | timeouts for text, agent and manual mode |
+| `FRAMEBOARD_LOOPS` | — | `off` turns off the background loops (tests) |
 
 ```bash
 DATA_ROOT=/tmp/frameboard COMFY_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 127.0.0.1
 ```
 
-### Фоновые циклы
+### Background loops
 
-Отдельного воркера нет. Очередь ComfyUI (раз в 2 с) и цикл агента (раз в 3 с, все эпизоды) работают внутри процесса Next: `src/instrumentation.ts` → `src/lib/background.ts`. Пока запущен `npm run dev`, задания уходят в ComfyUI сами. `npm run comfy-queue` — отладочный запуск очереди без доски, вместе с `npm run dev` не запускать.
+There is no separate worker. The ComfyUI queue (every 2 s) and the agent loop (every 3 s, all episodes) run inside the Next process: `src/instrumentation.ts` → `src/lib/background.ts`. While `npm run dev` is running, jobs go to ComfyUI on their own. `npm run comfy-queue` runs the queue without the board for debugging; do not run it together with `npm run dev`.
 
-### Агенты доски в Claude Code
+### Board agents in Claude Code
 
-Агенты, которых запускает доска (`claude -p`, запросы к Ollama), видны в строке состояния Claude Code CLI: `Frameboard: 2 работают · 3 в очереди`, `Frameboard: агентов нет` или `Frameboard: доска выключена`.
+Agents started by the board (`claude -p`, Ollama requests) show in the Claude Code CLI status line: `Frameboard: 2 running · 3 queued`, `Frameboard: no agents` or `Frameboard: board is off`.
 
-Строка состояния — поле `statusLine` в `~/.claude/settings.json` ([документация](https://code.claude.com/docs/en/statusline)). Путь — с прямыми слэшами (на Windows Claude Code запускает команду через Git Bash):
+The status line is the `statusLine` field in `~/.claude/settings.json` ([docs](https://code.claude.com/docs/en/statusline)). Use forward slashes in the path (on Windows Claude Code runs the command through Git Bash):
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "node C:/Users/dimak/Documents/vera/soviet_story/vid-flow/scripts/frameboard-status.mjs",
+    "command": "node /path/to/frameboard/scripts/frameboard-status.mjs",
     "refreshInterval": 5
   }
 }
 ```
 
-`refreshInterval` нужен: без него строка обновляется только на событиях сессии, а агенты доски меняются, пока сессия молчит. Доска не на 3456 — добавь в начало команды `FRAMEBOARD_PORT=3474 ` (так пишется в Git Bash; без Git Bash Claude Code запускает команду в PowerShell, там переменную так не задать). Проверка:
+`refreshInterval` is needed: without it the line only updates on session events, while board agents change when the session is quiet. If the board is not on 3456, add `FRAMEBOARD_PORT=3474 ` at the start of the command (that syntax is for Git Bash; without Git Bash Claude Code runs the command in PowerShell, where the variable cannot be set this way). Check:
 
 ```bash
 echo '{}' | node scripts/frameboard-status.mjs
 ```
 
-Список и остановка — тот же API, что у кнопки «Отменить»:
+List and stop use the same API as the "Cancel" button:
 
 ```bash
 npm run agents -- list
@@ -74,35 +77,35 @@ npm run agents -- stop e01/format
 npm run agents -- stop --all
 ```
 
-В сессии Claude Code — с `!` в начале: `! npm run agents -- list`. Или слэш-командой `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Разметка сценария (кнопка «Добавить») останавливается как `e01/format`.
+In a Claude Code session, start with `!`: `! npm run agents -- list`. Or use the slash command `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Script formatting (the "Add" button) is stopped as `e01/format`.
 
-## Что умеет доска
+## What the board does
 
-- таблица кадр × этап; на телефоне — карточки кадров. Клик по клетке — меню: загрузить, утвердить, выбрать воркфлоу, запустить, отменить, «Редактировать»
-- страница этапа: полоса состояния (фаза и время, место в очереди ComfyUI, текст ошибки и ошибки нод, «Отменить» / «Сбросить ошибку»), меню воркфлоу из манифестов, предложение агента «Переключить»
-- `prompt.md` — ровно текст для модели; над ним действие кадра из `shot.md`. История версий промпта с возвратом
-- «Отправить агенту»: рекомендация, выбор провайдера (запоминается в браузере), статус запроса. Пока агент или ComfyUI работают, этап закрыт
-- поля не затираются опросом: если файл изменился на диске, пока поле правят, — плашка «подтянуть?»
-- полноэкранный просмотр output с промптом и seed из PNG ComfyUI
-- импорт сценария в папки кадров (UI или агент)
+- a shot × stage table; on a phone, shot cards. Click a cell for a menu: upload, approve, pick a workflow, run, cancel, "Edit"
+- a stage page: a status bar (phase and time, place in the ComfyUI queue, error text and node errors, "Cancel" / "Clear error"), a workflow menu from manifests, an agent suggestion with "Switch"
+- `prompt.md` is exactly the text for the model; above it, the shot action from `shot.md`. Prompt version history with rollback
+- "Send to agent": a recommendation, provider choice (remembered in the browser), request status. While the agent or ComfyUI works, the stage is locked
+- fields are not overwritten by polling: if the file changed on disk while a field is being edited, a "pull in?" banner appears
+- full-screen view of output with the prompt and seed from the ComfyUI PNG
+- import of a script into shot folders (UI or agent)
 
-Контракты между модулями — [`docs/contracts/`](docs/contracts/): папка этапа и API, манифест графа, задание очереди, запрос агенту.
+Contracts between modules are in [`docs/contracts/`](docs/contracts/): stage folder and API, graph manifest, queue job, agent request.
 
-## Структура серии
+## Series layout
 
 ```text
 data/
   show.md
   current_episode.txt
-  characters/          # база: {name}/portrait.png, side.png, full_body.png
-  locations/           # база: {locationId}/ — общий вид
-  references/          # общие референсы сериала
-  scenarios/           # документы сценариев
+  characters/          # library: {name}/portrait.png, side.png, full_body.png
+  locations/           # library: {locationId}/ — general view
+  references/          # shared series references
+  scenarios/           # script documents
   episodes/
     e01/
       episode.md
-      scenario_raw.md  # сырой текст для агента
-      scenario.md      # кадры ## s01, их читает скрипт
+      scenario_raw.md  # raw text for the agent
+      scenario.md      # shots ## s01, read by the script
       format_request.md
       agent_inbox.md
       shots/
@@ -123,16 +126,20 @@ data/
           final_render/
 ```
 
-Имена персонажей в approve: `lena_s01.png`, `mark_s01.png`.
+Character names in `approve`: `lena_s01.png`, `mark_s01.png`.
 
-## Агент и playbooks
+## Agent and playbooks
 
-- Инструкция агенту по сборке структуры: `docs/AGENT_BOOTSTRAP.md`
-- Гайды модели и этапа: `playbooks/`. Страница этапа показывает связанные файлы
-- Shot-персонаж — правка одежды базы из `data/characters/` по образцу в `refs/`: граф `playbooks/workflows/comfy/character_outfit_qwen21.json`
-- Сырой сценарий: кнопка «Отправить на разметку» пишет `scenario_raw.md` и строку в `agent_inbox.md`. Агент в Cursor форматирует его в `scenario.md`. «Создать выбранные» — отдельный скрипт, он только создаёт папки из уже размеченного текста
+- Instructions for the agent that builds the structure: `docs/AGENT_BOOTSTRAP.md`
+- Model and stage guides: `playbooks/`. The stage page shows the related files
+- A shot character is an outfit edit of the library character from `data/characters/` against a sample in `refs/`: graph `playbooks/workflows/comfy/character_outfit_qwen21.json`
+- Raw script: the "Send for formatting" button writes `scenario_raw.md` and a line in `agent_inbox.md`. An agent in Cursor formats it into `scenario.md`. "Create selected" is a separate script; it only creates folders from text that is already formatted
 
-## Стек
+## Stack
 
 Next.js + TypeScript + Tailwind + shadcn/ui.  
-Данные серии — обычные файлы на диске, без обязательной БД.
+Series data is plain files on disk, no database required.
+
+## License
+
+MIT, see [LICENSE](LICENSE). You may use and sell this code commercially, but the copyright notice must stay with every copy, so the author is credited. The license covers only this repository's code. Models and tools you run with it have their own licenses; see [NOTICE.md](NOTICE.md).
