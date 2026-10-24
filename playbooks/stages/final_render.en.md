@@ -1,7 +1,5 @@
 # Stage: final_render
 
-English copy for the model. Russian original: `playbooks/stages/final_render.md`.
-
 ## Decision: the final with lines is MiniMax H3 Cinema from the first frame and the faces
 
 A shot with one speaker is made by MiniMax H3 in reference mode with the Cinema LoRA (`final_h3_cinema`): the approved first frame is `<Picture 1>`, one picture per character gives the face, and the text carries the motion of the approved preview. There is no video reference. The user chose this graph because it keeps the quality and the likeness stable; the old H3 graph with the low-res video as a reference (`MiniMaxH3Creator`) often failed and is removed. How to write the text and the `prompt.md` format: `playbooks/models/minimax_h3.en.md`. `prompt.md` is always English.

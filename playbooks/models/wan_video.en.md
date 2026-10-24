@@ -1,7 +1,5 @@
 # Wan 2.2 — how to write a prompt for a video sketch
 
-English copy for the model. Russian original: `playbooks/models/wan_video.md`.
-
 Built from the EP.1 sketches (S1–S28): what worked on the first try, what was redone 5–17 times, and what finally worked. Sketches are made only with Wan 2.2 i2v (turbo). MiniMax is not used for sketches.
 
 Board manifests that use this playbook: `video_i2v`, `video_flf` (stage `video_preview`), `final_i2v`, `final_flf` (stage `final_render`). The exact `prompt.md` template is section 8.

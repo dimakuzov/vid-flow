@@ -1,7 +1,5 @@
 # Workflow: video_preview (Comfy)
 
-English copy for the model. Russian original: `playbooks/workflows/video_preview_comfy.md`.
-
 Wan 2.2 turbo video sketch. The board runs the graph through the manifests `video_i2v` and `video_flf` (final: `final_i2v`, `final_flf`, the same graphs). The graphs stay as they are; nodes are not rewritten.
 
 - First frame: `playbooks/workflows/comfy/wan22_i2v_sketch_turbo_api.json`

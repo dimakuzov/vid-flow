@@ -1,7 +1,5 @@
 # Workflow: characters (Comfy)
 
-English copy for the agent. Russian original: `playbooks/workflows/characters_comfy.md`.
-
 A shot character is a Qwen Image 2.1 outfit edit. Graph: `playbooks/workflows/comfy/character_outfit_qwen21.json` (API format). It made `approve/katya_s07.png` and `approve/lena_s07.png` on teaser s07.
 
 Do not edit the graph JSON: the queue gets the image names, the text, the seed and the prefix. Do not run `update_comfyui.bat`. ComfyUI: `http://127.0.0.1:8188/`.

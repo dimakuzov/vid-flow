@@ -42,11 +42,11 @@ While this chat is open, check the current episode every 20 seconds.
 
 ## First frame
 
-A shot with no specific characters and no specific location is made directly in `shots/{shotId}/first_frame/`. Do not wait for `characters/approve` or `location/approve`, and do not create those stages. The rule is in `playbooks/stages/first_frame.md`, section «Без персонажа и локации».
+A shot with no specific characters and no specific location is made directly in `shots/{shotId}/first_frame/`. Do not wait for `characters/approve` or `location/approve`, and do not create those stages. The rule is in `playbooks/stages/first_frame.en.md`, section «No character and no location».
 
 ## Characters stage
 
-If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md` (Russian: `qwen_outfit.md`).
+If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md`.
 
 The board runs ComfyUI, one job per character, into `output/`. Do not queue Comfy, do not edit the graph JSON, do not copy files into `approve/`. The user approves. Graph: `character_outfit_qwen21.json`, manifest `character_outfit`. Image 1 is the character base (`refs/{name}_base.*` if the user put it there, otherwise `data/characters/{name}/`). Image 2 is `refs/{name}_clothes.*` when the user placed that file. With only the base, node «image 2: образец одежды» is bypassed. Other files in `refs/` do not enter this graph. Set `"status": "done"` in `agent_request.json` when `prompt.md` is written. Do not write `status.json`.
 

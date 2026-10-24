@@ -1,7 +1,5 @@
 # Model: HeyGen Video 1.0 (Comfy Cloud)
 
-English copy for the model. Russian original: `playbooks/models/heygen_video.md`.
-
 The final for a dialogue: two (or more) people talk to each other and their lips must move on their own lines. Graph `playbooks/workflows/comfy/heygen_video_i2v_api.json`, node `HeyGenImageToVideoNode`, Image to Video from the approved first frame. Runs only in Comfy Cloud and costs credits (about 45.3 per 10 s, 5–15 s); the board sends it only after the user ticks the permission box on the stage page.
 
 `prompt.md` is the whole `model.prompt`: one paragraph in English, no headings, no sections. Do not translate any of it into Russian. The board adds nothing to it.

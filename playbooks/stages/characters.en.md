@@ -1,7 +1,5 @@
 # Stage: characters
 
-English copy for the agent. Russian original: `playbooks/stages/characters.md`.
-
 A shot variant of a character: the clothes of this shot. Face and body come from the base asset, the clothes from a reference in `refs/` or from text. The character stands straight, full length, on a light background: the pose and the place in the frame are set by the `first_frame` stage, not this one.
 
 The board runs the pass: manifest `character_outfit`, graph `playbooks/workflows/comfy/character_outfit_qwen21.json`. The agent writes only `prompt.md` (sections `## name`). The user approves. The teaser s07 characters were made this way.

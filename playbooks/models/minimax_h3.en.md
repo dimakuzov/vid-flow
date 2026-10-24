@@ -1,7 +1,5 @@
 # MiniMax H3 Cinema (video preview and final render): how to write the prompt
 
-English copy for the agent. Russian original: `playbooks/models/minimax_h3.md`.
-
 Two variants use this playbook: `video_minimax` on the video preview (graph `minimax_h3_preview_api.json`, one pass at 0.5 MP) and `final_h3_cinema` on the final render (graph `minimax_h3_cinema_api.json`, a second pass with the latent upscale to 1.5 MP). Both are MiniMax H3 **reference to video** with the Cinema LoRA. There is no video reference: the model gets the approved first frame, one picture per character, the references the user gave the shot and the text. All the motion comes from the text. The user chose this graph because it keeps the quality and the likeness of the people stable; the old H3 graph with the low-res video as a reference often failed.
 
 ---

@@ -1,7 +1,5 @@
 # Model: Krea 2 location
 
-English copy for the model. Russian original: `playbooks/models/krea2_location.md`.
-
 A new location from text. Graph `playbooks/workflows/comfy/location_krea2_api.json`, manifest `location_krea2` (stage `location`, menu item «Локация с нуля: Krea 2 по тексту»). When to pick it and when to pick `location_views`: `playbooks/stages/location.en.md`, section "Which graph".
 
 ## The model

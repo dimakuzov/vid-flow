@@ -1,7 +1,5 @@
 # Model: Qwen Image 2.1 Edit (character)
 
-English copy for the agent. Russian original: `playbooks/models/qwen_image.md`.
-
 Prompts for the shot character: the outfit edit. Stage rules: `playbooks/stages/characters.en.md`. Graph and run: `playbooks/workflows/characters_comfy.en.md`.
 
 Location prompts: `playbooks/models/qwen_location.en.md`. First-frame prompt: `playbooks/models/qwen_first_frame.en.md`.

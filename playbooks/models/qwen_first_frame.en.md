@@ -1,7 +1,5 @@
 # Model: Qwen first frame
 
-English copy for the model. Russian original: `playbooks/models/qwen_first_frame.md`.
-
 Prompt for placing a character into a location, Qwen Image 2.1 Edit. Where files go: `playbooks/stages/first_frame.en.md`. Graph: `playbooks/workflows/first_frame_comfy.en.md`.
 
 These rules were checked on a previous series: 12 shots, about 110 generations. A single character, a simple pose, and an obvious place worked on the first run. Two people, a small physical detail, and the surface under the feet took the longest.

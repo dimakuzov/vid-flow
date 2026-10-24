@@ -1,7 +1,5 @@
 # Stage: first_frame
 
-English copy for the model. Russian original: `playbooks/stages/first_frame.md`.
-
 Build the start frame. When the shot has approved characters and a location, place them into it. When it has no specific characters and no location, make the frame directly. The earlier stages are not required. Prompt: `playbooks/models/qwen_first_frame.en.md`. Graph for compositing existing pictures: `playbooks/workflows/first_frame_comfy.en.md`.
 
 ## Goal: only add the characters

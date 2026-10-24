@@ -1,7 +1,5 @@
 # Stage: location
 
-English copy for the model. Russian original: `playbooks/stages/location.md`.
-
 Shot-specific location with no people. The general view comes from the series library. The angle and edits for this shot are built here.
 
 Prompts: `playbooks/models/qwen_location.en.md`. How to run the angle graph: `playbooks/workflows/location_comfy.en.md`. A new location from scratch: `playbooks/models/krea2_location.en.md`.

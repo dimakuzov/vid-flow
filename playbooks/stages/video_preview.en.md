@@ -1,7 +1,5 @@
 # Stage: video_preview
 
-English copy for the model. Russian original: `playbooks/stages/video_preview.md`.
-
 Low resolution: check the movement. The main sketches are LTX 2.5 (the default) and MiniMax H3 Cinema; Wan 2.2 stays as a fallback. The board runs the graph.
 
 The prompt follows the playbook of the selected variant (the `playbook` of its manifest): LTX — `playbooks/models/ltx_video.en.md`, MiniMax — `playbooks/models/minimax_h3.en.md`, Wan — `playbooks/models/wan_video.en.md`. `prompt.md` is always English.

@@ -54,9 +54,9 @@ Shot-персонаж и shot-локация собираются из общи�
 
 Перед заполнением этапа прочитай playbook:
 
-- персонаж: `playbooks/stages/characters.md`, `playbooks/models/qwen_image.md`, `playbooks/workflows/characters_comfy.md`. Прогон — раздел «Команда» в workflow, его выполняют и Cursor, и Claude
-- локация: `playbooks/stages/location.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
-- первый кадр: `playbooks/stages/first_frame.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
+- персонаж: `playbooks/stages/characters.en.md`, `playbooks/models/qwen_image.en.md`, `playbooks/workflows/characters_comfy.en.md`. Прогон — раздел «Команда» в workflow, его выполняют и Cursor, и Claude
+- локация: `playbooks/stages/location.en.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
+- первый кадр: `playbooks/stages/first_frame.en.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 
 ## Собрать папки кадров
 Это отдельный шаг после разметки. Прочитай `scenario.md` текущего эпизода.

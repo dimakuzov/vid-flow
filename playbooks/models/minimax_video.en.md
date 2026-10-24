@@ -1,7 +1,5 @@
 # Model: MiniMax Video
 
-English copy for the model. Russian original: `playbooks/models/minimax_video.md`.
-
 Status: the MiniMax H3 final render is connected to the board — playbook `playbooks/models/minimax_h3.en.md`, variant `final_h3_cinema`. Below are the notes from before: where MiniMax is needed instead of Wan and which files are installed.
 
 ## Where it is used
@@ -24,4 +22,4 @@ Checked against the `models/` folders (not run):
 1. Build a first-last (fl2va) graph in ComfyUI with the 4-step turbo LoRA, check it on one shot from the list above.
 2. Save it in API format as `playbooks/workflows/comfy/minimax_h3_flf_api.json`, write a manifest (`final_minimax_flf`, stage `final_render`, order 40; inputs as in `final_flf`).
 3. Check that the save node writes metadata (`prompt` in the container).
-4. Add here: what worked in the prompt, duration, resolution, and a `prompt.md` template following `wan_video.en.md`, section 8. Update the Russian file in the same commit.
+4. Add here: what worked in the prompt, duration, resolution, and a `prompt.md` template following `wan_video.en.md`, section 8.
