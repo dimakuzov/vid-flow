@@ -128,6 +128,25 @@ data/
 
 Character names in `approve`: `lena_s01.png`, `mark_s01.png`.
 
+## Agent modes
+
+"Send to agent" asks a language model to rewrite the stage prompt (`prompt.md`) from your note. The model is a helper, not a requirement: every `prompt.md` is a plain text field you can edit by hand in the board, and the board runs ComfyUI by itself. Choose the provider with `FRAMEBOARD_AGENT_PROVIDER` or in the stage menu.
+
+| Provider | What it needs | What it does |
+|---|---|---|
+| `manual` (default) | Any chat agent that can read and write files in the project (Claude Code, Cursor, Gemini CLI and so on), or you | The board writes the task to `llm_task.md` and waits. The agent (or you) updates `prompt.md` and sets `"status": "done"` in `agent_request.json`. Nothing is called automatically |
+| `ollama` | [Ollama](https://ollama.com) running locally and `FRAMEBOARD_OLLAMA_MODEL` set | Open-weights, fully local. Text mode only: rewrites `prompt.md` for stages that have a board workflow (location, first frame, video) |
+| `claude` | The `claude` CLI ([Claude Code](https://claude.com/claude-code)) signed in with a subscription; no API key | Text mode, plus agent mode for stages without a board workflow (characters), where the CLI works in a scratch folder with the task file. Models: Haiku 5.5 by default, Sonnet 5.5 for the first frame, Opus 5.5 for formatting a raw script |
+
+Two modes inside the board:
+
+- **text**: the model returns only the new prompt. The board saves it and queues the ComfyUI job itself.
+- **agent**: a CLI agent works through the task file, then the board continues.
+
+Formatting a raw script into shots ("Send for formatting") also needs an agent. Without one, write `scenario.md` yourself in the shot-block format described in `docs/AGENT_BOOTSTRAP.md`.
+
+If you have no model at all: skip "Send to agent", edit prompts by hand, and use the board as a file-based job queue and review table.
+
 ## Agent and playbooks
 
 - Instructions for the agent that builds the structure: `docs/AGENT_BOOTSTRAP.md`

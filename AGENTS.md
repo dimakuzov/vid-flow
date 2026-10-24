@@ -64,14 +64,6 @@ Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only 
 ## Задача для любого LLM
 «Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188/` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.
 
-## Agent mail
-Cloud and local agents share this git branch, not the `data/` folder. Branch: `cursor/episode-folders-7482`.
-
-- Cloud writes only `agent-mail/cloud-to-local.md`
-- Local writes only `agent-mail/local-to-cloud.md`
-- Before reading, `git pull`. Reply by appending a block to your own file, then commit and push only `agent-mail/`
-- Do not edit the other side's file
-
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
