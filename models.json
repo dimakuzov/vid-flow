@@ -278,15 +278,15 @@
     {
       "file": "minimax_h3_video_vae_int8_convrot.safetensors",
       "path": "vae/minimax_h3_video_vae_int8_convrot.safetensors",
-      "bytes": 2811065184,
+      "bytes": 3171670912,
       "usedBy": [
         "minimax_h3_cinema_api",
         "minimax_h3_preview_api"
       ],
-      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_int8_convrot.safetensors",
-      "page": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Kijai/MiniMax-H3-experimental/resolve/main/minimax_h3_video_vae_int8_convrot.safetensors",
+      "page": "https://huggingface.co/Kijai/MiniMax-H3-experimental",
       "auth": "huggingface",
-      "check": "the download is 2811065184 bytes, the file in use is 3171670912 bytes: check which one the graphs expect"
+      "check": "size matches the file in use (2026-10-24). The Comfy-Org/MiniMax-H3 file of the same name is smaller (2811065184 bytes) and was not used"
     },
     {
       "file": "qwen_image_2.1_vae_bf16.safetensors",
