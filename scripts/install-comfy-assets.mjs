@@ -10,7 +10,6 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
