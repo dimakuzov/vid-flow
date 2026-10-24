@@ -6,7 +6,7 @@ Source: `eposide_10` (14 shots) and `episode_11` (17 shots), first frame only, r
 
 - Applied: F1, F2, F4, F5, F6, F7, and the `ivan_sheet.png` fix.
 - F2: the «Спиной» box is set from the scenario markup word `back`; a shot with one person also gets it from «спиной» / «со спины» in the shot text.
-- F3 (face sheets by default) waits for the ComfyUI check below; only the playbook line and the sheet lookup are not switched.
+- F3 (face sheets by default) is not switched on: the check below found no gain in likeness and one extra person with sheets.
 - The Russian playbook copy was not updated.
 
 ## What the pictures show
@@ -129,12 +129,24 @@ Same shots, same seeds, existing graph only:
 
 Count the extra or mixed people.
 
-## The check, prepared
+## The check (existing graph, user's ComfyUI)
 
-Data copy in `%TEMP%rameboard-ff2`. 18 jobs are queued (3 shots × portrait / sheet / no face × seeds 111111111 and 222222222):
+Data copy in `%TEMP%rameboard-ff2`, 18 runs: 3 shots × portrait / face sheet / no face × seeds 111111111 and 222222222.
 
-- `a09*` — `episode_11/s09`;
-- `a11*` — `episode_11/s11`;
-- `b10*` — `eposide_10/s10`.
+- `a09` — `episode_11/s09`;
+- `a11` — `episode_11/s11`;
+- `b10` — `eposide_10/s10`.
 
-Each prompt is the approved prompt with the count line; only the face binding differs. The sheet variant puts the library sheet in `refs/{name}_face.png`, so the existing graph takes it instead of the portrait. They wait for ComfyUI at `127.0.0.1:8188`, which was not running.
+Each prompt is the approved prompt with the new count line (F1); only the face binding differs. The sheet variant puts the library sheet in `refs/{name}_face.png`, so the graph takes it instead of the portrait. Sheets: `sheet-check-a09.jpg`, `sheet-check-a11.jpg`, `sheet-check-b10.jpg` next to this file.
+
+| Shot | Portrait | Face sheet | No face |
+|---|---|---|---|
+| `a09`: Ivan at the gate, Lena close | 2 people, Lena close | 2 people, Lena close, same likeness | 2 people, but Lena full figure instead of close |
+| `a11`: three people | 3 people, both seeds | seed 111: 3 people; **seed 222: a fourth person** behind Lena | 3 people, both seeds |
+| `b10`: two profiles close | 2 people | 2 people, same likeness | 2 people |
+
+**Conclusions:**
+
+- With the count line first, no portrait run had an extra person (0 of 6). In the episode the same shots had extras.
+- Face sheets did not make the faces look more alike on a still frame, and in the three-person shot one of two runs gained a fourth person. They stay off by default on the first frame. The video stages keep using sheets, now including `ivan_sheet.png`.
+- Without a face picture the model drew Lena from her full-figure reference and lost the close-up. A visible face keeps its portrait; only people seen from behind lose it (F2).
