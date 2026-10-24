@@ -3,8 +3,8 @@
   "id": "video_i2v",
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "video_preview",
-  "label": "Видео от первого кадра (i2v)",
-  "description": "Движение от утверждённого первого кадра. По умолчанию.",
+  "label": "Video from the first frame (i2v)",
+  "description": "Motion from the approved first frame. Default.",
   "playbook": "models/wan_video.en.md",
   "order": 10,
   "aliases": [

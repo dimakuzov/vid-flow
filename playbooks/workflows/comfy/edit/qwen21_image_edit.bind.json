@@ -3,8 +3,8 @@
   "id": "qwen21_image_edit",
   "graph": "../qwen21_character_compositing.json",
   "stage": "first_frame",
-  "label": "Правка: Qwen Image 2.1",
-  "description": "Улучшение и правка одной картинки, image 1 — исходник. Пустой текст — только текстуры. Не пункт меню этапа: только окно «Править».",
+  "label": "Edit: Qwen Image 2.1",
+  "description": "Improves and edits a single picture, image 1 is the source. Empty text means textures only. Not a stage menu item: only the edit window.",
   "playbook": "models/image_edit.en.md",
   "order": 10,
   "inputs": {

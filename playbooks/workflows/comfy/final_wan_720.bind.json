@@ -3,8 +3,8 @@
   "id": "final_wan_720",
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал Wan от первого кадра, 720×1280",
-  "description": "Тот же промпт и первый кадр, что у эскиза, в 720×1280. По умолчанию для кадров без реплик.",
+  "label": "Final Wan from the first frame, 720×1280",
+  "description": "The same prompt and first frame as the preview, at 720×1280. Default for shots without lines.",
   "playbook": "models/wan_video.en.md",
   "order": 3,
   "inputs": {

@@ -3,8 +3,8 @@
   "id": "final_i2v",
   "graph": "wan22_i2v_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал от первого кадра (i2v)",
-  "description": "Финал пока = превью: тот же граф и настройки, файлы в frameboard/final/. См. stages/final_render.en.md.",
+  "label": "Final from the first frame (i2v)",
+  "description": "For now the final equals the preview: the same graph and settings, files in frameboard/final/. See stages/final_render.en.md.",
   "playbook": "models/wan_video.en.md",
   "order": 10,
   "aliases": [

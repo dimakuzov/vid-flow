@@ -3,8 +3,8 @@
   "id": "video_flf",
   "graph": "wan22_flf_sketch_turbo_api.json",
   "stage": "video_preview",
-  "label": "Видео между первым и последним кадром (FLF)",
-  "description": "Нужна конкретная конечная поза или смена состояния: последний кадр в refs/.",
+  "label": "Video between the first and last frame (FLF)",
+  "description": "For a specific end pose or a change of state: put the last frame in refs/.",
   "playbook": "models/wan_video.en.md",
   "order": 20,
   "aliases": [

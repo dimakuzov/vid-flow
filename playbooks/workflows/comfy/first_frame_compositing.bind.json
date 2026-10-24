@@ -3,8 +3,8 @@
   "id": "first_frame_compositing",
   "graph": "qwen21_character_compositing.json",
   "stage": "first_frame",
-  "label": "Первый кадр: персонажи в локации",
-  "description": "Вписать утверждённых персонажей в утверждённую локацию. Если в кадре нет персонажей, в граф идёт только локация, а промпт добавляет лишь то, что написано. Иначе в граф уходят локация (image 1), персонажи, затем лица тех, кто близко к камере, затем референсы пользователя из refs/, затем лица тех, кто далеко, — до 6 картинок.",
+  "label": "First frame: characters in the location",
+  "description": "Places the approved characters into the approved location. If the shot has no characters, only the location goes into the graph and the prompt adds only what is written. Otherwise the graph receives the location (image 1), the characters, then the faces of those close to the camera, then the user's references from refs/, then the faces of those far away: up to 6 pictures.",
   "playbook": "models/qwen_first_frame.en.md",
   "order": 10,
   "inputs": {

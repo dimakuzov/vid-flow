@@ -1,6 +1,6 @@
 # Model: FireRed location
 
-A new location from 1–3 pictures in `refs/`. Graph `playbooks/workflows/comfy/location_firered_edit.json`, manifest `location_firered` (stage `location`, menu item «Локация из референсов: FireRed»). When to pick it instead of `location_views` or `location_krea2`: `playbooks/stages/location.en.md`, section "Which graph".
+A new location from 1–3 pictures in `refs/`. Graph `playbooks/workflows/comfy/location_firered_edit.json`, manifest `location_firered` (stage `location`, menu item "Location from references: FireRed"). When to pick it instead of `location_views` or `location_krea2`: `playbooks/stages/location.en.md`, section "Which graph".
 
 ## The model
 

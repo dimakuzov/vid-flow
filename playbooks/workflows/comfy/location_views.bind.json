@@ -3,8 +3,8 @@
   "id": "location_views",
   "graph": "location_views_multiple_angles.json",
   "stage": "location",
-  "label": "Локация: 4 ракурса по общему виду",
-  "description": "Общий вид локации без людей: четыре ветки ракурса, у каждой свой раздел prompt.md.",
+  "label": "Location: 4 angles from the general view",
+  "description": "A general view of the location without people: four angle branches, each with its own section in prompt.md.",
   "playbook": "models/qwen_location.en.md",
   "order": 10,
   "inputs": {

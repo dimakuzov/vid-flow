@@ -3,8 +3,8 @@
   "id": "final_h3_head_swap",
   "graph": "minimax_h3_head_swap_api.json",
   "stage": "final_render",
-  "label": "Финал MiniMax H3: замена головы по листу лица (один персонаж)",
-  "description": "Улучшает утверждённое превью и ставит голову по листу лица. Только один персонаж в кадре, нужен его face_sheet. Промпт не нужен: жмите «Запустить».",
+  "label": "Final MiniMax H3: head swap from a face sheet (one character)",
+  "description": "Upgrades the approved preview and puts the head on from the face sheet. Only one character in the shot, and their face_sheet is required. No prompt needed: press \"Run\".",
   "order": 12,
   "inputs": {
     "video": {

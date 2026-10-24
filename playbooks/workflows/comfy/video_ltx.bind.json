@@ -3,8 +3,8 @@
   "id": "video_ltx",
   "graph": "ltx25_i2v_api.json",
   "stage": "video_preview",
-  "label": "Видео LTX 2.5 от первого кадра (i2v)",
-  "description": "LTX 2.5, 24 к/с, со звуком: персонажи могут говорить реплики из «Реплик» кадра. По умолчанию на эскизе; «▶ Все кадры» гонит его первым, затем MiniMax.",
+  "label": "Video LTX 2.5 from the first frame (i2v)",
+  "description": "LTX 2.5, 24 fps, with sound: characters can speak the lines from the shot's Lines. Default on a preview; \"▶ Every shot\" runs it first, then MiniMax.",
   "playbook": "models/ltx_video.en.md",
   "order": 5,
   "inputs": {

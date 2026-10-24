@@ -3,8 +3,8 @@
   "id": "final_flf",
   "graph": "wan22_flf_sketch_turbo_api.json",
   "stage": "final_render",
-  "label": "Финал Wan между кадрами (FLF), 720×1280",
-  "description": "Тот же промпт, первый и последний кадр, что у утверждённого эскиза FLF, в 720×1280 и 24 к/с. По умолчанию, если утверждённый эскиз — FLF.",
+  "label": "Final Wan between frames (FLF), 720×1280",
+  "description": "The same prompt, first frame and last frame as the approved FLF preview, at 720×1280 and 24 fps. Default when the approved preview is FLF.",
   "playbook": "models/wan_video.en.md",
   "order": 8,
   "aliases": [
