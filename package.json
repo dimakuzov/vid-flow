@@ -10,6 +10,7 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "bootstrap:sample": "node --import tsx scripts/bootstrap-sample.ts",
     "comfy-queue": "node --import tsx scripts/comfy-queue.ts",
+    "comfy:install": "node scripts/install-comfy-assets.mjs",
     "migrate-prompts": "node --import tsx scripts/migrate-prompts.ts",
     "agents": "node scripts/frameboard-agents.mjs",
     "status-line": "node scripts/frameboard-status.mjs"

@@ -79,6 +79,23 @@ npm run agents -- stop --all
 
 In a Claude Code session, start with `!`: `! npm run agents -- list`. Or use the slash command `/agents list`, `/agents stop --all` (`.claude/commands/agents.md`). Script formatting (the "Add" button) is stopped as `e01/format`.
 
+## ComfyUI models and nodes
+
+The graphs in `playbooks/workflows/comfy/` need ComfyUI 0.41.0 or newer, two custom node packs and the model files listed in `models.json` (about 209 GB for all graphs together; one graph needs less). `requirements-nodes.txt` lists the node packs. Everything else the graphs use is built into ComfyUI.
+
+```bash
+# report what is missing in your ComfyUI folder (the one that holds main.py)
+npm run comfy:install -- --comfy "C:\path\to\ComfyUI"
+
+# download the missing models and clone the missing node packs
+npm run comfy:install -- --comfy "C:\path\to\ComfyUI" --install
+```
+
+- It asks before downloading, skips files that are already complete, and resumes an interrupted download. Add `--only models` or `--only nodes` to do one part, `--yes` to skip the question, `--pip` to let it install a node pack's Python packages with ComfyUI's Python.
+- `Lightricks/LTX-2.5` (the LTX files) is gated on Hugging Face: log in, accept the terms on the model page, create a read token and set `HF_TOKEN`. Civitai files need `CIVITAI_TOKEN`; two Civitai files have no direct link, and the script prints the page to download them from.
+- Restart ComfyUI afterwards. Tested on ComfyUI 0.41.0 (Windows portable, 16 GB GPU).
+- Every model and LoRA has its own license. Study each one before commercial use; see [NOTICE.md](NOTICE.md).
+
 ## What the board does
 
 - a shot × stage table; on a phone, shot cards. Click a cell for a menu: upload, approve, pick a workflow, run, cancel, "Edit"
