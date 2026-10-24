@@ -16,9 +16,9 @@ delete process.env.SERIES_ROOT;
 import { renderGraphImages } from "../agent/task";
 import type { StageId } from "../series/constants";
 import { createEpisode, ensureStageDirs, getCharactersRoot, shotDir, stageDir } from "../series/paths";
-import { framingMessage, setFraming, setRefNote, withFramingMessage } from "../series/first-frame-settings";
+import { framingBlock, readBackView, setBackView, setFraming, setRefNote } from "../series/first-frame-settings";
 import { setExcluded } from "../series/run-settings";
-import { buildPrompt, stageBindings } from "./binding";
+import { buildPrompt, libraryFaceSheet, stageBindings } from "./binding";
 
 const EP = "e01";
 const PNG = Buffer.from("89504e470d0a1a0a", "hex");
@@ -59,6 +59,8 @@ before(() => {
   const root = getCharactersRoot();
   put(path.join(root, "Lena", "portret.png"));
   put(path.join(root, "Misha", "Misha_face.png"));
+  put(path.join(root, "Ivan", "ivan_sheet.png"));
+  put(path.join(root, "Katya", "katya_face_sheet.png"));
 });
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -105,22 +107,55 @@ test("мест не хватает: лицо дальнего персонажа
   assert.match(renderGraphImages(EP, "s04", "first_frame", WORKFLOW), /Not sent.*Misha_face\.png/);
 });
 
-test("агенту: дальность и подписи референсов строками после сообщения", () => {
+test("агенту: дальность и подписи референсов отдельным блоком задания", () => {
   shot("s05", ["lena", "misha"], ["helmet.jpg", "old.jpg"]);
   // Не выбрано на доске — план из текста кадра, здесь его нет: в полный рост. Пустых значений нет.
-  assert.match(framingMessage(EP, "s05"), /- lena: full figure.*\n- misha: full figure/);
+  assert.match(framingBlock(EP, "s05"), /^## Distance from the camera[^\n]*\n\n- lena: full figure.*\n- misha: full figure/);
   setFraming(EP, "s05", "lena", "face");
   setRefNote(EP, "s05", "helmet.jpg", "шлем Лены");
   setRefNote(EP, "s05", "old.jpg", "старый шлем");
   setExcluded(EP, "s05", "first_frame", `episodes/${EP}/shots/s05/first_frame/refs/old.jpg`, true);
-  const text = withFramingMessage(EP, "s05", "крупнее");
-  assert.match(text, /^крупнее\n\nDistance from the camera/);
-  assert.match(text, /- lena: face close-up: the face is about three quarters of the frame width/);
-  assert.match(text, /- misha: full figure/);
-  assert.match(text, /- helmet\.jpg: шлем Лены/);
+  const text = framingBlock(EP, "s05");
+  assert.match(text, /- lena: face close-up: the face is about three quarters of the frame width, the top of the head near the top edge/);
+  assert.match(text, /- misha: full figure: head to feet in the frame; set the height by an object/);
+  assert.match(text, /## What the user's reference files are[^\n]*\n\n- helmet\.jpg: шлем Лены/);
   assert.doesNotMatch(text, /old\.jpg/);
-  // Пустое сообщение: только строки доски.
-  assert.match(withFramingMessage(EP, "s05", ""), /^Distance from the camera/);
+});
+
+test("крупный план у двоих — одна строка «вместе», а не три четверти ширины на каждого", () => {
+  shot("s07", ["lena", "misha"]);
+  setFraming(EP, "s07", "lena", "face");
+  setFraming(EP, "s07", "misha", "face");
+  const text = framingBlock(EP, "s07");
+  assert.match(text, /- lena: face close-up together with the others marked so: their faces side by side fill the whole frame/);
+  assert.match(text, /- misha: face close-up together/);
+  assert.doesNotMatch(text, /three quarters of the frame width/);
+});
+
+test("спиной: портрет не идёт в граф, агент получает «seen from behind»", () => {
+  shot("s08", ["lena", "misha"]);
+  setFraming(EP, "s08", "lena", "waist");
+  setFraming(EP, "s08", "misha", "waist");
+  assert.deepEqual(slots("s08"), ["lena_s08.png", "misha_s08.png", "s08_face0.png", "s08_face1.png"]);
+  setBackView(EP, "s08", "lena", true);
+  // Лицо Лены не идёт; портрет Миши занимает её место в ряду.
+  assert.deepEqual(slots("s08"), ["lena_s08.png", "misha_s08.png", "s08_face0.png"]);
+  assert.match(renderGraphImages(EP, "s08", "first_frame", WORKFLOW), /image 4: character2 face \(misha in the task/);
+  assert.match(framingBlock(EP, "s08"), /- lena: seen from behind, the face hidden; waist up/);
+  setBackView(EP, "s08", "lena", false);
+  assert.equal(slots("s08").length, 4);
+});
+
+test("спиной по тексту кадра: только кадр с одним персонажем и пока отметок на доске нет", () => {
+  shot("s09", ["lena"]);
+  fs.appendFileSync(path.join(shotDir(EP, "s09"), "shot.md"), "\n## Summary\nЛена стоит спиной к нам у окна.\n");
+  assert.deepEqual([...readBackView(EP, "s09")], ["lena"]);
+  setBackView(EP, "s09", "lena", false);
+  // Снятая на доске отметка сильнее текста.
+  assert.deepEqual([...readBackView(EP, "s09")], []);
+  shot("s10", ["lena", "misha"]);
+  fs.appendFileSync(path.join(shotDir(EP, "s10"), "shot.md"), "\n## Summary\nЛена стоит спиной, Миша смотрит на неё.\n");
+  assert.deepEqual([...readBackView(EP, "s10")], []);
 });
 
 test("дальность и подпись: только персонажи кадра, известные значения и файлы из refs/", () => {
@@ -135,4 +170,10 @@ test("дальность и подпись: только персонажи ка
   const settings = JSON.parse(fs.readFileSync(path.join(stageDir(EP, "s06", "first_frame"), "run_settings.json"), "utf8"));
   assert.equal(settings.framing, undefined);
   assert.equal(settings.refNotes, undefined);
+});
+
+test("лист лица в библиотеке: `{имя}_face_sheet` и `{имя}_sheet`", () => {
+  assert.equal(path.basename(libraryFaceSheet("ivan")!), "ivan_sheet.png");
+  assert.equal(path.basename(libraryFaceSheet("katya")!), "katya_face_sheet.png");
+  assert.equal(libraryFaceSheet("misha"), null);
 });

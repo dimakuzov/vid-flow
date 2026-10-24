@@ -1,7 +1,5 @@
 # Model: Qwen outfit
 
-English copy for the model. Russian original: `playbooks/models/qwen_outfit.md`.
-
 An outfit edit for the shot's character. Graph `character_outfit_qwen21.json`, manifest `character_outfit`. Each character gets its own section of `prompt.md`.
 
 ## Prompt

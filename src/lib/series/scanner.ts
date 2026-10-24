@@ -35,7 +35,8 @@ import { readAgentRequestSummary } from "./agent-request";
 import { stageDuration } from "../comfy/binding";
 import { listWorkflowChoices, resolveWorkflowId } from "../comfy/workflows";
 import { readRunSettings } from "./run-settings";
-import { readFraming, readRefNotes } from "./first-frame-settings";
+import { readBackView, readFraming, readRefNotes } from "./first-frame-settings";
+import { shotSettingOn } from "./shot-settings";
 import { readShotSpeech, stageHasSpeech } from "./speech";
 import { stageInputs } from "./stage-inputs";
 import { readJobSummary, readStageState } from "./stage-state";
@@ -312,7 +313,15 @@ export function getStageDetail(episodeId: string, shotId: string, stageId: Stage
     job: readJobSummary(state.jobId),
     firstFrame:
       stageId === "first_frame"
-        ? { framing: readFraming(episodeId, shotId), refNotes: readRefNotes(episodeId, shotId) }
+        ? {
+            framing: readFraming(episodeId, shotId),
+            backView: [...readBackView(episodeId, shotId)],
+            refNotes: readRefNotes(episodeId, shotId),
+          }
+        : null,
+    strictFirstFrame:
+      stageId === "video_preview" || stageId === "final_render"
+        ? shotSettingOn(episodeId, shotId, "strictFirstFrame")
         : null,
     agentRequest: readAgentRequestSummary(episodeId, shotId, stageId),
     watch: readShotWatch(episodeId, shotId),

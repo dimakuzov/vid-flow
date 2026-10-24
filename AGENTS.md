@@ -26,7 +26,7 @@ Before other stage work, read `data/episodes/{episodeId}/agent_inbox.md`. Each p
 
 - Rewrite that stage's `prompt.md` from the user message. The previous prompt is kept by the board in `prompt_history.json` when the file changes.
 - The user message is in `agent_request.md` / `llm_task.md`. `prompt.md` is the exact text that goes to the model.
-- Do not touch `llm_notes.md`, `status.json`, `stage_state.json`, `agent_dispatch.json`, the shot's `agent.json` (the shot's agent: provider and model), the shot's `notes.json`, `action.md` and `action.json`, or `data/descriptions/`. The board owns them: it clears the recommendation field when the request is sent and sets every stage status itself. Append a run note to `run_log.md` only if you ran a generation.
+- Do not touch `llm_notes.md`, `status.json`, `stage_state.json`, `agent_dispatch.json`, the shot's `agent.json` (the shot's agent: provider and model), the shot's `notes.json` and `shot_settings.json`, `action.md` and `action.json`, or `data/descriptions/`. The board owns them: it clears the recommendation field when the request is sent and sets every stage status itself. Append a run note to `run_log.md` only if you ran a generation.
 - Rebuild refs only when `refsChangedByUser` is false and the message means the references are wrong. When it is true, leave `refs/` untouched.
 - Then write `agent_baseline.json` (`capturedAt`, `prompt`, `refsNote`, `workflowNote`, `refs` with `name`, `sha256`, `bytes`), set `agent_touch.json` to `{ "refsTouchedByUser": false }`, and set `"status": "done"` in `agent_request.json`.
 
@@ -42,11 +42,11 @@ While this chat is open, check the current episode every 20 seconds.
 
 ## First frame
 
-A shot with no specific characters and no specific location is made directly in `shots/{shotId}/first_frame/`. Do not wait for `characters/approve` or `location/approve`, and do not create those stages. The rule is in `playbooks/stages/first_frame.md`, section «Без персонажа и локации».
+A shot with no specific characters and no specific location is made directly in `shots/{shotId}/first_frame/`. Do not wait for `characters/approve` or `location/approve`, and do not create those stages. The rule is in `playbooks/stages/first_frame.en.md`, section «No character and no location».
 
 ## Characters stage
 
-If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md` (Russian: `qwen_outfit.md`).
+If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md`.
 
 The board runs ComfyUI, one job per character, into `output/`. Do not queue Comfy, do not edit the graph JSON, do not copy files into `approve/`. The user approves. Graph: `character_outfit_qwen21.json`, manifest `character_outfit`. Image 1 is the character base (`refs/{name}_base.*` if the user put it there, otherwise `data/characters/{name}/`). Image 2 is `refs/{name}_clothes.*` when the user placed that file. With only the base, node «image 2: образец одежды» is bypassed. Other files in `refs/` do not enter this graph. Set `"status": "done"` in `agent_request.json` when `prompt.md` is written. Do not write `status.json`.
 

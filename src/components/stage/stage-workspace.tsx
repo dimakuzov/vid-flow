@@ -289,6 +289,25 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
       });
       stage.merge(data);
     });
+  const chooseBackView = (name: string, value: boolean) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { backView: { name, value } },
+        fallbackError: t("framing.failed"),
+      });
+      stage.merge(data);
+    });
+  // Превью и финал: галка кадра «Строго первый кадр», сохраняется сразу и действует на оба этапа.
+  const chooseStrict = (value: boolean) =>
+    act(async () => {
+      const data = await requestJson<StageDetail>(stageApi, {
+        method: "PATCH",
+        body: { strictFirstFrame: value },
+        fallbackError: t("strict.failed"),
+      });
+      stage.merge(data);
+    });
   const saveRefNote = (file: MediaFile, text: string) =>
     act(async () => {
       const data = await requestJson<StageDetail>(stageApi, {
@@ -571,9 +590,25 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
               <FramingPicker
                 characters={detail.expectedCharacters}
                 framing={detail.firstFrame.framing}
+                backView={detail.firstFrame.backView}
                 disabled={busy || stageBusy}
                 onChange={chooseFraming}
+                onBackView={chooseBackView}
               />
+            ) : null}
+            {detail.strictFirstFrame !== null ? (
+              <label className="flex items-start gap-2 text-sm text-stone-800">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={detail.strictFirstFrame}
+                  disabled={busy || stageBusy}
+                  onChange={(event) => chooseStrict(event.target.checked)}
+                />
+                <span>
+                  {t("strict.title")} <span className="text-xs text-stone-500">{t("strict.note")}</span>
+                </span>
+              </label>
             ) : null}
             {stage.dirty ? (
               <Button variant="outline" disabled={busy} onClick={() => act(async () => {

@@ -1,7 +1,5 @@
 # Workflow: first_frame (Comfy)
 
-English copy for the model. Russian original: `playbooks/workflows/first_frame_comfy.md`.
-
 Graph: `playbooks/workflows/comfy/qwen21_character_compositing.json`. It is Qwen Image 2.1 Edit in ComfyUI API format.
 
 Write the prompt from `playbooks/models/qwen_first_frame.en.md`. Frameboard does not run the graph.

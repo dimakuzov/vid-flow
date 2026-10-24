@@ -1,7 +1,5 @@
 # LTX 2.5 — how to write the video prompt
 
-English copy for the model. Russian original: `playbooks/models/ltx_video.md`.
-
 Source: ComfyUI-Continuity, `creator/families/ltx25/prompts/craft.txt` (how LTX 2.5 is written) and `prompts/modes/i2v.txt` (the start frame is the first frame). Both board workflows use this caption: `video_ltx` on `video_preview` and `final_ltx` on `final_render`, graph `ltx25_i2v_api.json`. The board sends `prompt.md` as one string to node `398:376`. Continuity joins the paragraph, the soundscape and the music the same way (`plain_prompt`): sentences one after another, no field names.
 
 ## What the model reads

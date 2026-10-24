@@ -28,6 +28,11 @@ export interface RunSettings {
   characterImage?: Record<string, string>;
   /** Первый кадр: дальность до камеры по персонажу (ключ — имя строчными). См. first-frame-settings.ts. */
   framing?: Record<string, string>;
+  /**
+   * Первый кадр: кто стоит спиной к камере (имена строчными), портрета у них в графе нет.
+   * Пустой список — отметки сняты на доске; нет поля — берётся из текста кадра (first-frame-settings.ts).
+   */
+  backView?: string[];
   /** Первый кадр: что это за файл refs/, со слов пользователя (ключ — имя файла). */
   refNotes?: Record<string, string>;
   updatedAt?: string;

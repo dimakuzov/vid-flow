@@ -1,7 +1,5 @@
 # Model: Qwen first frame
 
-English copy for the model. Russian original: `playbooks/models/qwen_first_frame.md`.
-
 Prompt for placing a character into a location, Qwen Image 2.1 Edit. Where files go: `playbooks/stages/first_frame.en.md`. Graph: `playbooks/workflows/first_frame_comfy.en.md`.
 
 These rules were checked on a previous series: 12 shots, about 110 generations. A single character, a simple pose, and an obvious place worked on the first run. Two people, a small physical detail, and the surface under the feet took the longest.
@@ -101,7 +99,7 @@ When the location description shows more than one space, put each person in the 
 
 ### Shot size
 
-Take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` and `much closer` mean a close-up. Rewrite the size sentences to the close-up block below. Never compare with the previous picture: `much closer to the camera than before`, `closer than before`, `than before`, `as before` are forbidden, and the board will not run a prompt that contains them. The model has not seen that picture. Say how close the person is now. If prompt.md already has such a comparison, delete it. Each size has its own size block. The lock is the same for all of them (see «Lock»).
+When the task has a «Distance from the camera» block, each person's size comes from it, not from the first words of the shot text; write that person's size block from it. A size the user writes in the message wins over the block for that run. Without the block, take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` and `much closer` mean a close-up. Rewrite the size sentences to the close-up block below. Never compare with the previous picture: `much closer to the camera than before`, `closer than before`, `than before`, `as before` are forbidden, and the board will not run a prompt that contains them. The model has not seen that picture. Say how close the person is now. If prompt.md already has such a comparison, delete it. Each size has its own size block. The lock is the same for all of them (see «Lock»).
 
 The camera and the location never move, whatever the shot size. The size comes only from how close to the camera the person stands.
 
@@ -120,6 +118,8 @@ Under «Images the graph receives» the characters are followed by their portrai
 - One person: `character1 is image 2 and the face from image 3: her face exactly as in image 3, the same eyes, nose, lips and skin.`
 - Two people: `character1's face exactly as in image 4, character2's face exactly as in image 5.`
 - A portrait is the face only. Clothes, pose and height come from the character reference (image 2, image 3). Do not write `the girl from image 4`: the model adds an extra person.
+- With two or more people, a portrait can come out as one more person, or as a mix of two people (one person's head on another person's clothes). Bind each face to its own character in the first lines and keep the count sentence (see «Lock»).
+- A person marked `seen from behind` in the distance block has no portrait in the image list. Write `seen from behind, her face hidden` and no face line for that person.
 
 The portraits come after the characters, so the location and character numbers do not depend on whether a portrait exists.
 
@@ -127,7 +127,7 @@ The portraits come after the characters, so the location and character numbers d
 
 One main action. The model takes the direction of movement from the pose in the reference. If the picture runs to the right and the shot needs left, about half the seeds ignore the text. Use a reference that already faces the right way, or run 5–10 seeds.
 
-Write the gaze explicitly, with a target in image 1: `looks down at her knee`, `looks along the path at the far lamp post`. Without a target the gaze often goes into the lens; a target fixes it better than `NOT at the camera`.
+Write the gaze explicitly, with a target in image 1: `looks down at her knee`, `looks along the path at the far lamp post`. Without a target the gaze goes into the lens. Unless the shot text or the user asks otherwise, nobody looks at the camera, and the target is: people who talk look at each other's faces, heads and shoulders turned to each other; a person who walks is mid-stride, one foot in front of the other, and looks ahead in the direction of walking; anyone else looks at what the action is about.
 
 Describe difficult geometry physically. For a mirror this worked: `stands squarely facing the mirror, shoulders parallel to it, looks at her own eyes in the mirror`. `looks at herself` is not enough.
 
@@ -165,7 +165,11 @@ The last line is the same for every shot size. It keeps image 1 and names who is
 Keep image 1 exactly as it is: the same camera position, angle and framing, every object in the same place and size, the same light and colours. The only people in the frame are character1 and character2.
 ```
 
-One person: `… character1 is the only person in the frame.` The user asked to change something in image 1 (remove a bin, open a door): `Keep image 1 exactly as it is, except <the change, as the target state>: …`.
+One person: `… character1 is the only person in the frame.`
+
+With two or more people, also say the count right after the binding lines, before anything else: `Exactly two people are in the frame: character1 and character2, each one once.` Keep the lock sentence at the end as well. In episode_11 a third person appeared even with the lock sentence alone: Ivan's head on Lena's jacket, skirt and heels.
+
+The user asked to change something in image 1 (remove a bin, open a door): `Keep image 1 exactly as it is, except <the change, as the target state>: …`.
 
 If an object already disappeared or moved, name it in the lock: `the same window in the same place and size, the same handrail`.
 

@@ -13,7 +13,15 @@ process.env.FRAMEBOARD_LOOPS = "off";
 delete process.env.SERIES_ROOT;
 
 import { applyBootstrap, parseScenario } from "./bootstrap";
-import { framingFromText, parseFramingLine, readFraming, setFraming } from "./first-frame-settings";
+import {
+  framingFromText,
+  matchCharacter,
+  parseBackLine,
+  parseFramingLine,
+  readBackView,
+  readFraming,
+  setFraming,
+} from "./first-frame-settings";
 import { lockFormattedScenario } from "./format-guard";
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -59,4 +67,37 @@ test("разметка → дальность при создании кадра
   setFraming("e01", "s01", "luba", "waist");
   applyBootstrap({ scenario, episodeId: "e01", shotIds: ["s01"] });
   assert.equal(readFraming("e01", "s01").luba, "waist");
+});
+
+test("спиной в разметке: `имя: слово back`, слово дальности остаётся", () => {
+  assert.deepEqual(parseFramingLine("lena: waist back, ivan: full"), { lena: "waist", ivan: "full" });
+  assert.deepEqual(parseBackLine("lena: waist back, ivan: full, julia: спиной по пояс"), ["lena", "julia"]);
+  assert.deepEqual(parseFramingLine("ivan: background"), { ivan: "background" });
+  assert.deepEqual(parseBackLine("ivan: background"), []);
+});
+
+test("имя из разметки сводится к похожему персонажу кадра", () => {
+  assert.equal(matchCharacter("militsiya_officer", ["luba", "militsiya_officer_young"]), "militsiya_officer_young");
+  assert.equal(matchCharacter("lena", ["lena", "ivan"]), "lena");
+  assert.equal(matchCharacter("young_woman", ["ivan", "woman_from_street"]), null);
+  assert.equal(matchCharacter("woman", ["woman_from_street", "older_woman"]), null);
+});
+
+test("разметка со спиной → отметка при создании кадра и в перерисованной разметке", () => {
+  const scenario = [
+    "# Эпизод",
+    "",
+    "## s01 Двор",
+    "- characters: lena, militsiya_officer_young",
+    "- framing: lena: waist back, militsiya_officer: face",
+    "Средний план. Лена смотрит на милиционера.",
+    "",
+  ].join("\n");
+  const parsed = parseScenario(scenario);
+  assert.deepEqual(parsed.shots[0].backView, ["lena"]);
+  const raw = "1. Двор\nСредний план. Лена смотрит на милиционера.\n";
+  assert.match(lockFormattedScenario(raw, scenario, parsed.shots, "Эпизод"), /- framing: lena: waist back, militsiya_officer: face/);
+  applyBootstrap({ scenario, episodeId: "e02", shotIds: ["s01"] });
+  assert.deepEqual([...readBackView("e02", "s01")], ["lena"]);
+  assert.deepEqual(readFraming("e02", "s01"), { lena: "waist", militsiya_officer_young: "face" });
 });

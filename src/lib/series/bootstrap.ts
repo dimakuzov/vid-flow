@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { STAGES, type StageId } from "./constants";
 import { writeText } from "./media";
-import { parseFramingLine, seedFraming } from "./first-frame-settings";
+import { parseBackLine, parseFramingLine, seedFraming } from "./first-frame-settings";
 import { createEpisode, ensureStageDirs, episodeRoot, stageDir } from "./paths";
 import { readRunSettings, writeRunSettings } from "./run-settings";
 import { writeShotMeta, type ShotMeta } from "./shot-meta";
@@ -74,6 +74,7 @@ export function parseScenario(content: string): BootstrapPreview {
         if (Number.isFinite(seconds) && seconds > 0) current.durationSec = Math.round(seconds);
       } else if (key.startsWith("framing") || key.includes("дальност")) {
         current.framing = { ...(current.framing ?? {}), ...parseFramingLine(value) };
+        current.backView = [...(current.backView ?? []), ...parseBackLine(value)];
       }
       continue;
     }
@@ -92,18 +93,18 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   if (stageId === "characters") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nImage 1: refs/{name}_base.* (если положили сами), иначе data/characters/{name}/full_body.png.\nImage 2: refs/{name}_clothes.* — образец одежды. Нет файла — нода «image 2: образец одежды» в bypass.\nПерсонажи кадра: ${names}.\nДругие файлы refs/ в этот граф не входят.\nСм. playbooks/stages/characters.md.\n`;
+    return `# Refs\n\nImage 1: refs/{name}_base.* (если положили сами), иначе data/characters/{name}/full_body.png.\nImage 2: refs/{name}_clothes.* — образец одежды. Нет файла — нода «image 2: образец одежды» в bypass.\nПерсонажи кадра: ${names}.\nДругие файлы refs/ в этот граф не входят.\nСм. playbooks/stages/characters.en.md.\n`;
   }
   if (stageId === "location") {
     const location = shot.location || "{locationId}";
-    return `# Refs\n\nБаза: data/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.md.\n`;
+    return `# Refs\n\nБаза: data/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.en.md.\n`;
   }
   if (stageId === "first_frame") {
     if (!shot.characters.length && !shot.location.trim()) {
-      return `# Refs\n\nПерсонажей и локации нет. Предыдущие этапы не нужны.\nФайлы для кадра клади в refs/ этого этапа.\nСм. playbooks/stages/first_frame.md, раздел «Без персонажа и локации».\n`;
+      return `# Refs\n\nПерсонажей и локации нет. Предыдущие этапы не нужны.\nФайлы для кадра клади в refs/ этого этапа.\nСм. playbooks/stages/first_frame.en.md, раздел «No character and no location».\n`;
     }
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nЕсли персонажи и локация уже утверждены: локация из shots/${shot.id}/location/approve/, персонажи ${names} из shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nЕсли их нет, не жди эти этапы. Файлы кадра клади в refs/ здесь.\nСм. playbooks/stages/first_frame.md.\n`;
+    return `# Refs\n\nЕсли персонажи и локация уже утверждены: локация из shots/${shot.id}/location/approve/, персонажи ${names} из shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nЕсли их нет, не жди эти этапы. Файлы кадра клади в refs/ здесь.\nСм. playbooks/stages/first_frame.en.md.\n`;
   }
   return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
 }
@@ -111,7 +112,7 @@ function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
 function defaultWorkflow(stageId: StageId): string {
   const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет доска: манифест character_outfit, граф character_outfit_qwen21.json. Image 1 — база, image 2 — refs/{name}_clothes.*, если есть. Промпт — разделы ## имя в prompt.md. Плейбук: playbooks/models/qwen_outfit.md.\n`;
+    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет доска: манифест character_outfit, граф character_outfit_qwen21.json. Image 1 — база, image 2 — refs/{name}_clothes.*, если есть. Промпт — разделы ## имя в prompt.md. Плейбук: playbooks/models/qwen_outfit.en.md.\n`;
   }
   if (stageId === "location") {
     return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;
@@ -227,7 +228,9 @@ export function applyBootstrap(options: {
     };
     writeShotMeta(episodeId, meta);
     seedShotSpeechAndDuration(episodeId, shot, options.overwriteDocs === true);
-    seedFraming(episodeId, shot.id, shot.characters, shot.framing ?? {}, shot.summary, options.overwriteDocs === true);
+    // «Спиной» из разметки — только если в ней есть строка framing; иначе доска берёт это из текста кадра.
+    const back = shot.framing ? (shot.backView ?? []) : undefined;
+    seedFraming(episodeId, shot.id, shot.characters, shot.framing ?? {}, shot.summary, options.overwriteDocs === true, back);
 
     for (const stageId of STAGES) {
       const promptPath = path.join(stageDir(episodeId, shot.id, stageId), "prompt.md");

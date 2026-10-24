@@ -1,7 +1,5 @@
 # MiniMax H3 Cinema (video preview and final render): how to write the prompt
 
-English copy for the agent. Russian original: `playbooks/models/minimax_h3.md`.
-
 Two variants use this playbook: `video_minimax` on the video preview (graph `minimax_h3_preview_api.json`, one pass at 0.5 MP) and `final_h3_cinema` on the final render (graph `minimax_h3_cinema_api.json`, a second pass with the latent upscale to 1.5 MP). Both are MiniMax H3 **reference to video** with the Cinema LoRA. There is no video reference: the model gets the approved first frame, one picture per character, the references the user gave the shot and the text. All the motion comes from the text. The user chose this graph because it keeps the quality and the likeness of the people stable; the old H3 graph with the low-res video as a reference often failed.
 
 ---
@@ -17,6 +15,8 @@ Two variants use this playbook: `video_minimax` on the video preview (graph `min
 | the text | `prompt.md`, as written | this stage |
 
 The task lists the pictures under «Images the graph receives» with their labels and who is on each. Use exactly those labels. The task also gives the clip duration and, on the final, the prompt of the approved preview (the motion to keep).
+
+**Strict first frame.** When the user ticks «Strict first frame» for the shot, the board also anchors the approved first frame as frame 0 of the video, and the task says so under the picture list. Then `[Shot 1]` names the shot size `<Picture 1>` has, and the camera moves only where the shot action, the notes or the request ask for a move: `a slow push-in from the framing of <Picture 1> to a waist-up shot`. Without the tick MiniMax picks the framing itself, and the prompt is written as below.
 
 ## 2. `prompt.md` is the model's text, exactly
 

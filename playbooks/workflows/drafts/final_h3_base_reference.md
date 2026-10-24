@@ -24,4 +24,4 @@
 2. Откуда берётся базовый ролик: `video_preview/approve/` или своя папка?
 3. Почему без меток `@img-N` — из-за ошибок рефайнера с номерами картинок?
 
-После ответа: граф (тот же `minimax_h3_creator_api.json` или свой), манифест `final_h3_base` и раздел в `models/minimax_h3.md`.
+После ответа: граф (тот же `minimax_h3_creator_api.json` или свой), манифест `final_h3_base` и раздел в `models/minimax_h3.en.md`.

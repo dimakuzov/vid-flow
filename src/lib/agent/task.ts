@@ -16,6 +16,7 @@ import type { StageId } from "../series/constants";
 import { readTextIfExists } from "../series/media";
 import { getPlaybooksRoot, stageDir } from "../series/paths";
 import { excludedFiles, readRunSettings } from "../series/run-settings";
+import { framingBlock } from "../series/first-frame-settings";
 import { readShotSpeech, stageHasSpeech } from "../series/speech";
 import { readShotMeta } from "../series/shot-meta";
 import { LLM_TASK, readAgentDispatch, readBaseline } from "./files";
@@ -103,7 +104,7 @@ function personOnImage(
       return { role: "figure", name: name.toLowerCase() };
     }
     if (FACE_SHEET.test(stem)) {
-      const owner = stem.replace(/[_ -]?face[_ -]?sheet.*$/i, "") || path.basename(path.dirname(file));
+      const owner = stem.replace(/[_ -]?(face[_ -]?)?sheet.*$/i, "") || path.basename(path.dirname(file));
       return { role: "sheet", name: owner.toLowerCase() };
     }
     const name = /_face$/i.test(stem) ? stem.slice(0, -"_face".length) : path.basename(path.dirname(file));
@@ -159,16 +160,24 @@ export function renderGraphImages(
     characterOf.set(key, next);
     return next;
   };
+  // Галка «Строго первый кадр»: тот же первый кадр закреплён на кадре 0. Это не картинка для модели — без номера.
+  let anchored = false;
+  let firstNumber: number | null = null;
   for (const slot of binding.slots) {
     const found = slotFile(binding, slot, images);
     if (!found) continue;
     sent.add(`${found.name}:${found.index}`);
+    if (found.input.kind === "image" && found.input.whenShot === "strictFirstFrame") {
+      anchored = true;
+      continue;
+    }
     const who = personOnImage(found.input, found.file, shotId);
     const fileName = path.basename(found.file);
     const number = lines.length + 1;
     if (who.role === "location") {
       lines.push(`- ${label(number)}: the location (${fileName})`);
     } else if (who.role === "first") {
+      firstNumber ??= number;
       lines.push(`- ${label(number)}: the approved first frame: the place, the camera and the people in their clothes (${fileName})`);
     } else if (who.role === "figure" || who.role === "face" || who.role === "sheet") {
       const kind =
@@ -211,6 +220,13 @@ export function renderGraphImages(
   ];
   if (left.length) {
     parts.push("", `Not sent, the graph takes at most ${lines.length} images: ${left.join(", ")}. Do not refer to them.`);
+  }
+  if (anchored && firstNumber != null) {
+    const first = label(firstNumber);
+    parts.push(
+      "",
+      `Strict first frame (the user's choice for this shot): the board anchors ${first} as frame 0 of the video, so the clip starts on exactly that picture. In [Shot 1] name the shot size ${first} has, with its distance and framing. The camera moves only when the shot action, the user's notes or the request ask for a move (for example a slow push-in to a waist-up shot); then write that one move and its speed, starting from the framing of ${first}.`,
+    );
   }
   parts.push("", `Never write file names or paths in prompt.md: the model sees only the ${binding.imageLabel ? "picture names" : "image numbers"}.`);
   return parts.join("\n");
@@ -380,6 +396,9 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
   }
   const images = renderGraphImages(episodeId, shotId, stageId, workflow?.id);
   if (images) lines.push("", images);
+  // Первый кадр: дальность, «спиной» и подписи референсов — текущий выбор на доске, отдельным блоком.
+  const framing = stageId === "first_frame" ? framingBlock(episodeId, shotId) : "";
+  if (framing) lines.push("", framing);
   const excluded = [...excludedFiles(episodeId, shotId, stageId)];
   if (excluded.length) {
     lines.push(

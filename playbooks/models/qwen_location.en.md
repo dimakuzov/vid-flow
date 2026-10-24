@@ -1,7 +1,5 @@
 # Model: Qwen location
 
-English copy for the model. Russian original: `playbooks/models/qwen_location.md`.
-
 Prompts for a shot-specific location. Where files go: `playbooks/stages/location.en.md`. The simple-angle graph: `playbooks/workflows/location_comfy.en.md`.
 
 Write only about what is on `view.png` and in `description.txt`. Do not add details from the shot text that are not on the reference. The location reference wins over the shot text.

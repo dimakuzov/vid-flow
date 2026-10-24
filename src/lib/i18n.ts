@@ -526,14 +526,25 @@ const messages = {
   "refs.noteFailed": { en: "Could not save the caption", ru: "Не удалось сохранить подпись" },
   "framing.title": { en: "Distance from the camera", ru: "Дальность до камеры" },
   "framing.note": {
-    en: "set from the scenario when the shot is created; stays for the shot, goes to the agent with every request, and close faces get the portrait first",
-    ru: "ставится по сценарию при создании кадра; сохраняется для кадра, уходит агенту с каждым запросом, лицам близко к камере портрет важнее референсов",
+    en: "set from the scenario when the shot is created; stays for the shot and goes to the agent with every request. Close faces get the portrait first; a person seen from behind gets no portrait",
+    ru: "ставится по сценарию при создании кадра; сохраняется для кадра и уходит агенту с каждым запросом. Лицам близко к камере портрет важнее референсов; у того, кто спиной, портрета нет",
   },
   "framing.background": { en: "in the background", ru: "на заднем плане" },
   "framing.full": { en: "full figure", ru: "в полный рост" },
   "framing.waist": { en: "waist up", ru: "по пояс" },
   "framing.face": { en: "face close-up (75% of the width)", ru: "крупный план лица (75% ширины)" },
+  "framing.back": { en: "seen from behind", ru: "спиной" },
+  "framing.backTitle": {
+    en: "The face is not visible: the portrait does not go to the graph",
+    ru: "Лица не видно: портрет в граф не идёт",
+  },
   "framing.failed": { en: "Could not save the distance", ru: "Не удалось сохранить дальность" },
+  "strict.title": { en: "Strict first frame (MiniMax)", ru: "Строго первый кадр (MiniMax)" },
+  "strict.note": {
+    en: "for this shot on both the preview and the final: the video starts exactly on the approved first frame; the camera moves only when the scenario or your message asks. Off: MiniMax picks the framing itself",
+    ru: "для кадра на превью и на финале: видео начинается ровно с утверждённого первого кадра, камера движется, только если это есть в сценарии или в вашем сообщении. Без галки MiniMax сам выбирает план",
+  },
+  "strict.failed": { en: "Could not save the strict first frame", ru: "Не удалось сохранить «Строго первый кадр»" },
   "refs.hint": { en: "The name under the picture selects the file. The picture itself opens full screen.", ru: "Имя под картинкой выделяет файл. Сама картинка открывается на весь экран." },
 
   "history.title": { en: "Previous prompt versions", ru: "Прошлые версии промпта" },

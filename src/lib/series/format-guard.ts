@@ -161,6 +161,8 @@ interface ModelShot {
   location: string;
   durationSec?: number;
   framing?: Record<string, string>;
+  /** Кто спиной: в строке framing к его слову дописывается `back`. */
+  backView?: string[];
   speech?: string[];
   summary: string;
 }
@@ -190,7 +192,10 @@ function renderShot(id: string, title: string, shot: ModelShot | undefined, scen
   if (shot?.location.trim()) lines.push(`- location: ${shot.location.trim()}`);
   if (shot?.durationSec) lines.push(`- duration: ${shot.durationSec}`);
   const framing = Object.entries(shot?.framing ?? {});
-  if (framing.length) lines.push(`- framing: ${framing.map(([name, value]) => `${name}: ${value}`).join(", ")}`);
+  const back = new Set(shot?.backView ?? []);
+  if (framing.length) {
+    lines.push(`- framing: ${framing.map(([name, value]) => `${name}: ${value}${back.has(name) ? " back" : ""}`).join(", ")}`);
+  }
   const speeches = scene.speeches.length ? scene.speeches : (shot?.speech ?? []);
   for (const speech of speeches) lines.push(`- speech: ${speech}`);
   if (summary) lines.push(summary);
