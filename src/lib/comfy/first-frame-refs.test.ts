@@ -71,7 +71,7 @@ test("референс из refs/ уходит в граф после лица, 
   assert.deepEqual(slots("s01"), ["lena_s01.png", "s01_face0.png", "s01_ref0.jpg"]);
   const images = renderGraphImages(EP, "s01", "first_frame", WORKFLOW);
   assert.match(images, /image 3: character1 face/);
-  assert.match(images, /image 4: Референсы пользователя \(helmet\.jpg\)/);
+  assert.match(images, /image 4: User references \(helmet\.jpg\)/);
 });
 
 test("убранный кнопкой «Убрать» референс в граф не идёт", () => {

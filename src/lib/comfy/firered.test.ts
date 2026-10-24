@@ -66,6 +66,6 @@ test("FireRed: в меню локации, 2 референса, без трет
   refs("c_extra.png", "d_more.png");
   assert.throws(
     () => queueStageRun(EP, "s01", "location", { workflow: "location_firered" }),
-    /не больше 3 референсов/,
+    /at most 3 references/,
   );
 });

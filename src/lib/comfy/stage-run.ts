@@ -114,7 +114,7 @@ function assertFireredRefLimit(binding: GraphBinding, ctx: ShotContext): void {
   const files = resolveImageInput(ctx, { ...input, max: undefined });
   if (files.length > input.max) {
     throw new Error(
-      `В этот граф идёт не больше ${input.max} референсов. Сейчас ${files.length}. Лишние уберите из графа кнопкой «Убрать».`,
+      `The graph takes at most ${input.max} references. Now ${files.length}. Remove the extra ones from the graph with the "Remove" button.`,
     );
   }
 }

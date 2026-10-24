@@ -15,7 +15,7 @@
       "from": "library:character",
       "pick": "first",
       "uploadAs": "{shotId}_{character}_base{ext}",
-      "label": "База персонажа (data/characters/{character}/full_body.png)"
+      "label": "Character base (data/characters/{character}/full_body.png)"
     },
     "clothes": {
       "kind": "image",
@@ -24,14 +24,14 @@
       "pick": "newest",
       "min": 0,
       "uploadAs": "{shotId}_{character}_clothes{ext}",
-      "label": "Референс одежды в refs/ ({character}_clothes.png), необязательно"
+      "label": "Clothing reference in refs/ ({character}_clothes.png), optional"
     },
     "text": {
       "kind": "text",
       "from": "prompt",
       "section": "{character}",
       "required": true,
-      "label": "prompt.md (раздел ## {character})"
+      "label": "prompt.md (section ## {character})"
     }
   },
   "slots": [

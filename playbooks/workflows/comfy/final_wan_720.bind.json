@@ -13,14 +13,14 @@
       "from": "approve:first_frame",
       "pick": "newest",
       "uploadAs": "{shotId}_start{ext}",
-      "label": "Утверждённый первый кадр"
+      "label": "Approved first frame"
     },
     "preview": {
       "kind": "video",
       "from": "approve:video_preview",
       "pick": "newest",
       "min": 0,
-      "label": "Утверждённое превью (только длительность)"
+      "label": "Approved preview (duration only)"
     },
     "text": {
       "kind": "text",
@@ -33,7 +33,7 @@
       "fallback": "prompt",
       "stage": "video_preview",
       "required": true,
-      "label": "Промпт утверждённого эскиза"
+      "label": "Prompt of the approved preview"
     },
     "seconds": {
       "kind": "number",
@@ -41,7 +41,7 @@
       "of": "preview",
       "min": 2,
       "max": 12,
-      "label": "Длительность превью"
+      "label": "Preview duration"
     }
   },
   "slots": [

@@ -14,7 +14,7 @@
       "pick": "first",
       "min": 0,
       "whenPrompt": "$a",
-      "label": "Исходная картинка"
+      "label": "Source picture"
     },
     "extras": {
       "kind": "image",
@@ -22,7 +22,7 @@
       "pick": "all",
       "min": 0,
       "whenPrompt": "$a",
-      "label": "Лишние картинки графа"
+      "label": "Extra graph pictures"
     }
   },
   "slots": [

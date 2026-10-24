@@ -47,7 +47,7 @@ after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 test("один персонаж с листом лица и утверждённое превью — вариант доступен, не по умолчанию", () => {
   shot("s01", ["lena"]);
   assert.equal(choice("s01").available, false, "превью ещё нет");
-  assert.ok(choice("s01").missing.includes("Утверждённое превью"));
+  assert.ok(choice("s01").missing.includes("Approved preview"));
   put(path.join(stageDir(EP, "s01", "video_preview"), "approve", "s01_ltx_00001_.mp4"), Buffer.from("not a real video"));
   assert.equal(choice("s01").available, true, JSON.stringify(choice("s01").missing));
   assert.notEqual(listWorkflowChoices(EP, "s01", "final_render").find((item) => item.isDefault)?.id, ID);
@@ -78,12 +78,12 @@ test("два персонажа или нет листа лица — недос
   shot("s02", ["ivan", "lena"]);
   put(path.join(stageDir(EP, "s02", "video_preview"), "approve", "s02_ltx_00001_.mp4"), Buffer.from("x"));
   assert.equal(choice("s02").available, false);
-  assert.ok(choice("s02").missing.some((item) => /Утверждённые персонажи: не больше 1 \(сейчас 2\)/.test(item)), JSON.stringify(choice("s02").missing));
+  assert.ok(choice("s02").missing.some((item) => /Approved characters: at most 1 \(now 2\)/.test(item)), JSON.stringify(choice("s02").missing));
 
   shot("s03", ["ivan"]);
   put(path.join(stageDir(EP, "s03", "video_preview"), "approve", "s03_ltx_00001_.mp4"), Buffer.from("x"));
   assert.equal(choice("s03").available, false);
-  assert.ok(choice("s03").missing.includes("Лист лица персонажа (face_sheet)"), "у Ивана только лицо, листа нет");
+  assert.ok(choice("s03").missing.includes("Character face sheet (face_sheet)"), "у Ивана только лицо, листа нет");
   // Свой лист на кадр в refs/ финала тоже подходит.
   put(path.join(stageDir(EP, "s03", "final_render"), "refs", "ivan_face_sheet.png"));
   assert.equal(choice("s03").available, true);

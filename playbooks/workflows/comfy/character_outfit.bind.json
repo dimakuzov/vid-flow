@@ -16,7 +16,7 @@
       "match": "{character}_base*",
       "pick": "first",
       "uploadAs": "{shotId}_{character}_base{ext}",
-      "label": "База персонажа (refs/{имя}_base или data/characters/{имя}/)"
+      "label": "Character base (refs/{name}_base or data/characters/{name}/)"
     },
     "clothes": {
       "kind": "image",
@@ -25,14 +25,14 @@
       "pick": "newest",
       "min": 0,
       "uploadAs": "{shotId}_{character}_clothes{ext}",
-      "label": "Один референс одежды из refs/. Нет файла — нода image 2 в bypass. Второй референс запуск не берёт"
+      "label": "One clothing reference from refs/. No file: the image 2 node is bypassed. The run does not take a second reference"
     },
     "text": {
       "kind": "text",
       "from": "prompt",
       "required": true,
       "sectionsFrom": "characters",
-      "label": "prompt.md (раздел ## имя персонажа)"
+      "label": "prompt.md (section ## character name)"
     }
   },
   "slots": [

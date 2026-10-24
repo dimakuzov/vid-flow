@@ -197,7 +197,7 @@ function renderWorkflows(choices: WorkflowChoice[], selected: string | null): st
   const lines = choices.map((choice) => {
     const marks = [
       choice.id === selected ? "выбран" : null,
-      choice.available ? null : `не хватает: ${choice.missing.join(", ")}`,
+      choice.available ? null : `missing: ${choice.missing.join(", ")}`,
     ].filter(Boolean);
     const playbook = choice.playbook ? `, плейбук модели \`playbooks/${choice.playbook}\`` : "";
     return `- \`${choice.id}\` — ${choice.label}${playbook}${marks.length ? ` (${marks.join("; ")})` : ""}`;

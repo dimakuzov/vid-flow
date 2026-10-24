@@ -14,7 +14,7 @@
       "from": "approve:first_frame",
       "pick": "newest",
       "uploadAs": "{shotId}_start{ext}",
-      "label": "Утверждённый первый кадр"
+      "label": "Approved first frame"
     },
     "lock": {
       "kind": "image",
@@ -23,7 +23,7 @@
       "min": 0,
       "whenShot": "strictFirstFrame",
       "uploadAs": "{shotId}_start{ext}",
-      "label": "Строго первый кадр: утверждённый первый кадр закреплён на кадре 0 видео (галка «Строго первый кадр» кадра)"
+      "label": "Strict first frame: the approved first frame is pinned to frame 0 of the video (the shot's \"Strict first frame\" checkbox)"
     },
     "people": {
       "kind": "image",
@@ -34,7 +34,7 @@
       "min": 0,
       "max": 6,
       "uploadAs": "{shotId}_preview_ref{index}{ext}",
-      "label": "Лица персонажей: лист лица, иначе лицо, иначе утверждённый персонаж (refs/{имя}_face_sheet или {имя}_face — свои на кадр)"
+      "label": "Character faces: face sheet, otherwise face, otherwise the approved character (refs/{name}_face_sheet or {name}_face, per shot)"
     },
     "extras": {
       "kind": "image",
@@ -46,7 +46,7 @@
       "min": 0,
       "max": 6,
       "uploadAs": "{shotId}_preview_extra{index}{ext}",
-      "label": "Референсы пользователя (машина, вещь, деталь места): refs/ этого этапа, иначе refs/ первого кадра. Идут после лиц, всего 6 картинок"
+      "label": "User references (a car, an object, a detail of the place): refs/ of this stage, otherwise refs/ of the first frame. They go after the faces, 6 pictures in total"
     },
     "text": {
       "kind": "text",
@@ -60,7 +60,7 @@
       "fallback": "prompt:seconds",
       "min": 2,
       "max": 10,
-      "label": "Длительность клипа"
+      "label": "Clip duration"
     }
   },
   "slots": [

@@ -519,7 +519,7 @@ function faceSheetFiles(ctx: ShotContext): string[] {
 function tooMany(ctx: ShotContext, input: ImageInput): string | null {
   if (input.maxAvailable == null) return null;
   const count = resolveImageInput(ctx, { ...input, max: undefined }).length;
-  return count > input.maxAvailable ? `${input.label}: не больше ${input.maxAvailable} (сейчас ${count})` : null;
+  return count > input.maxAvailable ? `${input.label}: at most ${input.maxAvailable} (now ${count})` : null;
 }
 
 /**
@@ -1415,7 +1415,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
       if (textInput.requireSpeech) assertSpeechInText(texts[name], readShotSpeech(ctx.episodeId, ctx.shotId), resolved.where);
     }
   }
-  if (missing.length) throw new Error(`Для «${binding.label}» не хватает: ${missing.join(", ")}.`);
+  if (missing.length) throw new Error(`"${binding.label}" is missing: ${missing.join(", ")}.`);
   const counts = Object.fromEntries(Object.entries(images).map(([name, files]) => [name, files.length]));
 
   const uploads: BuiltPrompt["uploads"] = [];
@@ -1430,7 +1430,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   /** Значения нет: whenEmpty, иначе ошибка для обязательного входа, иначе значение графа. */
   const empty = (slot: BindingSlot, input: BindingInput, required: boolean) => {
     if (slot.whenEmpty) removals.push(...slot.whenEmpty.remove);
-    else if (required) throw new Error(`Для «${binding.label}» не хватает: ${input.label}.`);
+    else if (required) throw new Error(`"${binding.label}" is missing: ${input.label}.`);
   };
 
   for (const slot of binding.slots) {

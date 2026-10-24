@@ -188,7 +188,7 @@ test("библиотека: view.png важнее остальных; pick newes
 test("ошибки запуска: нет обязательной картинки, пустой обязательный текст, инструкция доски", () => {
   shot("s04", ["katya"], "nowhere");
   put("s04", "characters", "approve", "katya.png");
-  assert.throws(() => build("s04"), /не хватает: Место/);
+  assert.throws(() => build("s04"), /is missing: Место/);
   put("s04", "first_frame", "refs", "v.png");
   const required = structuredClone(FULL);
   (required.inputs.text as { required: boolean }).required = true;

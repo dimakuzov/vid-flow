@@ -15,7 +15,7 @@
         "library:location"
       ],
       "pick": "first",
-      "label": "Общий вид локации (refs/ или data/locations/)"
+      "label": "Location general view (refs/ or data/locations/)"
     },
     "text": {
       "kind": "text",

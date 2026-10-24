@@ -14,7 +14,7 @@
       "from": ["refs", "library:location"],
       "pick": "first",
       "min": 0,
-      "label": "Референс из refs/ или общий вид из data/locations/ (необязательно)"
+      "label": "Reference from refs/ or general view from data/locations/ (optional)"
     },
     "text": {
       "kind": "text",

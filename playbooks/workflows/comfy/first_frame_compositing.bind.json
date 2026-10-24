@@ -12,7 +12,7 @@
       "kind": "image",
       "from": "approve:location",
       "pick": "newest",
-      "label": "Утверждённая локация"
+      "label": "Approved location"
     },
     "people": {
       "kind": "image",
@@ -20,7 +20,7 @@
       "pick": "all",
       "min": 1,
       "max": 5,
-      "label": "Утверждённые персонажи"
+      "label": "Approved characters"
     },
     "faces": {
       "kind": "image",
@@ -29,7 +29,7 @@
       "min": 0,
       "max": 5,
       "uploadAs": "{shotId}_face{index}{ext}",
-      "label": "Портреты персонажей близко к камере",
+      "label": "Portraits of characters close to the camera",
       "framing": "near"
     },
     "extras": {
@@ -39,7 +39,7 @@
       "min": 0,
       "max": 5,
       "uploadAs": "{shotId}_ref{index}{ext}",
-      "label": "Референсы пользователя"
+      "label": "User references"
     },
     "faces_far": {
       "kind": "image",
@@ -49,7 +49,7 @@
       "min": 0,
       "max": 5,
       "uploadAs": "{shotId}_farface{index}{ext}",
-      "label": "Портреты персонажей далеко от камеры"
+      "label": "Portraits of characters far from the camera"
     },
     "text": {
       "kind": "text",

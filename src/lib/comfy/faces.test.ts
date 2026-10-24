@@ -144,7 +144,7 @@ test("больше шести картинок: лишние портреты н
 });
 
 test("страница этапа: портреты показаны как обычный вход", () => {
-  const faces = stageInputs(EP, "s01", "first_frame").find((input) => input.label.startsWith("Портреты"));
+  const faces = stageInputs(EP, "s01", "first_frame").find((input) => input.label.startsWith("Portraits"));
   assert.notEqual(faces?.source, "сейчас не уйдёт: prompt.md этот вход не зовёт");
   assert.deepEqual(faces?.files.map((file) => file.name), ["portret.png"]);
 });

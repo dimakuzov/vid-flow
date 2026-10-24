@@ -16,7 +16,7 @@
       "pick": "all",
       "min": 0,
       "max": 3,
-      "label": "Референсы в refs/ (необязательно)"
+      "label": "References in refs/ (optional)"
     },
     "text": {
       "kind": "text",

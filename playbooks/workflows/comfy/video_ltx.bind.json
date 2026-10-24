@@ -13,7 +13,7 @@
       "from": "approve:first_frame",
       "pick": "newest",
       "uploadAs": "{shotId}_start{ext}",
-      "label": "Утверждённый первый кадр"
+      "label": "Approved first frame"
     },
     "text": {
       "kind": "text",
@@ -27,7 +27,7 @@
       "fallback": "prompt:seconds",
       "min": 2,
       "max": 10,
-      "label": "Длительность клипа"
+      "label": "Clip duration"
     }
   },
   "slots": [

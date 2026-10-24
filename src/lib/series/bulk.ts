@@ -84,7 +84,7 @@ function blocked(
   // Этап без воркфлоу доски (персонажи) делает агент сам — здесь не блокируем.
   if (choices.length && !choices.some((choice) => choice.available)) {
     const missing = choices.find((choice) => choice.isDefault)?.missing ?? choices[0].missing;
-    return `не хватает: ${missing.join(", ")}`;
+    return `missing: ${missing.join(", ")}`;
   }
   return null;
 }

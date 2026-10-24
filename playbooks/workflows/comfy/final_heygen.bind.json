@@ -19,14 +19,14 @@
       "from": "approve:first_frame",
       "pick": "newest",
       "uploadAs": "{shotId}_heygen_first{ext}",
-      "label": "Утверждённый первый кадр"
+      "label": "Approved first frame"
     },
     "preview": {
       "kind": "video",
       "from": "approve:video_preview",
       "pick": "newest",
       "min": 0,
-      "label": "Утверждённое превью (только длительность)"
+      "label": "Approved preview (duration only)"
     },
     "text": {
       "kind": "text",
@@ -42,7 +42,7 @@
       "min": 5,
       "max": 15,
       "clamp": true,
-      "label": "Длительность превью (5–15 с)"
+      "label": "Preview duration (5–15 s)"
     }
   },
   "slots": [

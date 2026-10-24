@@ -104,7 +104,7 @@ test("этап на всех кадрах: запуск, где можно, и �
 test("первый кадр без утверждённых входов — пропуск с подписью недостающего", () => {
   const result = runStageForAllShots(EP, "first_frame", { provider: "manual" });
   const s01 = result.skipped.find((item) => item.shotId === "s01");
-  assert.match(s01?.reason ?? "", /не хватает: Утверждённая локация/);
+  assert.match(s01?.reason ?? "", /missing: Approved location/);
 });
 
 test("пройденное не переделывается: результат в output/ — пропуск, с redo — запуск", () => {

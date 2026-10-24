@@ -12,21 +12,21 @@
       "from": "approve:video_preview",
       "pick": "newest",
       "uploadAs": "{shotId}_final_src{ext}",
-      "label": "Утверждённое превью"
+      "label": "Approved preview"
     },
     "sheet": {
       "kind": "image",
       "from": "library:face-sheets",
       "pick": "first",
       "uploadAs": "{shotId}_face_sheet{ext}",
-      "label": "Лист лица персонажа (face_sheet)"
+      "label": "Character face sheet (face_sheet)"
     },
     "people": {
       "kind": "image",
       "from": "approve:characters",
       "pick": "all",
       "maxAvailable": 1,
-      "label": "Утверждённые персонажи"
+      "label": "Approved characters"
     }
   },
   "slots": [
