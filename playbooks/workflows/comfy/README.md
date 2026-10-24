@@ -6,7 +6,6 @@
 | --- | --- | --- | --- |
 | `location_views` | `location` | `location_views_multiple_angles.json` | доска; разделы `## simple/objects/camera/camera_objects` в `prompt.md` |
 | `location_krea2` | `location` | `location_krea2_api.json` (Krea 2 Turbo, локация с нуля; как пересохранить — `drafts/README.md`) | доска; один абзац в `prompt.md`, картинка из `refs/` необязательна |
-| `location_firered` | `location` | `location_firered_edit.json` (FireRed-Image-Edit-1.1, Lightning включена) | доска; 1–3 картинки из `refs/`, промпт — `models/firered_location.en.md` |
 | `first_frame_compositing` | `first_frame` | `qwen21_character_compositing.json` | доска |
 | `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
 | `video_ltx` | `video_preview` | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком) | доска; промпт — `models/ltx_video.en.md` |

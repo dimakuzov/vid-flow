@@ -81,7 +81,7 @@ In a Claude Code session, start with `!`: `! npm run agents -- list`. Or use the
 
 ## ComfyUI models and nodes
 
-The graphs in `playbooks/workflows/comfy/` need ComfyUI 0.41.0 or newer, two custom node packs and the model files listed in `models.json` (about 209 GB for all graphs together; one graph needs less). `requirements-nodes.txt` lists the node packs. Everything else the graphs use is built into ComfyUI.
+The graphs in `playbooks/workflows/comfy/` need ComfyUI 0.41.0 or newer, one custom node pack and the model files listed in `models.json` (about 158 GB for all graphs together; one graph needs less). `requirements-nodes.txt` lists the node packs. Everything else the graphs use is built into ComfyUI.
 
 ```bash
 # report what is missing in your ComfyUI folder (the one that holds main.py)

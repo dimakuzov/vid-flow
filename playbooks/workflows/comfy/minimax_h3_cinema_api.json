@@ -64,7 +64,7 @@
     "inputs": {
       "value": 1.5
     },
-    "class_type": "easy float",
+    "class_type": "PrimitiveFloat",
     "_meta": {
       "title": "Final Resolution(Stage 2)"
     }

@@ -7,18 +7,6 @@
   },
   "models": [
     {
-      "file": "FireRed-Image-Edit-1.1-transformer.safetensors",
-      "path": "diffusion_models/FireRed-Image-Edit-1.1-transformer.safetensors",
-      "bytes": 40861031488,
-      "usedBy": [
-        "location_firered_edit"
-      ],
-      "url": "https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.1-ComfyUI/resolve/main/FireRed-Image-Edit-1.1-transformer.safetensors",
-      "page": "https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.1-ComfyUI",
-      "auth": "huggingface",
-      "check": "size matches the file in use (2026-10-24)"
-    },
-    {
       "file": "krea2_turbo_int8_convrot.safetensors",
       "path": "diffusion_models/krea2_turbo_int8_convrot.safetensors",
       "bytes": 13492686496,
@@ -105,18 +93,6 @@
       "url": "https://glitchdata.com/models/lbh-123-ai/minimax-h3-latent-upscaler/resolve/minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors",
       "page": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
       "auth": null,
-      "check": "size matches the file in use (2026-10-24)"
-    },
-    {
-      "file": "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
-      "path": "loras/FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
-      "bytes": 849542744,
-      "usedBy": [
-        "location_firered_edit"
-      ],
-      "url": "https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.0-ComfyUI/resolve/main/FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
-      "page": "https://huggingface.co/FireRedTeam/FireRed-Image-Edit-1.0-ComfyUI",
-      "auth": "huggingface",
       "check": "size matches the file in use (2026-10-24)"
     },
     {
@@ -261,18 +237,6 @@
       "check": "size matches the file in use (2026-10-24)"
     },
     {
-      "file": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-      "path": "text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
-      "bytes": 9384670680,
-      "usedBy": [
-        "location_firered_edit"
-      ],
-      "url": "https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
-      "page": "https://huggingface.co/Comfy-Org/HunyuanVideo_1.5_repackaged",
-      "auth": "huggingface",
-      "check": "size matches the file in use (2026-10-24)"
-    },
-    {
       "file": "ltx-2.5-audio-vae-bf16.safetensors",
       "path": "vae/ltx-2.5-audio-vae-bf16.safetensors",
       "bytes": 364866540,
@@ -342,7 +306,6 @@
       "path": "vae/qwen_image_vae.safetensors",
       "bytes": 253806246,
       "usedBy": [
-        "location_firered_edit",
         "location_krea2_api"
       ],
       "url": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors",

@@ -78,7 +78,6 @@ export function queueStageRun(
     );
   }
   const ctx: ShotContext = { episodeId, shotId, stageId };
-  assertFireredRefLimit(binding, ctx);
   const takes = stageId === "final_render" ? 1 : takeCount(options?.takes);
   const queued =
     binding.forEach === "character"
@@ -104,19 +103,6 @@ export function queueStageRun(
 interface Queued {
   id: string;
   note?: string[];
-}
-
-/** FireRed берёт 1–3 картинки из refs/. Четвёртая — ошибка, а не тихий обрез. */
-function assertFireredRefLimit(binding: GraphBinding, ctx: ShotContext): void {
-  if (binding.id !== "location_firered") return;
-  const input = binding.inputs.refs;
-  if (!input || input.kind !== "image" || input.max == null) return;
-  const files = resolveImageInput(ctx, { ...input, max: undefined });
-  if (files.length > input.max) {
-    throw new Error(
-      `The graph takes at most ${input.max} references. Now ${files.length}. Remove the extra ones from the graph with the "Remove" button.`,
-    );
-  }
 }
 
 /** Вход базы персонажа: источник library:character. Нет его — базу перед прогоном не проверяем. */

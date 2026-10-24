@@ -233,7 +233,6 @@ function playbooksForStage(stageId: StageId): string[] {
   if (stageId === "location") {
     candidates.push(path.join("models", "qwen_location.md"));
     candidates.push(path.join("models", "krea2_location.md"));
-    candidates.push(path.join("models", "firered_location.md"));
     candidates.push(
       path.join("workflows", "comfy", "location_views_multiple_angles.json"),
     );
