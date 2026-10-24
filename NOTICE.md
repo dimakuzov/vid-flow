@@ -4,7 +4,7 @@
 
 The MIT license in [LICENSE](LICENSE) covers only the source code and documentation of this repository (the Frameboard board, its scripts, playbooks and workflow files).
 
-You may use, modify and sell it, including commercially, as long as you keep the copyright notice "Copyright (c) 2026 Dima Kuzov" and the license text in every copy or substantial portion. In practice: credit the author.
+You may use, modify and sell it, including commercially, as long as you keep the copyright notice "Copyright (c) 2026 Dmitry Kuznetsov" and the license text in every copy or substantial portion. In practice: credit the author.
 
 ## What the license does not cover
 

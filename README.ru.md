@@ -28,7 +28,7 @@ npm run dev
 | `DATA_ROOT` | `data/` | папка данных (для проб — временная папка) |
 | `SERIES_ROOT` | — | папка одного эпизода вместо `data/episodes/*` |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. Мёртвый порт (`http://127.0.0.1:9`) — задания висят в «Ожидает очереди», на GPU ничего не уходит |
-| `COMFY_TRANSPORT` | `legacy` | `legacy` — прямые HTTP-вызовы (`COMFY_URL`, cloud.comfy.org). `sdk` — официальный `@comfyorg/sdk`, см. [docs/COMFY_SDK.md](docs/COMFY_SDK.md) |
+| `COMFY_TRANSPORT` | `legacy` | `legacy` — прямые HTTP-вызовы (`COMFY_URL`, cloud.comfy.org). `sdk` — официальный `@comfyorg/sdk`, см. [docs/COMFY_SDK.ru.md](docs/COMFY_SDK.md) |
 | `COMFY_BASE_URL` | `http://127.0.0.1:8189` | только при `COMFY_TRANSPORT=sdk`: comfy-api-proxy перед локальным ComfyUI |
 | `COMFY_CLOUD_API_KEY` | — | ключ Comfy Cloud. Пишите в `.env.local` в корне проекта, не в git |
 | `FRAMEBOARD_AGENT_PROVIDER` | `manual` | кто выполняет «Отправить агенту»: `manual`, `ollama`, `claude` |

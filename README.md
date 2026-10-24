@@ -28,7 +28,7 @@ One series per repository. Shared folders: `data/characters`, `data/locations`, 
 | `DATA_ROOT` | `data/` | data folder (use a temporary folder for trials) |
 | `SERIES_ROOT` | — | folder of a single episode instead of `data/episodes/*` |
 | `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. A dead port (`http://127.0.0.1:9`) leaves jobs waiting in the queue and nothing goes to the GPU |
-| `COMFY_TRANSPORT` | `legacy` | `legacy`: direct HTTP calls (`COMFY_URL`, cloud.comfy.org). `sdk`: the official `@comfyorg/sdk`, see [docs/COMFY_SDK.md](docs/COMFY_SDK.md) (in Russian) |
+| `COMFY_TRANSPORT` | `legacy` | `legacy`: direct HTTP calls (`COMFY_URL`, cloud.comfy.org). `sdk`: the official `@comfyorg/sdk`, see [docs/COMFY_SDK.md](docs/COMFY_SDK.md) |
 | `COMFY_BASE_URL` | `http://127.0.0.1:8189` | only with `COMFY_TRANSPORT=sdk`: comfy-api-proxy in front of a local ComfyUI |
 | `COMFY_CLOUD_API_KEY` | — | Comfy Cloud key. Put it in `.env.local` in the project root, never in git |
 | `FRAMEBOARD_AGENT_PROVIDER` | `manual` | who runs "Send to agent": `manual`, `ollama`, `claude` |
