@@ -25,6 +25,7 @@ import { chosenCharacterFile, excludedFiles, readRunSettings } from "../series/r
 import { isNearFraming, readFraming } from "../series/first-frame-settings";
 import { latinToken } from "../series/latin-id";
 import { readShotMeta } from "../series/shot-meta";
+import { shotSettingOn } from "../series/shot-settings";
 import { readShotSpeech, speechPhrases } from "../series/speech";
 
 /*
@@ -130,6 +131,10 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
         }
         if (imageMin(input) > 0) fail(`вход ${name}: вход с whenPrompt должен быть необязательным (min: 0)`);
       }
+      if (input.whenShot !== undefined) {
+        if (input.whenShot !== "strictFirstFrame") fail(`вход ${name}: whenShot ${input.whenShot}`);
+        if (imageMin(input) > 0) fail(`вход ${name}: вход с whenShot должен быть необязательным (min: 0)`);
+      }
       if (!["first", "newest", "all"].includes(input.pick)) fail(`вход ${name}: pick ${input.pick}`);
       if (input.framing !== undefined) {
         if (input.framing !== "near" && input.framing !== "far") fail(`вход ${name}: framing ${input.framing}`);
@@ -196,6 +201,13 @@ export function validateBinding(binding: GraphBinding, graph: ApiPrompt, expecte
     for (const target of slot.targets) nodeRef(target.node, target.field, what, target.json);
     for (const removal of slot.whenEmpty?.remove ?? []) {
       nodeRef(removal.node, removal.field, `${what}, whenEmpty`, removal.json);
+      if (removal.relink !== undefined) {
+        const [node, output] = Array.isArray(removal.relink) ? removal.relink : [];
+        if (removal.field === undefined || removal.json !== undefined) fail(`${what}, whenEmpty: relink только у поля без json`);
+        if (typeof node !== "string" || !Number.isInteger(output) || !graph[node]) {
+          fail(`${what}, whenEmpty: relink — [нода графа, номер выхода]`);
+        }
+      }
     }
     const value = slot.value as Record<string, unknown>;
     if (typeof value.input === "string") {
@@ -587,8 +599,9 @@ function pickImages(files: string[], input: ImageInput): string[] {
   return input.max != null ? files.slice(0, input.max) : files;
 }
 
-/** Вход с whenPrompt включён: prompt.md этапа совпал с регэкспом. */
+/** Вход включён: prompt.md этапа совпал с whenPrompt, у кадра включена настройка whenShot. */
 export function promptEnablesInput(ctx: ShotContext, input: ImageInput): boolean {
+  if (input.whenShot && !shotSettingOn(ctx.episodeId, ctx.shotId, input.whenShot)) return false;
   if (!input.whenPrompt) return true;
   const prompt = readTextIfExists(path.join(stageDir(ctx.episodeId, ctx.shotId, ctx.stageId), "prompt.md"));
   return new RegExp(input.whenPrompt, "i").test(prompt);
@@ -1487,6 +1500,7 @@ export function buildPrompt(binding: GraphBinding, graph: ApiPrompt, ctx: BuildC
   for (const removal of [...removals].sort(removalOrder)) {
     if (removal.json) removeJson(prompt, removal);
     else if (removal.field === undefined) delete prompt[removal.node];
+    else if (prompt[removal.node] && removal.relink) prompt[removal.node].inputs[removal.field] = [...removal.relink];
     else if (prompt[removal.node]) delete prompt[removal.node].inputs[removal.field];
   }
   return { prompt, uploads };

@@ -18,6 +18,8 @@ Two variants use this playbook: `video_minimax` on the video preview (graph `min
 
 The task lists the pictures under «Images the graph receives» with their labels and who is on each. Use exactly those labels. The task also gives the clip duration and, on the final, the prompt of the approved preview (the motion to keep).
 
+**Strict first frame.** When the user ticks «Strict first frame» for the shot, the board also anchors the approved first frame as frame 0 of the video, and the task says so under the picture list. Then `[Shot 1]` names the shot size `<Picture 1>` has, and the camera moves only where the shot action, the notes or the request ask for a move: `a slow push-in from the framing of <Picture 1> to a waist-up shot`. Without the tick MiniMax picks the framing itself, and the prompt is written as below.
+
 ## 2. `prompt.md` is the model's text, exactly
 
 No `##` headings, no Markdown. The sections are plain lines that end with a colon, in this order. English only.

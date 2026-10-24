@@ -534,6 +534,12 @@ const messages = {
   "framing.waist": { en: "waist up", ru: "по пояс" },
   "framing.face": { en: "face close-up (75% of the width)", ru: "крупный план лица (75% ширины)" },
   "framing.failed": { en: "Could not save the distance", ru: "Не удалось сохранить дальность" },
+  "strict.title": { en: "Strict first frame (MiniMax)", ru: "Строго первый кадр (MiniMax)" },
+  "strict.note": {
+    en: "for this shot on both the preview and the final: the video starts exactly on the approved first frame; the camera moves only when the scenario or your message asks. Off: MiniMax picks the framing itself",
+    ru: "для кадра на превью и на финале: видео начинается ровно с утверждённого первого кадра, камера движется, только если это есть в сценарии или в вашем сообщении. Без галки MiniMax сам выбирает план",
+  },
+  "strict.failed": { en: "Could not save the strict first frame", ru: "Не удалось сохранить «Строго первый кадр»" },
   "refs.hint": { en: "The name under the picture selects the file. The picture itself opens full screen.", ru: "Имя под картинкой выделяет файл. Сама картинка открывается на весь экран." },
 
   "history.title": { en: "Previous prompt versions", ru: "Прошлые версии промпта" },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { setFraming, setRefNote } from "@/lib/series/first-frame-settings";
+import { setStrictFirstFrame } from "@/lib/series/shot-settings";
 import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
@@ -72,7 +73,17 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       framing?: { name?: string; value?: string | null };
       /** Подпись к файлу refs/ («шлем Лены»). Только первый кадр. Пустой текст — снять. */
       refNote?: { file?: string; text?: string };
+      /** Галка кадра «Строго первый кадр». Ставится на превью или финале и действует на оба этапа. */
+      strictFirstFrame?: boolean;
     };
+    if (typeof body.strictFirstFrame === "boolean") {
+      if (stageId !== "video_preview" && stageId !== "final_render") {
+        throw new Error("«Строго первый кадр» — только на превью и финале");
+      }
+      // От галки зависят граф и задача агенту: пока этап работает, её не меняем.
+      assertStageFree(episodeId, shotId, stageId);
+      setStrictFirstFrame(episodeId, shotId, body.strictFirstFrame);
+    }
     if (body.framing || body.refNote) {
       if (stageId !== "first_frame") throw new Error("Дальность и подписи референсов — только на первом кадре");
       // Порядок картинок графа зависит от выбора: пока агент или граф работают, его не меняем.

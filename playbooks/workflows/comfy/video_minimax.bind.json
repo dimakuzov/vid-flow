@@ -16,6 +16,15 @@
       "uploadAs": "{shotId}_start{ext}",
       "label": "Утверждённый первый кадр"
     },
+    "lock": {
+      "kind": "image",
+      "from": "approve:first_frame",
+      "pick": "newest",
+      "min": 0,
+      "whenShot": "strictFirstFrame",
+      "uploadAs": "{shotId}_start{ext}",
+      "label": "Строго первый кадр: утверждённый первый кадр закреплён на кадре 0 видео (галка «Строго первый кадр» кадра)"
+    },
     "people": {
       "kind": "image",
       "from": [
@@ -64,6 +73,43 @@
       ],
       "value": {
         "input": "first"
+      }
+    },
+    {
+      "targets": [
+        {
+          "node": "29",
+          "field": "image"
+        }
+      ],
+      "value": {
+        "input": "lock"
+      },
+      "whenEmpty": {
+        "remove": [
+          {
+            "node": "29"
+          },
+          {
+            "node": "400"
+          },
+          {
+            "node": "145",
+            "field": "conditioning",
+            "relink": [
+              "121",
+              0
+            ]
+          },
+          {
+            "node": "146",
+            "field": "conditioning",
+            "relink": [
+              "121",
+              0
+            ]
+          }
+        ]
       }
     },
     {

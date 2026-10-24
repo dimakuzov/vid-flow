@@ -148,6 +148,8 @@ export interface StageDetail {
    * background | full | waist | face) и подписи к файлам refs/ (имя файла → текст). Иначе null.
    */
   firstFrame: { framing: Record<string, string>; refNotes: Record<string, string> } | null;
+  /** Галка кадра «Строго первый кадр» (shot_settings.json). null — этап не превью и не финал. */
+  strictFirstFrame: boolean | null;
   agentRequest: {
     status: AgentRequestStatus;
     createdAt: string;

@@ -188,7 +188,7 @@
         0
       ],
       "conditioning": [
-        "121",
+        "400",
         0
       ]
     },
@@ -204,7 +204,7 @@
         0
       ],
       "conditioning": [
-        "121",
+        "400",
         0
       ]
     },
@@ -491,6 +491,40 @@
     "class_type": "LoadImage",
     "_meta": {
       "title": "Picture 7 (character 6)"
+    }
+  },
+  "29": {
+    "inputs": {
+      "image": "first_frame_guide.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Строго первый кадр: картинка"
+    }
+  },
+  "400": {
+    "inputs": {
+      "frame_idx": 0,
+      "positive": [
+        "121",
+        0
+      ],
+      "latent": [
+        "121",
+        1
+      ],
+      "vae": [
+        "4",
+        0
+      ],
+      "image": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3AddGuide",
+    "_meta": {
+      "title": "Строго первый кадр: закрепить кадр 0"
     }
   }
 }
