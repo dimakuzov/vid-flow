@@ -161,4 +161,4 @@ Series data is plain files on disk, no database required.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). You may use and sell this code commercially, but the copyright notice must stay with every copy, so the author is credited. The license covers only this repository's code. Models and tools you run with it have their own licenses; see [NOTICE.md](NOTICE.md).
+MIT, see [LICENSE](LICENSE). You may use and sell this code commercially, but the copyright notice must stay with every copy, so the author is credited. The license covers only this repository's code. Models and tools you run with it have their own licenses. Study the license of each model and LoRA before any commercial use; see [NOTICE.md](NOTICE.md).

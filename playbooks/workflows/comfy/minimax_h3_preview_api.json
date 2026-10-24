@@ -354,10 +354,10 @@
   },
   "183": {
     "inputs": {
-      "lora_name": "minimax\\Cinema-MH3-V02_000010000.safetensors",
+      "lora_name": "minimax\\CinematicMH3-V01.safetensors",
       "strength_model": 1,
       "model": [
-        "186",
+        "120",
         0
       ]
     },
@@ -366,26 +366,12 @@
       "title": "Load LoRA-Cinema"
     }
   },
-  "186": {
-    "inputs": {
-      "lora_name": "minimax\\MysticXXX_MMH3-V1.safetensors",
-      "strength_model": 0.5,
-      "model": [
-        "120",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "Load LoRA"
-    }
-  },
   "187": {
     "inputs": {
       "lora_name": "minimax\\电影感loraV1.0正式版_剪枝与非剪枝通用.safetensors",
       "strength_model": 0.7,
       "model": [
-        "186",
+        "120",
         0
       ]
     },
