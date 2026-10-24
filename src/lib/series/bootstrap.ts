@@ -93,32 +93,32 @@ export function parseScenario(content: string): BootstrapPreview {
 function defaultRefs(stageId: StageId, shot: BootstrapShotDraft): string {
   if (stageId === "characters") {
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nImage 1: refs/{name}_base.* (если положили сами), иначе data/characters/{name}/full_body.png.\nImage 2: refs/{name}_clothes.* — образец одежды. Нет файла — нода «image 2: образец одежды» в bypass.\nПерсонажи кадра: ${names}.\nДругие файлы refs/ в этот граф не входят.\nСм. playbooks/stages/characters.en.md.\n`;
+    return `# Refs\n\nImage 1: refs/{name}_base.* (if you put one there), otherwise data/characters/{name}/full_body.png.\nImage 2: refs/{name}_clothes.* is the clothing sample. No file: the "image 2: clothing sample" node is bypassed.\nShot characters: ${names}.\nOther files in refs/ do not go into this graph.\nSee playbooks/stages/characters.en.md.\n`;
   }
   if (stageId === "location") {
     const location = shot.location || "{locationId}";
-    return `# Refs\n\nБаза: data/locations/${location}/view.png и description.txt.\nВ refs/ этого кадра: общий вид и, если нужен чужой ракурс, angle.png.\nShot-вариант уходит в output/ и approve/.\nСм. playbooks/stages/location.en.md.\n`;
+    return `# Refs\n\nBase: data/locations/${location}/view.png and description.txt.\nIn this shot's refs/: the general view and, if you need another angle, angle.png.\nThe shot variant goes to output/ and approve/.\nSee playbooks/stages/location.en.md.\n`;
   }
   if (stageId === "first_frame") {
     if (!shot.characters.length && !shot.location.trim()) {
-      return `# Refs\n\nПерсонажей и локации нет. Предыдущие этапы не нужны.\nФайлы для кадра клади в refs/ этого этапа.\nСм. playbooks/stages/first_frame.en.md, раздел «No character and no location».\n`;
+      return `# Refs\n\nThere are no characters and no location. The earlier stages are not needed.\nPut the shot's files in this stage's refs/.\nSee playbooks/stages/first_frame.en.md, section "No character and no location".\n`;
     }
     const names = shot.characters.length ? shot.characters.join(", ") : "{name}";
-    return `# Refs\n\nЕсли персонажи и локация уже утверждены: локация из shots/${shot.id}/location/approve/, персонажи ${names} из shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nЕсли их нет, не жди эти этапы. Файлы кадра клади в refs/ здесь.\nСм. playbooks/stages/first_frame.en.md.\n`;
+    return `# Refs\n\nIf the characters and location are already approved: the location is from shots/${shot.id}/location/approve/, the characters ${names} are from shots/${shot.id}/characters/approve/{name}_${shot.id}.png.\nIf they are not there, do not wait for those stages. Put the shot's files in refs/ here.\nSee playbooks/stages/first_frame.en.md.\n`;
   }
-  return `# Refs\n\nОпиши, какие файлы из refs/ используются и зачем.\n`;
+  return `# Refs\n\nDescribe which files from refs/ are used and why.\n`;
 }
 
 function defaultWorkflow(stageId: StageId): string {
-  const note = `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа. Сам граф здесь не выбирается.\n`;
+  const note = `# Workflow\n\nAn optional note for this shot. It can stay empty.\n\nIf needed, write how the run differs from the graph template. The graph is not chosen here.\n`;
   if (stageId === "characters") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nОдежду меняет доска: манифест character_outfit, граф character_outfit_qwen21.json. Image 1 — база, image 2 — refs/{name}_clothes.*, если есть. Промпт — разделы ## имя в prompt.md. Плейбук: playbooks/models/qwen_outfit.en.md.\n`;
+    return `# Workflow\n\nAn optional note for this shot. It can stay empty.\n\nThe board changes the outfit: manifest character_outfit, graph character_outfit_qwen21.json. Image 1 is the base, image 2 is refs/{name}_clothes.* if present. The prompt is the ## name sections in prompt.md. Playbook: playbooks/models/qwen_outfit.en.md.\n`;
   }
   if (stageId === "location") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: какой ракурс, какая ветка промпта. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;
+    return `# Workflow\n\nAn optional note for this shot. It can stay empty.\n\nIf needed, write how the run differs from the graph template: which angle, which prompt branch. The graph is not chosen here.\n\nTemplate: playbooks/workflows/comfy/location_views_multiple_angles.json\n`;
   }
   if (stageId === "first_frame") {
-    return `# Workflow\n\nНеобязательная заметка на этот кадр. Можно оставить пустым.\n\nЕсли нужно, запиши чем прогон отличается от болванки графа: режим сборки или правки, сколько персонажей. Сам граф здесь не выбирается.\n\nБолванка: playbooks/workflows/comfy/qwen21_character_compositing.json\n`;
+    return `# Workflow\n\nAn optional note for this shot. It can stay empty.\n\nIf needed, write how the run differs from the graph template: assembly or edit mode, how many characters. The graph is not chosen here.\n\nTemplate: playbooks/workflows/comfy/qwen21_character_compositing.json\n`;
   }
   return note;
 }

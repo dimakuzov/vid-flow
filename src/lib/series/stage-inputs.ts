@@ -17,11 +17,20 @@ import {
   missingCharacterClothes,
   tooManyClothingRefs,
 } from "./character-base";
-import { STAGE_LABELS, type StageId } from "./constants";
+import type { StageId } from "./constants";
 import { mediaKind, mediaUrlPath } from "./media";
 import { getCharactersRoot, getDataRoot, getLocationsRoot, stageDir, toPosix } from "./paths";
 import { chosenCharacterFile, excludedFiles, readRunSettings } from "./run-settings";
 import { readShotMeta } from "./shot-meta";
+
+/** Stage names for the source text shown on the stage page. */
+const STAGE_NAMES: Record<string, string> = {
+  characters: "Characters",
+  location: "Location",
+  first_frame: "First frame",
+  video_preview: "Video (preview)",
+  final_render: "Final render",
+};
 import type { MediaFile, StageInput } from "./types";
 
 /*
@@ -51,27 +60,27 @@ function dataLabel(absoluteDir: string): string {
 }
 
 function sourceLabel(ctx: ShotContext, source: ImageSource, files: string[]): string {
-  if (source === "refs") return "refs/ этого этапа";
-  if (source === "refs:other") return "refs/ этого этапа, кроме {имя}_face, _base, _clothes";
+  if (source === "refs") return "refs/ of this stage";
+  if (source === "refs:other") return "refs/ of this stage, except {name}_face, _base, _clothes";
   if (source.startsWith("refs:")) {
     const other = source.slice("refs:".length) as StageId;
-    return `refs/ этапа ${STAGE_LABELS[other] ?? other}`;
+    return `refs/ of stage ${STAGE_NAMES[other] ?? other}`;
   }
   if (source === "library:location") {
     const folder = files[0]
       ? path.dirname(files[0])
       : path.join(getLocationsRoot(), readShotMeta(ctx.episodeId, ctx.shotId).location || "?");
-    return `библиотека ${dataLabel(folder)}`;
+    return `library ${dataLabel(folder)}`;
   }
-  if (source === "library:faces") return `лица: refs/{имя}_face или ${dataLabel(getCharactersRoot())}`;
+  if (source === "library:faces") return `faces: refs/{name}_face or ${dataLabel(getCharactersRoot())}`;
   if (source === "library:face-sheets") {
-    return `листы лица: refs/{имя}_face_sheet или *face_sheet* в ${dataLabel(getCharactersRoot())}`;
+    return `face sheets: refs/{name}_face_sheet or *face_sheet* in ${dataLabel(getCharactersRoot())}`;
   }
   if (source === "library:faces-or-characters") {
-    return `на персонажа: лицо (refs/{имя}_face или ${dataLabel(getCharactersRoot())}), иначе approve этапа ${STAGE_LABELS.characters}`;
+    return `per character: face (refs/{name}_face or ${dataLabel(getCharactersRoot())}), otherwise approve of stage ${STAGE_NAMES.characters}`;
   }
   const stage = source.slice("approve:".length) as StageId;
-  return `approve этапа ${STAGE_LABELS[stage] ?? stage}`;
+  return `approve of stage ${STAGE_NAMES[stage] ?? stage}`;
 }
 
 function mediaFiles(files: string[]): MediaFile[] {
@@ -86,7 +95,7 @@ function bindingInput(ctx: ShotContext, input: ImageInput): StageInput {
     // Вход по фразе в промпте: показываем, что уйдёт, если промпт его позовёт.
     return {
       label: input.label,
-      source: "сейчас не уйдёт: prompt.md этот вход не зовёт",
+      source: "not sent now: prompt.md does not call this input",
       files: mediaFiles(resolveImageInput(ctx, { ...input, whenPrompt: undefined })),
       excluded,
     };
@@ -99,7 +108,7 @@ function bindingInput(ctx: ShotContext, input: ImageInput): StageInput {
   }
   return {
     label: input.label,
-    source: `пусто: ${sources.map((source) => sourceLabel(ctx, source, [])).join(" или ")}`,
+    source: `empty: ${sources.map((source) => sourceLabel(ctx, source, [])).join(" or ")}`,
     files: [],
     excluded,
   };
@@ -166,17 +175,17 @@ function characterInputs(ctx: ShotContext): StageInput[] {
     const heldBack = manual && !manualActive ? [manual] : [];
     const hint =
       !manualActive && automatic && path.basename(automatic).toLowerCase() !== "full_body.png"
-        ? " Положите full_body.png во весь рост."
+        ? " Put a full-length full_body.png there."
         : "";
     let source: string;
     if (manualActive && manual) {
-      source = `выбран вручную (${path.basename(manual)}). Это персонаж в графе; одежду меняет образец или текст.`;
+      source = `picked by hand (${path.basename(manual)}). This is the character in the graph; the outfit changes by a sample or by text.`;
     } else if (!automatic) {
       source = missingCharacterBase(name);
     } else if (fromRefs) {
-      source = `refs/ этого этапа (${path.basename(fromRefs)}).${hint}`;
+      source = `refs/ of this stage (${path.basename(fromRefs)}).${hint}`;
     } else {
-      source = `библиотека ${dataLabel(folder!)} (${path.basename(fromLibrary!)}).${hint}`;
+      source = `library ${dataLabel(folder!)} (${path.basename(fromLibrary!)}).${hint}`;
     }
     inputs.push({
       label: `Персонаж ${name}`,
@@ -189,7 +198,7 @@ function characterInputs(ctx: ShotContext): StageInput[] {
       clothes.length > 1
         ? tooManyClothingRefs(name, clothes.length)
         : clothes.length === 1
-          ? `refs/ этого этапа (${path.basename(clothes[0])}). Второе изображение графа.`
+          ? `refs/ of this stage (${path.basename(clothes[0])}). The second image of the graph.`
           : missingCharacterClothes(name);
     inputs.push({
       label: `Одежда ${name}`,

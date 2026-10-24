@@ -97,8 +97,8 @@ test("входы первого кадра: утверждённые локац�
   put("characters", "approve", "katya_s01.png");
   put("characters", "approve", "mark_s01.png");
   const inputs = stageInputs("e01", "s01", "first_frame");
-  const location = inputs.find((input) => input.source === "approve этапа Локация");
-  const people = inputs.find((input) => input.source === "approve этапа Персонажи");
+  const location = inputs.find((input) => input.source === "approve of stage Location");
+  const people = inputs.find((input) => input.source === "approve of stage Characters");
   assert.ok(location && people, JSON.stringify(inputs));
   assert.deepEqual(location.files.map((file) => file.name), ["cafe_view.png"]);
   assert.deepEqual(people.files.map((file) => file.name), ["katya_s01.png", "mark_s01.png"]);
@@ -111,11 +111,11 @@ test("входы первого кадра: утверждённые локац�
 test("входы видео: утверждённый первый кадр", () => {
   const before = stageInputs("e01", "s01", "video_preview");
   assert.ok(before.every((input) => !input.files.length));
-  assert.match(before[0].source, /^пусто: approve этапа Первый кадр/);
+  assert.match(before[0].source, /^empty: approve of stage First frame/);
 
   put("first_frame", "approve", "ff.png");
   const start = stageInputs("e01", "s01", "video_preview").find(
-    (input) => input.source === "approve этапа Первый кадр",
+    (input) => input.source === "approve of stage First frame",
   );
   assert.deepEqual(start?.files.map((file) => file.name), ["ff.png"]);
 });
@@ -132,11 +132,11 @@ test("входы персонажей: одна база и один образ�
   const inputs = stageInputs("e01", "s01", "characters");
   const base = inputs.find((input) => input.label === "Персонаж katya");
   assert.deepEqual(base?.files.map((file) => file.name), ["full_body.png"]);
-  assert.equal(base?.source, "библиотека data/characters/Katya/ (full_body.png).");
+  assert.equal(base?.source, "library data/characters/Katya/ (full_body.png).");
   assert.match(base!.files[0].url, /^\/api\/media\/characters\/Katya\/full_body\.png/);
   const clothes = inputs.find((input) => input.label === "Одежда katya");
   assert.deepEqual(clothes?.files.map((file) => file.name), ["katya_clothes.png", "katya_outfit.png"]);
-  assert.match(clothes!.source, /не больше одного референса/);
+  assert.match(clothes!.source, /at most one clothing reference/);
 
   // Старое имя базы, как у Лены: body.png. Копии не берутся. Лист не режется.
   const lena = path.join(getCharactersRoot(), "Lena");
@@ -147,12 +147,12 @@ test("входы персонажей: одна база и один образ�
   fs.writeFileSync(path.join(shotDir("e01", "s01"), "shot.md"), "# Кафе\n\n- characters: katya, lena, mark\n- location: cafe\n");
   const withLena = stageInputs("e01", "s01", "characters").find((input) => input.label === "Персонаж lena");
   assert.deepEqual(withLena?.files.map((file) => file.name), ["body.png"]);
-  assert.match(withLena!.source, /Положите full_body\.png во весь рост/);
+  assert.match(withLena!.source, /Put a full-length full_body\.png there/);
 
   const mark = inputs.find((input) => input.label === "Персонаж mark");
   assert.equal(mark?.files.length, 0);
-  assert.equal(mark!.source, "нет базы для mark: положите картинку в data/characters/mark/");
+  assert.equal(mark!.source, "no base for mark: put a picture in data/characters/mark/");
   const markClothes = inputs.find((input) => input.label === "Одежда mark");
   assert.equal(markClothes?.files.length, 0);
-  assert.match(markClothes!.source, /image 2: образец одежды/);
+  assert.match(markClothes!.source, /image 2: clothing sample/);
 });

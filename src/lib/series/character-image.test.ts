@@ -89,7 +89,7 @@ test("выбранный референс, output и прошлый кадр с�
   assert.deepEqual(built.prompt["17"].inputs["images.image_2"], ["22", 0]);
   const row = stageInputs("e01", "s02", "characters").find((input) => input.label === "Персонаж lena");
   assert.equal(row?.files[0].name, "lena_coat.png");
-  assert.match(row!.source, /выбран вручную/);
+  assert.match(row!.source, /picked by hand/);
 
   setCharacterImage("e01", "s02", "lena", mediaUrlPath(dressed)!);
   assert.equal(path.basename(resolveImageInput(ctx, baseInput)[0]), "lena_dressed.png");
@@ -100,5 +100,5 @@ test("выбранный референс, output и прошлый кадр с�
   assert.throws(() => setCharacterImage("e01", "s02", "lena", mediaUrlPath(path.join(library, "full_body.png"))!), /output, refs или предыдущего/);
 
   fs.writeFileSync(path.join(refs, "lena_hat.png"), PNG);
-  assert.throws(() => queueStageRun("e01", "s02", "characters"), /не больше одного референса/);
+  assert.throws(() => queueStageRun("e01", "s02", "characters"), /at most one clothing reference/);
 });

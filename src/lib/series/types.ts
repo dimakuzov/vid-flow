@@ -19,7 +19,7 @@ export interface MediaFile {
 export interface StageInput {
   /** Что это за вход: «Утверждённая локация». */
   label: string;
-  /** Откуда файлы: «approve этапа Локация», «refs/ этого этапа», «библиотека data/locations/cafe/». */
+  /** Откуда файлы: "approve of stage Location", "refs/ of this stage", "library data/locations/cafe/". */
   source: string;
   /** Пусто — источник пока пустой, граф этот вход не получит. */
   files: MediaFile[];

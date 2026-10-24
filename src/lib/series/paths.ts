@@ -179,7 +179,7 @@ export function prepareDataRoot(): void {
   if (!fs.existsSync(show)) {
     fs.writeFileSync(
       show,
-      "# Сериал\n\nОдин сериал. Общие персонажи, локации, референсы и документы сценариев лежат рядом с папками серий.\n",
+      "# Series\n\nOne series. Shared characters, locations, references and script documents live next to the episode folders.\n",
       "utf8",
     );
   }

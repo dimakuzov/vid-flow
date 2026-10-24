@@ -13,7 +13,7 @@ export interface BoardData {
 export function emptySeries(): SeriesSummary {
   return {
     id: "series",
-    title: "Сериал",
+    title: "Series",
     description: "",
     root: "",
     episodeId: null,

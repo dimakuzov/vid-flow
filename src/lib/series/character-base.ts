@@ -141,15 +141,15 @@ export function characterClothingFiles(
 
 /** Больше одного референса одежды в один граф не берём. */
 export function tooManyClothingRefs(name: string, count: number): string {
-  return `В этот граф идёт один персонаж и не больше одного референса одежды. У ${name} референсов ${count}. Лишний уберите кнопкой «Убрать».`;
+  return `The graph takes one character and at most one clothing reference. ${name} has ${count} references. Remove the extra one with the "Remove" button.`;
 }
 
 /** Текст ошибки, когда персонажа не из чего собрать. */
 export function missingCharacterBase(name: string): string {
-  return `нет базы для ${name}: положите картинку в data/characters/${name}/`;
+  return `no base for ${name}: put a picture in data/characters/${name}/`;
 }
 
 /** Нет референса одежды: прогон идёт, нода «image 2: образец одежды» в bypass. */
 export function missingCharacterClothes(name: string): string {
-  return `нет референса одежды для ${name}: нода «image 2: образец одежды» в bypass`;
+  return `no clothing reference for ${name}: the "image 2: clothing sample" node is bypassed`;
 }
