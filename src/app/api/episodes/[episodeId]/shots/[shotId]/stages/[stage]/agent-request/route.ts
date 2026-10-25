@@ -27,6 +27,8 @@ export async function POST(request: Request, context: StageRouteContext) {
     const { episodeId, shotId, stageId } = parseStageParams(await context.params);
     const body = (await request.json()) as {
       message?: string;
+      /** Этап characters: выбранный на странице персонаж. */
+      character?: unknown;
       prompt?: string;
       refs?: string;
       /** Заметка workflow.md. */
@@ -55,6 +57,7 @@ export async function POST(request: Request, context: StageRouteContext) {
       shotId,
       stageId,
       message: body.message || "",
+      character: typeof body.character === "string" ? body.character : undefined,
       prompt: body.prompt || "",
       refsNote: body.refs || "",
       workflowNote: body.workflow || "",

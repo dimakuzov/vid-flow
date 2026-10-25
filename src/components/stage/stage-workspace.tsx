@@ -155,6 +155,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
           method: "POST",
           body: {
             message: docs.llmNotes,
+            ...(stageId === "characters" && editingCharacter ? { character: editingCharacter } : {}),
             prompt: docs.prompt,
             refs: docs.refs,
             workflow: docs.workflow,

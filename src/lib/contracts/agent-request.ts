@@ -30,6 +30,8 @@ export interface AgentRequestFile {
   createdAt: string;
   status: AgentRequestStatus;
   message: string;
+  /** Этап characters: персонаж, выбранный на странице. Просьба относится только к нему, разделы остальных остаются пустыми. */
+  character?: string;
   refsChangedByUser: boolean;
   /** Кто исполняет. Нет поля — manual (запросы до контракта). */
   provider?: AgentProviderId;

@@ -317,7 +317,10 @@ function renderLlmTask(request: AgentRequestFile, boardQueues: boolean, workflow
 
   let work: string;
   if (stageId === "characters") {
-    work = `Персонажи этого кадра: ${bulletList(meta.characters)}. Перепиши \`prompt.md\`: каждому — свой раздел \`## имя\` строчными латинскими буквами (как имя в shot.md). Пустой раздел — этого персонажа доска не перегенерирует. Текст до первого заголовка и неизвестное имя раздела — ошибка.
+    const only = request.character
+      ? `**Пользователь выбрал на странице персонажа ${request.character}: просьба из сообщения относится только к нему.** Напиши инструкцию только в раздел \`## ${request.character.toLowerCase()}\`, а разделы остальных персонажей оставь пустыми (пустой раздел — доска этого персонажа не запускает). Не подставляй другого персонажа, даже если в тексте кадра он упомянут чаще.\n\n`
+      : "";
+    work = `${only}Персонажи этого кадра: ${bulletList(meta.characters)}. Перепиши \`prompt.md\`: каждому — свой раздел \`## имя\` строчными латинскими буквами (как имя в shot.md). Пустой раздел — этого персонажа доска не перегенерирует. Текст до первого заголовка и неизвестное имя раздела — ошибка.
 
 Image 1 — база: файл пользователя \`refs/{имя}_base.*\`, если он его положил, иначе библиотека. Image 2 — образец одежды \`refs/{имя}_clothes.*\`, если пользователь его положил. Нет образца — нода «image 2: образец одежды» в bypass, одежду опиши текстом и image 2 не упоминай. Другие файлы \`refs/\` в этот граф не входят. Одежда в тексте — только из сообщения пользователя. Лицо, волосы, фигура, поза, фон и остальная одежда — как на image 1. Внешность по памяти не описывай. Имена персонажей в текст модели не пиши.
 
@@ -446,6 +449,8 @@ export function submitAgentRequest(options: {
   shotId: string;
   stageId: StageId;
   message: string;
+  /** Этап characters: персонаж, выбранный на странице (имя из shot.md). */
+  character?: string;
   prompt: string;
   refsNote: string;
   workflowNote: string;
@@ -490,6 +495,11 @@ export function submitAgentRequest(options: {
 
   const typed = options.message.trim();
   const message = typed || "Сгенерируй по текущим документам этапа.";
+  // Выбранный персонаж должен быть в кадре; иначе выбор игнорируется, а не ломает запрос.
+  const selectedCharacter =
+    stageId === "characters" && options.character
+      ? readShotMeta(episodeId, shotId).characters.find((name) => name.toLowerCase() === options.character!.trim().toLowerCase())
+      : undefined;
 
   const baseline = readBaseline(episodeId, shotId, stageId);
   const touched = readTouch(episodeId, shotId, stageId);
@@ -531,6 +541,7 @@ export function submitAgentRequest(options: {
     createdAt,
     status: "pending",
     message,
+    ...(selectedCharacter ? { character: selectedCharacter } : {}),
     refsChangedByUser,
     provider: providerId,
     model: providerId === "manual" ? undefined : model,

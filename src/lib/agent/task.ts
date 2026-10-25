@@ -335,6 +335,11 @@ export function buildTextParts(request: AgentRequestFile): { system: string; use
     meta.summary || "(no action text in shot.md)",
     "",
     `- characters: ${meta.characters.join(", ") || "(none)"}`,
+    ...(request.character
+      ? [
+          `- selected character: ${request.character}. The user's request is about ${request.character} only: write the instruction in the "## ${request.character.toLowerCase()}" section and leave the sections of the other characters empty. Do not apply the request to another character, even if the shot text mentions that one more often.`,
+        ]
+      : []),
     `- location: ${meta.location || "(none)"}`,
     `- stage: ${stageId}`,
     `- workflow: ${workflow ? `${workflow.id} — ${workflow.label}` : "(none)"}`,
