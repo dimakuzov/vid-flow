@@ -257,7 +257,7 @@ playbooks/workflows/comfy/
 | `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
 | `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |
 | `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с; промпт — `approve-meta` эскиза, запасной `prompt.md`) |
-| `final_ltx` | final_render | `ltx25_i2v_api.json` (нода `403`: 1.2 Мп, 9:16 → 832×1504, 24 к/с; `whenSketch` — эскиз LTX) |
+| `final_ltx` | final_render | `ltx25_i2v_api.json` (нода `403`: 1.2 Мп, 9:16 → 832×1472, 24 к/с; `whenSketch` — эскиз LTX) |
 | `video_minimax` | video_preview | `minimax_h3_preview_api.json` (MiniMax H3 по референсам, 0.5 Мп; `imageLabel: <Picture {n}>`). По умолчанию на эскизе теперь `video_ltx` (order 5) |
 | `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema: первый кадр + по картинке на персонажа, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; промпт эскиза из `approve-meta` — только в задаче агенту) |
 | `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (замена головы: утверждённое превью + `library:face-sheets`; вход персонажей с `maxAvailable: 1`; без текста) |

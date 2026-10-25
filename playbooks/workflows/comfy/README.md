@@ -10,7 +10,7 @@
 | `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
 | `video_ltx` | `video_preview` | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком) | доска; промпт — `models/ltx_video.en.md` |
 | `final_wan_720` | `final_render` | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с) | доска; промпт — из метаданных утверждённого эскиза |
-| `final_ltx` | `final_render` | тот же `ltx25_i2v_api.json` (1.2 Мп, 832×1504, 24 к/с) | доска, по умолчанию если эскиз LTX |
+| `final_ltx` | `final_render` | тот же `ltx25_i2v_api.json` (1.2 Мп, 832×1472, 24 к/с) | доска, по умолчанию если эскиз LTX |
 | `video_minimax` | `video_preview` | `minimax_h3_preview_api.json` (MiniMax H3 по референсам + ЛоРа Cinema, один проход 0.5 Мп) | доска; «▶ Все кадры» гонит его вторым, после `video_ltx` (`run_chain.json`) |
 | `final_h3_cinema` | `final_render` | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema) | доска; `prompt.md` — текст модели целиком, с `subject_definitions ASTROCINEMAV01K2T:` первой строкой; первый кадр — `<Picture 1>`, лица персонажей — `<Picture 2…7>` |
 | `final_h3_head_swap` | `final_render` | `minimax_h3_head_swap_api.json` (MiniMax H3, замена головы по листу лица, без промпта) | доска; доступен только с одним персонажем, его `face_sheet` и утверждённым превью |

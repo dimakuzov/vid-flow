@@ -4,7 +4,7 @@
   "graph": "ltx25_i2v_api.json",
   "stage": "final_render",
   "label": "Final LTX 2.5, 1.2 MP",
-  "description": "The same graph as the LTX preview. Resolution Selector is 1.2 MP, 9:16 (832×1504), 24 fps. Default when the approved preview was made with LTX.",
+  "description": "The same graph as the LTX preview. Resolution Selector is 1.2 MP, 9:16 (832×1472), 24 fps. Default when the approved preview was made with LTX.",
   "playbook": "models/ltx_video.en.md",
   "order": 7,
   "whenSketch": {

@@ -108,6 +108,18 @@ npm run comfy:install -- --comfy "C:\path\to\ComfyUI" --install
 
 Contracts between modules are in [`docs/contracts/`](docs/contracts/): stage folder and API, graph manifest, queue job, agent request.
 
+## Order of the stages
+
+A shot is built stage by stage, and a stage can run only when the stages it depends on have an approved file. Approve means: pick a result in `output/` and press "Approve selected"; the file moves to `approve/`.
+
+1. **Characters.** Required whenever a character appears in the shot. Approve one picture of each character for this shot: either the library picture or an outfit edit made here (`lena_s01.png`). Without it the first frame stays unavailable ("Missing: Approved characters").
+2. **Location.** Required for the first frame. Take the library location, or make a new one from text with Krea 2, and approve it. A shot that has characters but no location still needs this stage: the first frame stays unavailable until a location is approved ("Missing: Approved location").
+3. **First frame.** Puts the approved characters into the approved location.
+4. **Video (preview).** Animates the approved first frame (LTX 2.5 or MiniMax H3). Several previews can be tried; approve one.
+5. **Final render.** Renders the approved preview again at higher quality.
+
+A shot with no characters and no location skips stages 1 and 2 and is made directly in the first frame stage (`playbooks/stages/first_frame.en.md`, section "No character and no location").
+
 ## Series layout
 
 ```text
@@ -162,7 +174,9 @@ Two modes inside the board:
 
 Formatting a raw script into shots ("Send for formatting") also needs an agent. Without one, write `scenario.md` yourself in the shot-block format described in `docs/AGENT_BOOTSTRAP.md`.
 
-If you have no model at all: skip "Send to agent", edit prompts by hand, and use the board as a file-based job queue and review table.
+Every stage runs a prompt that follows the rules in `playbooks/models/` (which words each model reads well, how to number the pictures, what to leave out). An agent writes that prompt for you from the shot text and the approved pictures, so plan on using one: `claude`, `ollama`, or a chat agent in `manual` mode.
+
+If you have no model at all: skip "Send to agent" and write each `prompt.md` by hand, following those playbooks. The board then works as a file-based job queue and review table.
 
 ## Agent and playbooks
 

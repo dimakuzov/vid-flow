@@ -42,7 +42,7 @@ After the paragraph, append the soundscape as one to four sentences, with no lab
 
 The board sets the duration (the stage menu, otherwise `N sec` in `prompt.md`; LTX is 2–10 s). When the task says the duration was chosen in the menu, do not write `N sec` or a timestamp. The action and the lines must fit that duration.
 
-`video_ltx` is the sketch. `final_ltx` is the same graph at 1.2 MP: node `403` `megapixels` is 1.2, aspect stays `9:16 (Portrait Widescreen)`, multiple stays 32, which is 832×1504, and `398:361` is 24 fps. Write the final caption by these same rules. When an approved sketch video exists, the board copies its caption from the file metadata into the final and does not rewrite it; with no metadata it uses the sketch `prompt.md` and notes that in `run_log.md`. A later edit of `prompt.md` without a new video does not reach the final. Do not feed this caption to a Wan final. If another final is selected and the sketch is LTX, write `final_ltx` in `suggestedWorkflow`. The board does not switch by itself.
+`video_ltx` is the sketch. `final_ltx` is the same graph at 1.2 MP: node `403` `megapixels` is 1.2, aspect stays `9:16 (Portrait Widescreen)`, multiple stays 32, which is 832×1472, and `398:361` is 24 fps. Write the final caption by these same rules. When an approved sketch video exists, the board copies its caption from the file metadata into the final and does not rewrite it; with no metadata it uses the sketch `prompt.md` and notes that in `run_log.md`. A later edit of `prompt.md` without a new video does not reach the final. Do not feed this caption to a Wan final. If another final is selected and the sketch is LTX, write `final_ltx` in `suggestedWorkflow`. The board does not switch by itself.
 
 ## Example
 
