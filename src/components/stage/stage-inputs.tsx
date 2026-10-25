@@ -56,6 +56,7 @@ export function StageInputs({
               output={characterSources.output}
               refs={characterSources.refs}
               previous={characterSources.previous}
+              current={input.files[0]?.relativePath ?? null}
               disabled={!onToggleExclude}
               onPick={(file) => onPickCharacter(input.characterName!, file)}
             />

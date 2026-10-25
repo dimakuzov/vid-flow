@@ -704,6 +704,10 @@ const messages = {
   "pick.ref": { en: "From a reference", ru: "Из референса" },
   "pick.prev": { en: "From the previous shot", ru: "Из предыдущего кадра" },
   "pick.first": { en: "This is the first shot", ru: "Это первый кадр" },
+  "pick.cycle": {
+    en: "Puts the picture in as the character at once. If there are several, each press takes the next one.",
+    ru: "Сразу ставит картинку персонажем. Если их несколько, каждое нажатие берёт следующую.",
+  },
   "pick.shot": { en: "Shot {id}", ru: "Кадр {id}" },
   "pick.noOutput": { en: "output/ of this shot has no pictures.", ru: "В output/ этого кадра нет картинок." },
   "pick.noRefs": { en: "refs/ has no pictures.", ru: "В refs/ нет картинок." },
