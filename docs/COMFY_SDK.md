@@ -31,6 +31,10 @@ The rule from AGENTS.md stays: a paid run leaves only from the board, after the 
 
 In the header, to the right of EN/RU: "Direct" (direct calls) and "SDK". The choice is written to `data/comfy_transport.txt` and wins over `COMFY_TRANSPORT`; while the file does not exist, the variable applies. While any job has the `running` status, the buttons are locked and `POST /api/comfy/transport` answers 409: a job sent through one transport cannot be found by id through the other. Jobs with the `pending` status do not block switching.
 
+## Checked on a real ComfyUI
+
+On 2026-10-25 the board ran in SDK mode against `comfy-api-proxy` 0.1.6 in front of ComfyUI 0.41.0 (Windows, `@comfyorg/sdk` 0.5.0). These stages ran from start to finish and produced the expected files: the Krea 2 location, the Qwen Image 2.1 first frame (several uploaded pictures), the LTX 2.5 video preview (video with sound) and the MiniMax H3 video preview. Cancelling a running MiniMax H3 final emptied ComfyUI's queue and put the stage back to idle. Not checked: errors from a rejected graph, the Whisper text output path, and the paid cloud path.
+
 ## What the SDK cannot do, and how that shows in the board
 
 - **Queue.** The SDK cannot read the shared queue (the list of waiting and running jobs), so in SDK mode `readComfyQueue()` throws, `queuePosition` stays `null` on jobs, and a "lost" job is not detected by timeout. If the service forgets a job, this will probably become a read error (`NotFound`); not checked live.
