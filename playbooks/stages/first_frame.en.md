@@ -11,7 +11,7 @@ The reference pictures win over the shot text.
 - When the shot text (shot.md) differs from the references — in clothes, light, weather or objects — the references are right.
 - Change clothes, items, the light or the location only when the user explicitly asks, and only what they named.
 
-The board helps with this. A model with vision describes the approved location, characters and first frame right after they are approved (`data/descriptions/`, once per file). Before the agent task it merges the shot's scenario text, these descriptions and the user's notes into one action, `shots/{shotId}/action.md` («Действие по картинкам» on the stage page; the user can edit it). The agent task has all three and every earlier note for the shot. Priority: the user's request, the user's earlier notes (a later one wins), what the pictures show, the adapted action, the shot.md text.
+The board helps with this. A model with vision describes the approved location, characters and first frame right after they are approved (`data/descriptions/`, once per file). Before the agent task it merges the shot's scenario text, these descriptions and the user's notes into one action, `shots/{shotId}/action.md` ("Action from the pictures" on the stage page; the user can edit it). The agent task has all three and every earlier note for the shot. Priority: the user's request, the user's earlier notes (a later one wins), what the pictures show, the adapted action, the shot.md text.
 
 How to write this in the prompt: `playbooks/models/qwen_first_frame.en.md`, sections «First: the references win over the text», «Clothes and items», «Light», «Lock».
 
@@ -30,7 +30,7 @@ Not from the raw libraries. Those have a different angle and different clothes.
 - Location: the one file in `shots/{shotId}/location/approve/`. This is image 1.
 - Character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. The board takes them in alphabetical order of the file name: with `julia_s05.png` and `lena_s05.png`, Julia is image 2 and Lena is image 3. In prompt.md they are character1 and character2 in that order. The agent task lists the numbers under «Images the graph receives». The names are for the task only.
 - Portrait: the character's face, after all the characters, in the same order (image 3 for one person, image 4 and image 5 for two). The board always sends it when one exists. Source: `refs/{name}_face.png` of this stage, otherwise the portrait in `data/characters/{name}/` (`portrait.png`, `portret.png`, `{Name}_portret.png`, `face.png`). Rules: `playbooks/models/qwen_first_frame.en.md`, «Portraits».
-- The graph takes up to 6 images: the location and 5 references in a row, with no gaps in the numbers. The task names anything that did not fit. A file removed with «Убрать» does not go to the graph and takes no number.
+- The graph takes up to 6 images: the location and 5 references in a row, with no gaps in the numbers. The task names anything that did not fit. A file removed with "Remove" does not go to the graph and takes no number.
 
 Copies go in this stage's `refs/`: `location.png`, `{name}.png`. A manual approve can skip the upstream check, but the graph still receives these shot frames, not `view.png` and not `full_body.png`.
 

@@ -1,28 +1,28 @@
 # Comfy graphs
 
-Графы в формате API. Доска запускает их через манифесты `*.bind.json` (`docs/contracts/graph-binding.md`): манифест говорит, какие файлы и какой текст идут в какие ноды. Новый вариант этапа = граф + манифест, без правки кода.
+Graphs in API format. The board runs them through the `*.bind.json` manifests (`docs/contracts/graph-binding.md`): a manifest says which files and which text go into which nodes. A new stage variant = a graph + a manifest, no code change.
 
-| Манифест | Этап | Граф | Кто запускает |
+| Manifest | Stage | Graph | Who runs it |
 | --- | --- | --- | --- |
-| `location_views` | `location` | `location_views_multiple_angles.json` | доска; разделы `## simple/objects/camera/camera_objects` в `prompt.md` |
-| `location_krea2` | `location` | `location_krea2_api.json` (Krea 2 Turbo, локация с нуля; как пересохранить — `drafts/README.md`) | доска; один абзац в `prompt.md`, картинка из `refs/` необязательна |
-| `first_frame_compositing` | `first_frame` | `qwen21_character_compositing.json` | доска |
-| `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | доска |
-| `video_ltx` | `video_preview` | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком) | доска; промпт — `models/ltx_video.en.md` |
-| `final_wan_720` | `final_render` | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с) | доска; промпт — из метаданных утверждённого эскиза |
-| `final_ltx` | `final_render` | тот же `ltx25_i2v_api.json` (1.2 Мп, 832×1472, 24 к/с) | доска, по умолчанию если эскиз LTX |
-| `video_minimax` | `video_preview` | `minimax_h3_preview_api.json` (MiniMax H3 по референсам + ЛоРа Cinema, один проход 0.5 Мп) | доска; «▶ Все кадры» гонит его вторым, после `video_ltx` (`run_chain.json`) |
-| `final_h3_cinema` | `final_render` | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema) | доска; `prompt.md` — текст модели целиком, с `subject_definitions ASTROCINEMAV01K2T:` первой строкой; первый кадр — `<Picture 1>`, лица персонажей — `<Picture 2…7>` |
-| `final_h3_head_swap` | `final_render` | `minimax_h3_head_swap_api.json` (MiniMax H3, замена головы по листу лица, без промпта) | доска; доступен только с одним персонажем, его `face_sheet` и утверждённым превью |
-| `final_heygen` | `final_render` | `heygen_video_i2v_api.json` (Comfy Cloud) | доска, только с галочкой на этот запуск |
-| `final_i2v` | `final_render` | граф Wan i2v превью | доска, запасной вариант |
-| `final_flf` | `final_render` | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 к/с | доска; по умолчанию после эскиза FLF; промпт и последний кадр эскиза |
-| — | `characters` | `character_outfit_qwen21.json` (правка одежды, image 1 — персонаж, image 2 — образец) | агент по `characters_comfy.en.md`; манифест — черновик в `drafts/` |
+| `location_views` | `location` | `location_views_multiple_angles.json` | the board; sections `## simple/objects/camera/camera_objects` in `prompt.md` |
+| `location_krea2` | `location` | `location_krea2_api.json` (Krea 2 Turbo, a location from scratch; how to re-save it — `drafts/README.md`) | the board; one paragraph in `prompt.md`, a picture from `refs/` is optional |
+| `first_frame_compositing` | `first_frame` | `qwen21_character_compositing.json` | the board |
+| `video_i2v`, `video_flf` | `video_preview` | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json` | the board |
+| `video_ltx` | `video_preview` | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 fps, with sound) | the board; prompt — `models/ltx_video.en.md` |
+| `final_wan_720` | `final_render` | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 fps) | the board; prompt — from the approved sketch's metadata |
+| `final_ltx` | `final_render` | the same `ltx25_i2v_api.json` (1.2 MP, 832×1472, 24 fps) | the board, the default when the sketch is LTX |
+| `video_minimax` | `video_preview` | `minimax_h3_preview_api.json` (MiniMax H3 from references + the Cinema LoRA, one pass at 0.5 MP) | the board; "▶ All shots" runs it second, after `video_ltx` (`run_chain.json`) |
+| `final_h3_cinema` | `final_render` | `minimax_h3_cinema_api.json` (MiniMax H3 from references + the Cinema LoRA) | the board; `prompt.md` is the whole model text, with `subject_definitions ASTROCINEMAV01K2T:` as the first line; the first frame is `<Picture 1>`, character faces are `<Picture 2…7>` |
+| `final_h3_head_swap` | `final_render` | `minimax_h3_head_swap_api.json` (MiniMax H3, head swap from a face sheet, no prompt) | the board; available only with one character, their `face_sheet` and an approved preview |
+| `final_heygen` | `final_render` | `heygen_video_i2v_api.json` (Comfy Cloud) | the board, only with the tick for that run |
+| `final_i2v` | `final_render` | the Wan i2v preview graph | the board, fallback |
+| `final_flf` | `final_render` | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 fps | the board; the default after an FLF sketch; the sketch's prompt and last frame |
+| — | `characters` | `character_outfit_qwen21.json` (outfit edit, image 1 — the character, image 2 — the sample) | an agent following `characters_comfy.en.md`; the manifest is a draft in `drafts/` |
 
-Черновики, которые ещё не проверены в ComfyUI: `playbooks/workflows/drafts/`.
+Drafts not yet checked in ComfyUI: `playbooks/workflows/drafts/`.
 
-## После пересохранения графа
+## After re-saving a graph
 
-1. Экспорт из ComfyUI в формате API под тем же именем.
-2. Если поменялись id нод — поправить манифест в том же коммите.
-3. `npm test`: проверка манифестов (`src/lib/contracts/graph-binding.test.ts`) падает, если нода, поле или путь внутри JSON пропали из графа.
+1. Export from ComfyUI in API format under the same name.
+2. If node ids changed, fix the manifest in the same commit.
+3. `npm test`: the manifest check (`src/lib/contracts/graph-binding.test.ts`) fails if a node, a field or a path inside the JSON disappeared from the graph.

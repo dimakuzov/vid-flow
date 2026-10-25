@@ -68,7 +68,7 @@ The model reads every word as part of the picture. A negation puts the unwanted 
 | `nothing moved` | `every object in the same place and size` |
 | `the braid is NOT finished, NO hair tie` | `the braid is half done, the loose end hangs free, unlike image 2` |
 
-A negation stays only when a run already showed the error and the positive wording did not fix it; one per prompt at most. When the user's message says «не …», turn it into the wanted state the same way.
+A negation stays only when a run already showed the error and the positive wording did not fix it; one per prompt at most. When the user's message says "not …", turn it into the wanted state the same way.
 
 ### No character references
 
@@ -99,7 +99,7 @@ When the location description shows more than one space, put each person in the 
 
 ### Shot size
 
-When the task has a «Distance from the camera» block, each person's size comes from it, not from the first words of the shot text; write that person's size block from it. A size the user writes in the message wins over the block for that run. Without the block, take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `ещё ближе`, `очень крупный план` and `much closer` mean a close-up. Rewrite the size sentences to the close-up block below. Never compare with the previous picture: `much closer to the camera than before`, `closer than before`, `than before`, `as before` are forbidden, and the board will not run a prompt that contains them. The model has not seen that picture. Say how close the person is now. If prompt.md already has such a comparison, delete it. Each size has its own size block. The lock is the same for all of them (see «Lock»).
+When the task has a «Distance from the camera» block, each person's size comes from it, not from the first words of the shot text; write that person's size block from it. A size the user writes in the message wins over the block for that run. Without the block, take the shot size from the first words of the shot text (`Close up`, `Medium shot`, `Long shot`). A user message wins over shot.md: `closer`, `very tight close-up` and `much closer` mean a close-up. Rewrite the size sentences to the close-up block below. Never compare with the previous picture: `much closer to the camera than before`, `closer than before`, `than before`, `as before` are forbidden, and the board will not run a prompt that contains them. The model has not seen that picture. Say how close the person is now. If prompt.md already has such a comparison, delete it. Each size has its own size block. The lock is the same for all of them (see «Lock»).
 
 The camera and the location never move, whatever the shot size. The size comes only from how close to the camera the person stands.
 

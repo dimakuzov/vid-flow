@@ -36,7 +36,7 @@ The approved file: `approve/{name}_{shotId}.png` (example: `lena_s01.png`). It i
 | File | Role | From |
 | --- | --- | --- |
 | `{name}_base.*` | image 1, when the user placed the file | a base for this shot. Without it the library picture is used |
-| `{name}_clothes.*` | image 2, when the user placed the file | without it, node «image 2: образец одежды» is bypassed. `{name}_outfit.png` does not enter the graph |
+| `{name}_clothes.*` | image 2, when the user placed the file | without it, node «image 2: clothing sample» is bypassed. `{name}_outfit.png` does not enter the graph |
 | `{name}_face.png` | the face for later stages | this graph does not use it |
 
 One item — one reference. A layer that is not visible on the reference (a dress under a jacket) is made in a separate pass.

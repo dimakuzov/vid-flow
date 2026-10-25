@@ -485,7 +485,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Строго первый кадр: картинка"
+      "title": "Strict first frame: picture"
     }
   },
   "400": {
@@ -510,7 +510,7 @@
     },
     "class_type": "MiniMaxH3AddGuide",
     "_meta": {
-      "title": "Строго первый кадр: закрепить кадр 0"
+      "title": "Strict first frame: pin frame 0"
     }
   }
 }

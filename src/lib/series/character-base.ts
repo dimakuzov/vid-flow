@@ -178,7 +178,7 @@ export function characterBaseExcluded(name: string, files: string[]): string {
   return `every picture of ${name} is out of the graph (${files.join(", ")}). Press "Restore" on one of them under "What goes into the graph", or pick another picture for ${name}.`;
 }
 
-/** Нет референса одежды: прогон идёт, нода «image 2: образец одежды» в bypass. */
+/** Нет референса одежды: прогон идёт, нода «image 2: clothing sample» в bypass. */
 export function missingCharacterClothes(name: string): string {
   return `no clothing reference for ${name}: the "image 2: clothing sample" node is bypassed`;
 }

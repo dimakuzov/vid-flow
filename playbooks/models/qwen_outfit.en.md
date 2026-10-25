@@ -8,7 +8,7 @@ A section `## name` in lowercase latin, the same name as in shot.md. An empty se
 
 Change only the clothes from the user's request. Face, hair, figure, pose, background, and the other clothes stay as in image 1. Do not describe appearance from memory. Do not write file names.
 
-Image 2 is the one clothing reference from `refs/` (not the picture of the person). Without a reference, node «image 2: образец одежды» is bypassed, and the text does not mention image 2: describe the clothes in words. Two clothing references are refused.
+Image 2 is the one clothing reference from `refs/` (not the picture of the person). Without a reference, node «image 2: clothing sample» is bypassed, and the text does not mention image 2: describe the clothes in words. Two clothing references are refused.
 
 ```md
 ## lena

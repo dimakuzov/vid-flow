@@ -13,7 +13,7 @@ The prompt follows the playbook of the selected variant (the `playbook` of its m
 | `video_i2v` | 10 | `wan22_i2v_sketch_turbo_api.json` | the newest file in `first_frame/approve/`, `prompt.md` |
 | `video_flf` | 20 | `wan22_flf_sketch_turbo_api.json` | the same + the newest picture in this stage's `refs/` as the last frame |
 
-The board defaults to `video_ltx`. «▶ All shots» over this stage runs two sketches on every shot, one after the other: LTX first, then MiniMax (`run_chain.json` in the stage folder). When the LTX run finishes, the board sends the agent the MiniMax step: the agent rewrites `prompt.md` in the MiniMax form and the board runs it. An error or «Отменить» stops the chain. The user approves one of the two videos; the final follows the approved one.
+The board defaults to `video_ltx`. "▶ Every shot" over this stage runs two sketches on every shot, one after the other: LTX first, then MiniMax (`run_chain.json` in the stage folder). When the LTX run finishes, the board sends the agent the MiniMax step: the agent rewrites `prompt.md` in the MiniMax form and the board runs it. An error or "Cancel" stops the chain. The user approves one of the two videos; the final follows the approved one.
 
 The user can also switch the variant in the menu and send to the agent with no message: the task then says that `prompt.md` was written for another workflow, and the agent rewrites it in the new form, keeping the action and the user's notes.
 

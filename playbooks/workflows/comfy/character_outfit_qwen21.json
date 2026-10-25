@@ -5,7 +5,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "image 1: персонаж (база или прошлый проход)"
+      "title": "image 1: character (base or previous pass)"
     }
   },
   "11": {
@@ -72,7 +72,7 @@
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
-      "title": "PROMPT (правка одежды)"
+      "title": "PROMPT (outfit edit)"
     }
   },
   "17": {
@@ -170,7 +170,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "image 2: образец одежды"
+      "title": "image 2: clothing sample"
     }
   }
 }

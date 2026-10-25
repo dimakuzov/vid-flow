@@ -22,7 +22,7 @@ Do not edit the graph JSON: the queue gets the image names, the text, the seed a
 
 Do not change steps, cfg, sampler or LoRA.
 
-No garment reference — node 22 («image 2: образец одежды») is bypassed: node 22 and the `images.image_2` key on node 17 leave the prompt. Do not mention image 2 in the text. Other files in `refs/` do not enter the graph.
+No garment reference — node 22 («image 2: clothing sample») is bypassed: node 22 and the `images.image_2` key on node 17 leave the prompt. Do not mention image 2 in the text. Other files in `refs/` do not enter the graph.
 
 ## Command
 

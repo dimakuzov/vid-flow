@@ -8,7 +8,7 @@ A shot with one speaker is made by MiniMax H3 in reference mode with the Cinema 
 
 | manifest id | order | Graph | When |
 | --- | --- | --- | --- |
-| `final_heygen` | 2 | `heygen_video_i2v_api.json`, HeyGen Video 1.0 in **Comfy Cloud** (paid, ~45.3 credits per 10 s, 5–15 s), from the approved first frame, the preview's length | default for a **dialogue** (two or more speakers in `speech.md`); runs only after the box «Разрешить платную отправку в Comfy Cloud» is ticked for this run. Prompt: `playbooks/models/heygen_video.en.md` |
+| `final_heygen` | 2 | `heygen_video_i2v_api.json`, HeyGen Video 1.0 in **Comfy Cloud** (paid, ~45.3 credits per 10 s, 5–15 s), from the approved first frame, the preview's length | default for a **dialogue** (two or more speakers in `speech.md`); runs only after the box "Allow a paid send to Comfy Cloud" is ticked for this run. Prompt: `playbooks/models/heygen_video.en.md` |
 | `final_wan_720` | 3 | `wan22_i2v_sketch_turbo_api.json`, 720×1280, 24 fps, the sketch's prompt and first frame, the preview's length | default for a shot **without lines**, when the sketch is not LTX |
 | `final_h3_cinema` | 4 | `minimax_h3_cinema_api.json`, MiniMax H3 reference to video + Cinema LoRA, two passes (1 MP, then the latent upscale to 1.5 MP), 24 fps, the preview's length | default for a shot **with one speaker** (`speech.md`): MiniMax voices it and moves the lips |
 | `final_ltx` | 7 | the same graph as `video_ltx` (`ltx25_i2v_api.json`), 1.2 MP (832×1472), 24 fps | default when the approved sketch was made with LTX. This wins over the line rows |
@@ -33,7 +33,7 @@ The board looks at the newest file in `video_preview/approve/`: the final follow
 | The approved sketch was FLF (Wan, first and last frame) | `final_flf` | the board, the default |
 | Nobody speaks, and the sketch is Wan | `final_wan_720` | the board, the default |
 | One speaker | `final_h3_cinema` | the board, the default |
-| Two or more speakers | `final_heygen` | the board, the default. It runs only after the box «Разрешить платную отправку в Comfy Cloud» is ticked for this run |
+| Two or more speakers | `final_heygen` | the board, the default. It runs only after the box "Allow a paid send to Comfy Cloud" is ticked for this run |
 | A specific end pose is needed, but the sketch was not FLF | `final_flf` | the agent writes `suggestedWorkflow`. The last frame goes in this stage's `refs/` |
 
 How the board knows the sketch graph: the video metadata (the `prompt` key, written by SaveVideo) has non-empty text in node `398:376` / `value` — that is LTX. No metadata — it looks at the file name: the substring `_ltx` (`s01_ltx_00001_.mp4`). It does not look at the name when metadata is present: the file may have been renamed. Details: `docs/contracts/graph-binding.md`.

@@ -48,21 +48,21 @@ A shot with no specific characters and no specific location is made directly in 
 
 If the inbox item is `characters`, write only `prompt.md`. One section per character, heading `## <name>` in lowercase latin (`## lena`). An empty section means that character is not regenerated. The model playbook is `playbooks/models/qwen_outfit.en.md`.
 
-The board runs ComfyUI, one job per character, into `output/`. Do not queue Comfy, do not edit the graph JSON, do not copy files into `approve/`. The user approves. Graph: `character_outfit_qwen21.json`, manifest `character_outfit`. Image 1 is the character base (`refs/{name}_base.*` if the user put it there, otherwise `data/characters/{name}/`). Image 2 is `refs/{name}_clothes.*` when the user placed that file. With only the base, node «image 2: образец одежды» is bypassed. Other files in `refs/` do not enter this graph. Set `"status": "done"` in `agent_request.json` when `prompt.md` is written. Do not write `status.json`.
+The board runs ComfyUI, one job per character, into `output/`. Do not queue Comfy, do not edit the graph JSON, do not copy files into `approve/`. The user approves. Graph: `character_outfit_qwen21.json`, manifest `character_outfit`. Image 1 is the character base (`refs/{name}_base.*` if the user put it there, otherwise `data/characters/{name}/`). Image 2 is `refs/{name}_clothes.*` when the user placed that file. With only the base, node «image 2: clothing sample» is bypassed. Other files in `refs/` do not enter this graph. Set `"status": "done"` in `agent_request.json` when `prompt.md` is written. Do not write `status.json`.
 
 ## Do not
-- Delete `output/` or `approve/` without explicit user confirmation. The trash button on a board file card in `output/` is that confirmation and the board deletes the file itself; an agent still never deletes from these folders on its own. In `refs/` the board has no trash: «Убрать» only keeps a file out of this stage's graph (`run_settings.json` → `excluded`). Do not use excluded files, and do not delete or restore them
+- Delete `output/` or `approve/` without explicit user confirmation. The trash button on a board file card in `output/` is that confirmation and the board deletes the file itself; an agent still never deletes from these folders on its own. In `refs/` the board has no trash: "Remove" only keeps a file out of this stage's graph (`run_settings.json` → `excluded`). Do not use excluded files, and do not delete or restore them
 - Put playbooks inside a series folder; they are global
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 
 ## Comfy Cloud
-Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only the board sends them, and only after the user ticks «Разрешить платную отправку в Comfy Cloud» on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
+Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only the board sends them, and only after the user ticks "Allow a paid send to Comfy Cloud" on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
 
 ## Comfy queue
-Любой агент ставит прогон файлом `data/comfy_queue/<id>.json` (`status: pending`, `prompt` в формате API Comfy, `uploads`, `saveTo` внутри `data/`). Процесс доски на компьютере с ComfyUI отправляет его в ComfyUI (по умолчанию через Comfy SDK и comfy-api-proxy на `http://127.0.0.1:8189/`, в режиме `legacy` напрямую на `http://127.0.0.1:8188/`) и пишет результат в тот же файл. Сам адрес из чужой оболочки не вызывать.
+Any agent queues a run with the file `data/comfy_queue/<id>.json` (`status: pending`, `prompt` in ComfyUI API format, `uploads`, `saveTo` inside `data/`). The board process on the computer with ComfyUI sends it to ComfyUI (by default through the Comfy SDK and comfy-api-proxy at `http://127.0.0.1:8189/`; in `legacy` mode directly to `http://127.0.0.1:8188/`) and writes the result into the same file. Never call that address from a foreign shell.
 
-## Задача для любого LLM
-«Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188/` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.
+## Task for any LLM
+"Send to agent" writes `llm_task.md` into the stage folder. Claude, Cursor and a local Gemini read that file and carry it out. `git pull` is not needed for this task: the files are already on disk. ComfyUI is at `http://127.0.0.1:8188/` on the same computer as the project folder. Run commands from a local shell that sees this folder.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

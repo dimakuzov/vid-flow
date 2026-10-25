@@ -1,32 +1,31 @@
-# Черновики графов и манифестов
+# Graph and manifest drafts
 
-Тест `npm test` эту папку не читает. Переносить в `workflows/comfy/` только после проверки в ComfyUI.
+`npm test` does not read this folder. Move a draft into `workflows/comfy/` only after checking it in ComfyUI.
 
-| Файл | Что | Что нужно до переноса |
+| File | What | What is needed before moving |
 | --- | --- | --- |
-| `character_outfit.bind.json` | Манифест одежды к настоящему графу `workflows/comfy/character_outfit_qwen21.json` (id нод сверены) | В контракте нет `forEach`, `library:character`, `match`: доске нужен обход по персонажам кадра |
-| `final_h3_base_reference.md` | Финал H3 от базового low-res H3-ролика (шаблон `create_final_video_using_base_reference`) | Ответы пользователя на вопросы в файле |
-| `first_frame_text.bind.json` | Первый кадр без персонажей и локации, тот же граф сборки, refs/ 0–3 картинки, без картинок — text-to-image | В контракте нет `when.shot`: без него вариант станет «по умолчанию» у кадров с персонажами, пока их approve нет |
+| `character_outfit.bind.json` | The outfit manifest for the real graph `workflows/comfy/character_outfit_qwen21.json` (node ids checked) | The contract has no `forEach`, `library:character`, `match`: the board needs a walk over the shot's characters |
+| `final_h3_base_reference.md` | H3 final from a base low-res H3 clip (template `create_final_video_using_base_reference`) | The user's answers to the questions in the file |
+| `first_frame_text.bind.json` | First frame with no characters and no location, the same assembly graph, 0–3 pictures in refs/, with no pictures — text-to-image | The contract has no `when.shot`: without it the variant becomes the "default" for shots with characters while they have no approve yet |
 
-## Krea 2: граф локации с нуля
+## Krea 2: a location graph from scratch
 
-Граф пользователя уже лежит в `workflows/comfy/location_krea2_api.json`, манифест — `workflows/comfy/location_krea2.bind.json` (тест нод проходит). В черновики переносить нечего. Ниже — как пересохранить граф, если он поменяется.
+The user's graph already lies in `workflows/comfy/location_krea2_api.json`, its manifest is `workflows/comfy/location_krea2.bind.json` (the node test passes). There is nothing to move into drafts. Below is how to re-save the graph if it changes.
 
-1. В ComfyUI открыть граф Krea 2 (столовая, `The_dining_room`). Проверить, что прогон в ComfyUI проходит.
-2. Ноды, которые нужны доске (id сейчас):
+1. In ComfyUI open the Krea 2 graph (dining room, `The_dining_room`). Check that a run in ComfyUI passes.
+2. The nodes the board needs (ids as of now):
 
-   | id | Тип | Поле, которое пишет доска |
+   | id | Type | Field the board writes |
    | --- | --- | --- |
-   | `61` | `PrimitiveStringMultiline` (Text String) | `value` — весь `prompt.md` |
-   | `66` | `TextEncodeQwenImageEditPlus` | `image1` — удаляется, если картинки нет |
-   | `67` | `LoadImage` | `image` — первый файл `refs/` или общий вид из `data/locations/` |
+   | `61` | `PrimitiveStringMultiline` (Text String) | `value` — the whole `prompt.md` |
+   | `66` | `TextEncodeQwenImageEditPlus` | `image1` — removed when there is no picture |
+   | `67` | `LoadImage` | `image` — the first file of `refs/` or the general view from `data/locations/` |
    | `49` | `ResolutionSelector` | `aspect_ratio` = `9:16 (Portrait Widescreen)` |
-   | `54` | `KSampler` | `seed` — случайный |
+   | `54` | `KSampler` | `seed` — random |
    | `29` | `SaveImage` | `filename_prefix` = `frameboard/location/{shotId}_krea2` |
 
-   LoRA (`60`, `65`), переключатель `63`, шаги, cfg, сэмплер доска не трогает: их меняют в ComfyUI.
-3. Сохранить в формате API: меню **Workflow → Export (API)** (в старом интерфейсе — включить Dev mode в настройках и нажать **Save (API Format)**). Имя файла — `location_krea2_api.json`.
-4. Положить файл в `playbooks/workflows/comfy/`, заменив старый.
-5. Если id нод поменялись — вписать новые в `location_krea2.bind.json` (поле `node` в `slots`). Удалили `LoadImage` — убрать первый слот и вход `view`.
-6. `npm test`: тест манифестов скажет, какой ноды или поля не хватает.
-
+   The LoRAs (`60`, `65`), the switch `63`, steps, cfg and the sampler are not touched by the board: change them in ComfyUI.
+3. Save in API format: menu **Workflow → Export (API)** (in the old interface — enable Dev mode in settings and press **Save (API Format)**). The file name is `location_krea2_api.json`.
+4. Put the file into `playbooks/workflows/comfy/`, replacing the old one.
+5. If node ids changed, write the new ones into `location_krea2.bind.json` (the `node` field in `slots`). If `LoadImage` was deleted, remove the first slot and the `view` input.
+6. `npm test`: the manifest test says which node or field is missing.

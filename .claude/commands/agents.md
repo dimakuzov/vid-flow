@@ -1,7 +1,7 @@
 ---
-description: Агенты доски Frameboard — список и остановка
-argument-hint: list | stop <эпизод>/<кадр>/<этап> | stop <эпизод>/format | stop --all
+description: Frameboard board agents — list and stop
+argument-hint: list | stop <episode>/<shot>/<stage> | stop <episode>/format | stop --all
 allowed-tools: Bash(node scripts/frameboard-agents.mjs:*)
 ---
 
-Выполни `node scripts/frameboard-agents.mjs $ARGUMENTS` из корня репозитория (без аргументов — `list`) и покажи вывод как есть, без пересказа. Ничего больше не запускай и не останавливай сам.
+Run `node scripts/frameboard-agents.mjs $ARGUMENTS` from the repository root (with no arguments — `list`) and show the output as is, without retelling it. Do not start or stop anything else yourself.

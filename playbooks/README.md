@@ -1,42 +1,42 @@
 # Global playbooks
 
-Эти документы глобальны для всех серий. В папку серии их не копировать.
+These documents are global for all series. Do not copy them into a series folder.
 
-Структура:
+Structure:
 
-- `models/` — как писать промпты под конкретную модель
-- `stages/` — что делает каждый этап кадра и от какой базы он зависит
-- `workflows/` — как гонять Comfy вручную
-- `workflows/comfy/` — сами JSON-графы
+- `models/` — how to write prompts for a specific model
+- `stages/` — what each shot stage does and which base it depends on
+- `workflows/` — how to run Comfy by hand
+- `workflows/comfy/` — the JSON graphs themselves
 
-Базы identity серии (не playbooks):
+Series identity bases (not playbooks):
 
 - `data/characters/{name}/` — portrait, side, full body
-- `data/locations/{locationId}/` — общий вид локации
-- `data/references/` — общие референсы сериала, не refs кадра
-- `data/scenarios/` — документы сценариев, не рабочий `scenario.md` серии
+- `data/locations/{locationId}/` — the general view of a location
+- `data/references/` — shared series references, not a shot's refs
+- `data/scenarios/` — script documents, not the series' working `scenario.md`
 
-Shot-этапы `characters` и `location` собирают вариант кадра из этих баз. Контракт этапа тот же: `refs/`, `output/`, `approve/` и пять документов.
+The shot stages `characters` and `location` build a shot variant from these bases. The stage contract is the same: `refs/`, `output/`, `approve/` and five documents.
 
-Сейчас заполнены правила shot-персонажа (правка одежды Qwen Image 2.1 по образцу, проверено на teaser s07):
+Rules of the shot character (Qwen Image 2.1 outfit edit from a clothing sample, checked on teaser s07):
 
 - `stages/characters.en.md`
 - `models/qwen_image.en.md`
 - `workflows/characters_comfy.en.md`
 - `workflows/comfy/character_outfit_qwen21.json`
 
-Ракурсы локации (проверено на прошлом проекте: ветка objects чаще всего идёт в работу):
+Location views (checked on a previous project: the objects branch is the one used most often):
 
 - `stages/location.en.md`
 - `models/qwen_location.en.md`
 - `workflows/location_comfy.en.md`
 - `workflows/comfy/location_views_multiple_angles.json`
 
-Первый кадр (вписать утверждённых персонажей в утверждённую локацию):
+First frame (place the approved characters into the approved location):
 
 - `stages/first_frame.en.md`
 - `models/qwen_first_frame.en.md`
 - `workflows/first_frame_comfy.en.md`
 - `workflows/comfy/qwen21_character_compositing.json`
 
-Плейбуки только на английском (`.en.md`): их читают агенты, русских копий нет. Страница этапа показывает путь к `stages/{stage}.en.md`, `workflows/{stage}_comfy.en.md` и model playbook. Граф персонажа виден на этапе `characters`, граф ракурсов — на `location`, граф сборки кадра — на `first_frame`.
+Playbooks are English only (`.en.md`): agents read them, there are no other-language copies. The stage page shows the path to `stages/{stage}.en.md`, `workflows/{stage}_comfy.en.md` and the model playbook. The character graph is visible on the `characters` stage, the views graph on `location`, the frame assembly graph on `first_frame`.
