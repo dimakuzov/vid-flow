@@ -46,7 +46,7 @@ test("библиотека: без полного роста берётся пе
 });
 
 test("все картинки персонажа убраны из графа: ошибка говорит про «Убрать» и «Вернуть»", () => {
-  createEpisode("e01", "Серия");
+  createEpisode("e01");
   const dir = library("lena_x", ["lena_x_body.png"]);
   const shot = shotDir("e01", "s01");
   fs.mkdirSync(shot, { recursive: true });
@@ -64,7 +64,7 @@ test("все картинки персонажа убраны из графа: �
 });
 
 test("нет ни одной картинки: прежняя ошибка про папку", () => {
-  createEpisode("e01", "Серия");
+  createEpisode("e01");
   fs.mkdirSync(path.join(getCharactersRoot(), "empty_one"), { recursive: true });
   const shot = shotDir("e01", "s02");
   fs.mkdirSync(shot, { recursive: true });
