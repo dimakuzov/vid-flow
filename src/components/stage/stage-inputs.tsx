@@ -68,7 +68,15 @@ export function StageInputs({
                   file={file}
                   compact
                   onOpen={() => onOpen(input.files, file)}
-                  onToggleExclude={onToggleExclude ? () => onToggleExclude(file, true) : undefined}
+                  onToggleExclude={
+                    onToggleExclude
+                      ? () => {
+                          // Картинка персонажа — основа прогона: случайный клик по «Убрать» оставляет этап без неё.
+                          if (input.characterName && !window.confirm(t("graph.confirmRemoveCharacter", { name: input.characterName, file: file.name }))) return;
+                          onToggleExclude(file, true);
+                        }
+                      : undefined
+                  }
                 />
               ))}
               {input.excluded.map((file) => (

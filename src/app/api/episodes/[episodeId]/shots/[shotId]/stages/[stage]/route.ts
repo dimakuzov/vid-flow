@@ -76,7 +76,7 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       /** Прямая речь кадра (speech.md). Только на видео-этапах, на других игнорируется. */
       speech?: string;
       /** Убрать файл из графа этапа или вернуть (путь как MediaFile.relativePath). Файл не удаляется. */
-      exclude?: { path?: string; excluded?: boolean };
+      exclude?: { path?: string; excluded?: boolean; click?: { trusted?: boolean; detail?: number; at?: string } | null };
       /** Список персонажей кадра. Только этап characters. Пишет строку `- characters:` в shot.md. */
       characters?: string[];
       /** Картинка персонажа в графе (image 1). path пустой — снова база по имени или библиотека. */
@@ -147,6 +147,9 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       logSettingsChange(episodeId, shotId, stageId, {
         change: body.exclude.excluded !== false ? "exclude" : "restore",
         path: body.exclude.path,
+        click: body.exclude.click
+          ? { trusted: body.exclude.click.trusted === true, detail: Number(body.exclude.click.detail ?? -1), at: String(body.exclude.click.at ?? "") }
+          : null,
         from: requestOrigin(request),
       });
     }

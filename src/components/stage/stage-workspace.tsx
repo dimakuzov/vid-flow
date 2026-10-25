@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusPill } from "@/components/board/status-pill";
 import { isTypingTarget, overlayOpen } from "@/components/hotkeys";
+import { lastClick } from "./click-trace";
 import { LanguageSwitch, useT } from "@/components/language";
 import { stageName } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -271,7 +272,7 @@ export function StageWorkspace({ initialDetail }: { initialDetail: StageDetail }
     act(async () => {
       const data = await requestJson<StageDetail>(stageApi, {
         method: "PATCH",
-        body: { exclude: { path: file.relativePath, excluded: exclude } },
+        body: { exclude: { path: file.relativePath, excluded: exclude, click: lastClick() } },
         fallbackError: t("page.inputsFailed"),
       });
       stage.merge(data);

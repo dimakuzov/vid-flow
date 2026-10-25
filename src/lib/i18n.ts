@@ -507,6 +507,10 @@ const messages = {
   },
 
   "graph.title": { en: "What goes into the graph", ru: "Что уйдёт в граф" },
+  "graph.confirmRemoveCharacter": {
+    en: "Keep {file} out of the graph? {name} will have no picture for the run until you press Restore.",
+    ru: "Не отдавать {file} в граф? У {name} не останется картинки для прогона, пока вы не нажмёте «Вернуть».",
+  },
   "graph.board": { en: "by default, for the selected workflow", ru: "по умолчанию, при выбранном воркфлоу" },
   "graph.agent": { en: "the agent takes these files from the playbook", ru: "агент берёт эти файлы по плейбуку" },
   "graph.excludeNote": { en: " · Remove does not delete the file, it only keeps it out of the graph", ru: " · «Убрать» не удаляет файл, а только не отдаёт его в граф" },

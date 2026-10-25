@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { useT } from "@/components/language";
 import type { MediaFile } from "@/lib/series/types";
+import { rememberClick } from "./click-trace";
 
 function DeleteButton({ name, onDelete }: { name: string; onDelete: () => void }) {
   const t = useT();
@@ -27,7 +28,10 @@ function ExcludeButton({ excluded, onToggle }: { excluded: boolean; onToggle: ()
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={(event) => {
+        rememberClick(event);
+        onToggle();
+      }}
       className="shrink-0 text-stone-500 underline hover:text-stone-800"
       title={excluded ? t("media.restoreTitle") : t("media.excludeTitle")}
     >
