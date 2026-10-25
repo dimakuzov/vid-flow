@@ -10,6 +10,15 @@ One project root is one series. The table shows the status of every shot, stage 
 
 Files are the source of truth. The UI reads and writes the series directory, so if the interface fails you can work directly in the folders.
 
+## Requirements
+
+- Node.js 22 or newer and npm
+- Python 3.10 or newer (only for `comfy-api-proxy`)
+- git and ffmpeg on the `PATH`
+- ComfyUI 0.41 or newer with the models and the one custom node pack listed in [ComfyUI models and nodes](#comfyui-models-and-nodes) (about 158 GB of models in total)
+- A GPU with about 16 GB of VRAM (tested on an RTX 4070 Ti SUPER, Windows 11)
+- Optional: Kdenlive or another editor for the final cut
+
 ## Run
 
 The board sends jobs to ComfyUI through the official Comfy SDK, which talks to ComfyUI through `comfy-api-proxy`. Start ComfyUI first, then the proxy, then the board:
