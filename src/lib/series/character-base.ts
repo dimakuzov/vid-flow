@@ -19,6 +19,28 @@ const NAMED_SLOTS = [
   ["side.png", "portret_side.png"],
 ];
 
+/**
+ * Полный рост, названный по папке: `man_ptu/man_ptu_body.png`. Так названы картинки в библиотеке,
+ * сделанной в ComfyUI; ищется после full_body.png и body.png, до «первой картинки».
+ */
+function folderNamedBody(folder: string): string | null {
+  const owner = path.basename(folder).toLowerCase();
+  let items: string[];
+  try {
+    items = fs.readdirSync(folder);
+  } catch {
+    return null;
+  }
+  const found = items
+    .filter((item) => IMAGE.test(item) && !/copy/i.test(item))
+    .filter((item) => {
+      const stem = path.parse(item).name.toLowerCase();
+      return stem === `${owner}_body` || stem === `${owner}_full_body`;
+    })
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0];
+  return found ? path.join(folder, found) : null;
+}
+
 /** Папка data/characters/{name}/ без учёта регистра. Нет папки — null. */
 export function characterFolder(name: string): string | null {
   if (!name) return null;
@@ -46,8 +68,10 @@ function imagesIn(folder: string): string[] {
 
 /** Картинки папки для показа: канонические слоты, иначе любые без «copy» в имени. */
 export function characterBaseFiles(folder: string): string[] {
-  const named = NAMED_SLOTS.map((names) => names.map((name) => path.join(folder, name)).find((file) => fs.existsSync(file)))
-    .filter((file): file is string => Boolean(file));
+  const slots = NAMED_SLOTS.map((names) => names.map((name) => path.join(folder, name)).find((file) => fs.existsSync(file)));
+  // Полный рост по имени папки занимает слот full_body.png, если самого full_body.png и body.png нет.
+  if (!slots[0]) slots[0] = folderNamedBody(folder) ?? undefined;
+  const named = slots.filter((file): file is string => Boolean(file));
   if (named.length) return named;
   return imagesIn(folder);
 }
@@ -61,7 +85,7 @@ export function characterBaseImage(folder: string): string | null {
     const file = path.join(folder, name);
     if (fs.existsSync(file)) return file;
   }
-  return imagesIn(folder)[0] ?? null;
+  return folderNamedBody(folder) ?? imagesIn(folder)[0] ?? null;
 }
 
 /** Папки `data/characters/`, как они лежат на диске. Старые `_old` и скрытые не предлагаются. */
@@ -147,6 +171,11 @@ export function tooManyClothingRefs(name: string, count: number): string {
 /** Текст ошибки, когда персонажа не из чего собрать. */
 export function missingCharacterBase(name: string): string {
   return `no base for ${name}: put a picture in data/characters/${name}/`;
+}
+
+/** Картинки персонажа есть, но все убраны из графа кнопкой «Убрать». */
+export function characterBaseExcluded(name: string, files: string[]): string {
+  return `every picture of ${name} is out of the graph (${files.join(", ")}). Press "Restore" on one of them under "What goes into the graph", or pick another picture for ${name}.`;
 }
 
 /** Нет референса одежды: прогон идёт, нода «image 2: образец одежды» в bypass. */

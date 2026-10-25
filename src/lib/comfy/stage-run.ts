@@ -2,14 +2,26 @@ import path from "path";
 import type { ApiPrompt } from "../contracts/comfy-job";
 import type { GraphBinding, ImageInput } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
-import { characterClothingFiles, missingCharacterBase, tooManyClothingRefs } from "../series/character-base";
+import {
+  characterBaseExcluded,
+  characterClothingFiles,
+  missingCharacterBase,
+  tooManyClothingRefs,
+} from "../series/character-base";
 import { latinToken } from "../series/latin-id";
 import { readTextIfExists } from "../series/media";
 import { stageDir, toPosix } from "../series/paths";
 import { readShotMeta } from "../series/shot-meta";
 import { assertStageFree, readStageStateFile, writeStageState } from "../series/stage-state";
 import { readRunSettings } from "../series/run-settings";
-import { buildPrompt, resolveImageInput, splitSections, type BuiltPrompt, type ShotContext } from "./binding";
+import {
+  buildPrompt,
+  excludedInputFiles,
+  resolveImageInput,
+  splitSections,
+  type BuiltPrompt,
+  type ShotContext,
+} from "./binding";
 import { characterJobId, enqueueComfyJob, startComfyQueue } from "./queue";
 import { requireStageBinding, resolveWorkflowId } from "./workflows";
 
@@ -179,7 +191,8 @@ function queueCharacters(
     if (!section.trim()) continue;
     const run: ShotContext = { ...ctx, character: name };
     if (base && !resolveImageInput(run, base).length) {
-      skipped.push(missingCharacterBase(name));
+      const hidden = excludedInputFiles(run, base);
+      skipped.push(hidden.length ? characterBaseExcluded(name, hidden.map((file) => path.basename(file))) : missingCharacterBase(name));
       continue;
     }
     const clothes = characterClothingFiles(ctx.episodeId, ctx.shotId, ctx.stageId, name);

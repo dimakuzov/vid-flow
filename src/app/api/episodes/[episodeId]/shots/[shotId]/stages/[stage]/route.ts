@@ -5,7 +5,13 @@ import { stageDuration } from "@/lib/comfy/binding";
 import { resolveWorkflowId } from "@/lib/comfy/workflows";
 import { updateStageDocs } from "@/lib/series/mutations";
 import { assignShotLocation } from "@/lib/series/library";
-import { readRunSettings, setCharacterImage, setExcluded, updateRunSettings } from "@/lib/series/run-settings";
+import {
+  logSettingsChange,
+  readRunSettings,
+  setCharacterImage,
+  setExcluded,
+  updateRunSettings,
+} from "@/lib/series/run-settings";
 import { setShotCharacters } from "@/lib/series/shot-meta";
 import { readStatusFile, writeStatusFile } from "@/lib/series/status";
 import { assertStageFree } from "@/lib/series/stage-state";
@@ -24,6 +30,14 @@ export async function GET(_request: Request, context: StageRouteContext) {
     const message = error instanceof Error ? error.message : "Ошибка этапа";
     return NextResponse.json({ error: message }, { status: 400 });
   }
+}
+
+/** Кто прислал правку: браузер доски шлёт Referer и User-Agent браузера, скрипт и агент — нет. */
+function requestOrigin(request: Request): { userAgent: string; referer: string } {
+  return {
+    userAgent: (request.headers.get("user-agent") ?? "").slice(0, 120),
+    referer: request.headers.get("referer") ?? "",
+  };
 }
 
 /** Длительность из PATCH: пусто — по умолчанию (null), иначе целое в пределах меню воркфлоу. */
@@ -116,6 +130,7 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       const raw = body.characterImage.path;
       const mediaPath = typeof raw === "string" && raw.trim() ? raw.trim() : null;
       setCharacterImage(episodeId, shotId, name, mediaPath);
+      logSettingsChange(episodeId, shotId, stageId, { change: "characterImage", name, path: mediaPath, from: requestOrigin(request) });
     }
     if (Array.isArray(body.characters)) {
       if (stageId !== "characters") throw new Error("Список персонажей меняется на этапе персонажей");
@@ -129,6 +144,11 @@ export async function PATCH(request: Request, context: StageRouteContext) {
       // Граф или агент могут как раз читать входы: менять их можно только у свободного этапа.
       assertStageFree(episodeId, shotId, stageId);
       setExcluded(episodeId, shotId, stageId, body.exclude.path, body.exclude.excluded !== false);
+      logSettingsChange(episodeId, shotId, stageId, {
+        change: body.exclude.excluded !== false ? "exclude" : "restore",
+        path: body.exclude.path,
+        from: requestOrigin(request),
+      });
     }
     const patch: { workflow?: string | null; durationSec?: number | null } = {};
     if (typeof body.runWorkflow === "string") {

@@ -82,6 +82,25 @@ export function updateRunSettings(
   return writeRunSettings(episodeId, shotId, stageId, next);
 }
 
+/**
+ * Журнал правок входов этапа (`run_settings.log`, по строке JSON): кто убрал файл или поставил
+ * картинку персонажа. Нужен, чтобы по следу понять, откуда пришла правка (браузер доски или другой клиент).
+ */
+export function logSettingsChange(
+  episodeId: string,
+  shotId: string,
+  stageId: StageId,
+  entry: Record<string, unknown>,
+): void {
+  try {
+    const file = path.join(stageDir(episodeId, shotId, stageId), "run_settings.log");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n", "utf8");
+  } catch {
+    // журнал не должен ломать правку
+  }
+}
+
 /** Убранные из графа файлы этапа (пути от data/). */
 export function excludedFiles(episodeId: string, shotId: string, stageId: StageId): Set<string> {
   const list = readRunSettings(episodeId, shotId, stageId).excluded;
