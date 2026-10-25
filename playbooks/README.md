@@ -25,12 +25,11 @@ Rules of the shot character (Qwen Image 2.1 outfit edit from a clothing sample, 
 - `workflows/characters_comfy.en.md`
 - `workflows/comfy/character_outfit_qwen21.json`
 
-Location views (checked on a previous project: the objects branch is the one used most often):
+Location (Krea 2 from text):
 
 - `stages/location.en.md`
-- `models/qwen_location.en.md`
-- `workflows/location_comfy.en.md`
-- `workflows/comfy/location_views_multiple_angles.json`
+- `models/krea2_location.en.md`
+- `workflows/comfy/location_krea2_api.json`
 
 First frame (place the approved characters into the approved location):
 
@@ -39,4 +38,4 @@ First frame (place the approved characters into the approved location):
 - `workflows/first_frame_comfy.en.md`
 - `workflows/comfy/qwen21_character_compositing.json`
 
-Playbooks are English only (`.en.md`): agents read them, there are no other-language copies. The stage page shows the path to `stages/{stage}.en.md`, `workflows/{stage}_comfy.en.md` and the model playbook. The character graph is visible on the `characters` stage, the views graph on `location`, the frame assembly graph on `first_frame`.
+Playbooks are English only (`.en.md`): agents read them, there are no other-language copies. The stage page shows the path to `stages/{stage}.en.md`, `workflows/{stage}_comfy.en.md` and the model playbook. The character graph is visible on the `characters` stage, the location graph on `location`, the frame assembly graph on `first_frame`.

@@ -54,11 +54,11 @@ before(() => {
 
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-test("старых вариантов H3 нет; без реплик по умолчанию Wan", () => {
+test("старых вариантов H3 нет; без реплик по умолчанию LTX", () => {
   const ids = listWorkflowChoices(EP, "s01", "final_render").map((choice) => choice.id);
   assert.ok(ids.includes(H3));
   for (const old of ["final_h3", "final_h3_768", "final_h3_768_face"]) assert.ok(!ids.includes(old), old);
-  assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, "final_wan_720");
+  assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, "final_ltx");
 });
 
 test("H3 Cinema: Picture 1 — первый кадр, дальше по картинке на персонажа, лишние ноды убраны", () => {
@@ -92,7 +92,7 @@ test("триггер ЛоРы: доска ставит его первой ст�
   assert.equal(build(H3, written).prompt["190"].inputs.value, written);
 });
 
-test("один говорящий — по умолчанию H3 Cinema, двое — HeyGen; без дословной реплики H3 не запускается", () => {
+test("один говорящий — по умолчанию H3 Cinema; без дословной реплики H3 не запускается", () => {
   fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Lena: It is kind of scary.\n");
   try {
     assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, H3);
@@ -100,7 +100,6 @@ test("один говорящий — по умолчанию H3 Cinema, дво�
     const value = build(H3, "subject_definitions ASTROCINEMAV01K2T:\nShe says quietly, <d>[English] It is kind of scary.</d>").prompt["190"].inputs.value;
     assert.match(String(value), /<d>\[English\] It is kind of scary\.<\/d>/);
     fs.writeFileSync(path.join(shotDir(EP, "s01"), "speech.md"), "Lena: It is kind of scary.\nIvan: Why?\n");
-    assert.equal(listWorkflowChoices(EP, "s01", "final_render").find((choice) => choice.isDefault)?.id, "final_heygen");
   } finally {
     fs.rmSync(path.join(shotDir(EP, "s01"), "speech.md"), { force: true });
   }

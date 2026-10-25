@@ -1,5 +1,3 @@
-English · [Русский](README.ru.md)
-
 # Frameboard
 
 A local board for structuring video generation.

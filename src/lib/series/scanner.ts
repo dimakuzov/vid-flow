@@ -213,12 +213,8 @@ function playbooksForStage(stageId: StageId): string[] {
     path.join("workflows", `${stageId}_comfy.md`),
   ];
   if (stageId === "video_preview" || stageId === "final_render") {
-    candidates.push(path.join("models", "wan_video.md"));
-    candidates.push(path.join("models", "minimax_video.md"));
-  }
-  if (stageId === "video_preview") {
-    candidates.push(path.join("workflows", "comfy", "wan22_i2v_sketch_turbo_api.json"));
-    candidates.push(path.join("workflows", "comfy", "wan22_flf_sketch_turbo_api.json"));
+    candidates.push(path.join("models", "minimax_h3.md"));
+    candidates.push(path.join("models", "ltx_video.md"));
   }
   if (stageId === "characters") {
     candidates.push(path.join("models", "qwen_outfit.md"));
@@ -231,11 +227,7 @@ function playbooksForStage(stageId: StageId): string[] {
     );
   }
   if (stageId === "location") {
-    candidates.push(path.join("models", "qwen_location.md"));
     candidates.push(path.join("models", "krea2_location.md"));
-    candidates.push(
-      path.join("workflows", "comfy", "location_views_multiple_angles.json"),
-    );
   }
   if (stageId === "characters") {
     candidates.push(

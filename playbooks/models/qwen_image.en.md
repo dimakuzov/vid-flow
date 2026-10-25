@@ -2,7 +2,7 @@
 
 Prompts for the shot character: the outfit edit. Stage rules: `playbooks/stages/characters.en.md`. Graph and run: `playbooks/workflows/characters_comfy.en.md`.
 
-Location prompts: `playbooks/models/qwen_location.en.md`. First-frame prompt: `playbooks/models/qwen_first_frame.en.md`.
+Location prompts: `playbooks/models/krea2_location.en.md`. First-frame prompt: `playbooks/models/qwen_first_frame.en.md`.
 
 ## Parameters
 

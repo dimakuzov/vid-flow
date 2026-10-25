@@ -174,5 +174,5 @@ test("Krea 2: без картинки — text-to-image, по умолчанию
   const withRef = buildPrompt(binding, graph, ctx);
   assert.equal(withRef.prompt["67"].inputs.image, "Kitchen_view.png");
   assert.deepEqual(withRef.prompt["66"].inputs.image1, ["67", 0]);
-  assert.equal(listWorkflowChoices("e01", "s02", "location").find((item) => item.isDefault)?.id, "location_views");
+  assert.equal(listWorkflowChoices("e01", "s02", "location").find((item) => item.isDefault)?.id, "location_krea2");
 });

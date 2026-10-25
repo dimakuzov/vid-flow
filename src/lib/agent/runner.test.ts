@@ -122,7 +122,7 @@ test("text: ответ провайдера → prompt.md, история, basel
 
   const task = calls[0];
   assert.match(task.system, /Reply with the complete new text of prompt\.md/);
-  assert.match(task.system, /playbooks\/models\/qwen_location\.en\.md/);
+  assert.match(task.system, /playbooks\/models\/krea2_location\.en\.md/);
   assert.match(task.user, /Сделай вечер/);
   assert.match(task.user, /Катя входит в кафе/);
   assert.match(task.user, /view\.png/);
@@ -299,7 +299,7 @@ test("llm_task.md самодостаточен: действие кадра, б�
   const task = readLlmTask(EP, "s01", "location");
   assert.match(task, /Катя входит в кафе/);
   assert.match(task, /Сделай вечер/);
-  assert.match(task, /location_views/);
+  assert.match(task, /location_krea2/);
   assert.match(task, /"status": "done"/);
   assert.doesNotMatch(task, /status\.json|stage_state|llm_notes|agent_request\.md/);
   assert.equal(fs.existsSync(file("s01", "location", "agent_request.md")), false);

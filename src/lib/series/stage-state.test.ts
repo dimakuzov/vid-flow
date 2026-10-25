@@ -98,7 +98,7 @@ test("агент закончил → задание в очереди, в мо�
   assert.ok(file?.jobId);
   assert.equal(readStageState(EP, SHOT, STAGE).phase, "queued");
   const job = readComfyJob(file!.jobId!);
-  const text = String(job?.prompt["100"].inputs.value);
+  const text = String(job?.prompt["61"].inputs.value);
   assert.match(text, /Evening light over the old cafe\./);
   assert.doesNotMatch(text, /НЕ ДОЛЖНО/);
 });

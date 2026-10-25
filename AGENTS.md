@@ -10,7 +10,7 @@ This repo is a local-first board for structuring video generation.
 - Shot variants stay in `data/episodes/{episodeId}/shots/sXX/` and are built from those libraries
 - Global playbooks: `playbooks/`
 - Character outfit graph: `playbooks/workflows/comfy/character_outfit_qwen21.json`
-- Location Comfy graph: `playbooks/workflows/comfy/location_views_multiple_angles.json`
+- Location Comfy graph: `playbooks/workflows/comfy/location_krea2_api.json`
 - First-frame Comfy graph: `playbooks/workflows/comfy/qwen21_character_compositing.json`
 - Bootstrap instructions: `docs/AGENT_BOOTSTRAP.md`
 
@@ -56,7 +56,7 @@ The board runs ComfyUI, one job per character, into `output/`. Do not queue Comf
 - Commit `data/`. Episodes, pictures, and secrets stay on the local disk
 
 ## Comfy Cloud
-Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only the board sends them, and only after the user ticks "Allow a paid send to Comfy Cloud" on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
+A manifest can mark a workflow as a Comfy Cloud one; such runs cost credits. Only the board sends them, and only after the user ticks "Allow a paid send to Comfy Cloud" on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
 
 ## Comfy queue
 Any agent queues a run with the file `data/comfy_queue/<id>.json` (`status: pending`, `prompt` in ComfyUI API format, `uploads`, `saveTo` inside `data/`). The board process on the computer with ComfyUI sends it to ComfyUI (by default through the Comfy SDK and comfy-api-proxy at `http://127.0.0.1:8189/`; in `legacy` mode directly to `http://127.0.0.1:8188/`) and writes the result into the same file. Never call that address from a foreign shell.

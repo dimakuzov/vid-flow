@@ -55,7 +55,7 @@ A shot's approved character: `shots/{shotId}/characters/approve/{name}_{shotId}.
 Before filling in a stage, read the playbook:
 
 - character: `playbooks/stages/characters.en.md`, `playbooks/models/qwen_image.en.md`, `playbooks/workflows/characters_comfy.en.md`
-- location: `playbooks/stages/location.en.md`, `playbooks/models/krea2_location.en.md`, `playbooks/workflows/location_comfy.en.md`
+- location: `playbooks/stages/location.en.md`, `playbooks/models/krea2_location.en.md`
 - first frame: `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 
 ## Build the shot folders

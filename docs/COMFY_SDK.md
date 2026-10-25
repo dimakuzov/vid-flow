@@ -1,5 +1,3 @@
-English · [Русский](COMFY_SDK.ru.md)
-
 # Comfy SDK transport
 
 By default the board talks to ComfyUI and Comfy Cloud through the official `@comfyorg/sdk` (Comfy API v2). Direct HTTP calls (`legacy`) stay as a second transport. The `data/comfy_queue/<id>.json` format and the rules for agents do not change: the choice is made by `src/lib/comfy/transport.ts`, and the SDK implementation is `src/lib/comfy/sdk.ts`. The direct modules `client.ts` and `cloud.ts` stay, and `COMFY_TRANSPORT=legacy` or the "Direct" button in the header selects them.

@@ -112,7 +112,7 @@ You must not write paths or file names (`refs/x.png`, `lena_s01.png`) in `prompt
 Text (`kind: text`):
 
 - `from: "prompt"`: the stage's `prompt.md`, `trim()`, **with no filters**. `required: true`: an empty `prompt.md` is an error at run time.
-- `from: "approve-meta"`: the text of a node from the metadata of the newest video of input `of` (kind: video, `pick: newest`). `nodes` are pairs `{ node, field }` in the saved graph; the first with non-empty text is taken. This way one manifest reads both a Wan node and an LTX node (for example `398:376` / `value`): the nodes are listed in the manifest, the code does not know them and does not check them against the graph of this choice. `fallback: "prompt"`: no video, no `prompt` key, or no text in any node: take the `prompt.md` of stage `stage` (no `stage` means the run's stage). The board appends a note to the run stage's `run_log.md`.
+- `from: "approve-meta"`: the text of a node from the metadata of the newest video of input `of` (kind: video, `pick: newest`). `nodes` are pairs `{ node, field }` in the saved graph; the first with non-empty text is taken. This way one manifest can read several possible nodes (for example `398:376` / `value`): the nodes are listed in the manifest, the code does not know them and does not check them against the graph of this choice. `fallback: "prompt"`: no video, no `prompt` key, or no text in any node: take the `prompt.md` of stage `stage` (no `stage` means the run's stage). The board appends a note to the run stage's `run_log.md`.
 
 Text and number inputs do not affect `available`: the prompt is often written by the agent after the choice was made.
 
@@ -250,18 +250,11 @@ A manifest does not add metadata-saving nodes.
 
 | id | Stage | Graph |
 |---|---|---|
-| `location_views` | location | `location_views_multiple_angles.json` |
 | `location_krea2` | location | `location_krea2_api.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
-| `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; duration: `settings:seconds` → `prompt:seconds` → graph (node `129:161`) |
 | `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 fps, with sound); duration: `settings:seconds` → `prompt:seconds` → graph (node `398:362`), 2–10 s |
-| `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 fps; prompt from `approve-meta` of the preview, fallback `prompt.md`) |
 | `final_ltx` | final_render | `ltx25_i2v_api.json` (node `403`: 1.2 MP, 9:16 → 832×1472, 24 fps; `whenSketch` is the LTX preview) |
 | `video_minimax` | video_preview | `minimax_h3_preview_api.json` (MiniMax H3 from references, 0.5 MP; `imageLabel: <Picture {n}>`). On a preview the default is `video_ltx` (order 5) |
 | `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 from references + the Cinema LoRA: the first frame plus one picture per character, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; the preview prompt from `approve-meta` goes only into the agent task) |
-| `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (head swap: approved preview + `library:face-sheets`; the characters input has `maxAvailable: 1`; no text) |
-| `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; runs only with the checkbox for that one run) |
-| `final_i2v` | final_render | the Wan i2v preview graph, prefix `frameboard/final/` |
-| `final_flf` | final_render | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 fps, the preview prompt (`approve-meta`), the last frame from the final's `refs`, otherwise `refs:video_preview`; `whenSketch` is node `98` (last frame) in the metadata or `_flf` in the name |
 
 The prompt built from these must match the current one (except random seeds).

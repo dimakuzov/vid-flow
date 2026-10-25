@@ -108,4 +108,4 @@ What we learned on the earlier H3 graph still holds for the text:
 
 Video preview: LTX (`video_ltx`) is the default; «▶ All shots» runs LTX and then this MiniMax variant on every shot. Table: `playbooks/stages/video_preview.en.md`.
 
-Final render (table: `playbooks/stages/final_render.en.md`): the final follows the approved preview. A MiniMax preview makes `final_h3_cinema` the default, an LTX preview makes `final_ltx` the default. Otherwise one speaker defaults to `final_h3_cinema`; two or more default to HeyGen (`final_heygen`, the cloud runs only after the user ticks the box for this one run); nobody speaking defaults to Wan (`final_wan_720`). If the selected variant does not fit the shot, write its id in `suggestedWorkflow` of `agent_request.json`.
+Final render (table: `playbooks/stages/final_render.en.md`): the final follows the approved preview. A MiniMax preview makes `final_h3_cinema` the default, an LTX preview makes `final_ltx` the default. Otherwise one speaker defaults to `final_h3_cinema` and everything else to `final_ltx`. If the selected variant does not fit the shot, write its id in `suggestedWorkflow` of `agent_request.json`.

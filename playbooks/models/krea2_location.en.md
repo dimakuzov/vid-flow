@@ -82,7 +82,7 @@ A small kitchen in a Soviet five-story apartment block in the late 1970s, low ce
 
 ## Before the run
 
-1. The space is new, or a fresh variant for the library is needed: Krea 2. The same room from another point: `location_views`.
+1. The space is new, or a fresh variant for the library is needed: Krea 2. The same room from another point: put its general view into `refs/` and describe the new point of view.
 2. One English paragraph after the trigger line, 80–200 words.
 3. Every object has a color and a material. The era is named.
 4. Light by source, camera in words.

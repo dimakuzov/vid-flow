@@ -16,7 +16,6 @@ import type { GraphBinding, TextInput } from "../contracts/graph-binding";
 import type { StageId } from "../series/constants";
 import { createEpisode, ensureStageDirs, shotDir, stageDir } from "../series/paths";
 import { readStageStateFile, setIdle, writeStageState } from "../series/stage-state";
-import { migratePrompt } from "../../../scripts/migrate-prompts";
 import { buildPrompt, russianLine, sectionText, splitSections, validateBinding, videoDurationSeconds } from "./binding";
 import { listHistoryImages } from "./client";
 
@@ -268,25 +267,3 @@ test("история ComfyUI: mmc_video забирается, повторы и 
   assert.deepEqual(files.map((file) => file.filename), ["H3_00001_.mp4"]);
 });
 
-test("миграция старых prompt.md", () => {
-  assert.deepEqual(migratePrompt("Собери локацию для s07.\nПравила: playbooks/stages/location.md", "location"), {
-    kind: "agent",
-  });
-  const video = migratePrompt(
-    "Preview-видео s07, 6 секунд, камера подъезжает.\n\nThe camera slowly dollies in. Realistic, natural movement.",
-    "video_preview",
-  );
-  assert.deepEqual(video, { kind: "write", text: "The camera slowly dollies in. Realistic, natural movement. 6 sec" });
-  const frame = migratePrompt(
-    'Собери первый кадр.\nРеплика: "You are just a new shiny thing."\n\nSFX: a screech.\nPlace the woman from image 2 into the corridor from image 1.',
-    "first_frame",
-  );
-  assert.deepEqual(frame, { kind: "write", text: "Place the woman from image 2 into the corridor from image 1." });
-  const location = migratePrompt("---\nv1: Close-up of the street.\nv2: The lamp and the curb.\nv4: v1 + In frame: the lamp.", "location");
-  assert.deepEqual(location, {
-    kind: "write",
-    text: "## simple\nClose-up of the street.\n\n## objects\nThe lamp and the curb.\n\n## camera_objects\nClose-up of the street. In frame: the lamp.",
-  });
-  const twice = migratePrompt("Close-up portrait of the girl, red light.\n\nClose-up portrait of the girl, daylight.", "first_frame");
-  assert.equal(twice.kind, "review");
-});
