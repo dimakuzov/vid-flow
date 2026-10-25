@@ -17,7 +17,7 @@ import { queueStageRun } from "../comfy/stage-run";
 import { characterBaseFiles, characterBaseImage, characterFolder } from "./character-base";
 import { mediaUrlPath } from "./media";
 import { createEpisode, ensureStageDirs, getCharactersRoot, shotDir, stageDir } from "./paths";
-import { setExcluded } from "./run-settings";
+import { readRunSettings, setCharacterImage, setExcluded } from "./run-settings";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -72,4 +72,23 @@ test("нет ни одной картинки: прежняя ошибка пр�
   ensureStageDirs("e01", "s02");
   fs.writeFileSync(path.join(stageDir("e01", "s02", "characters"), "prompt.md"), "## empty_one\nChange the clothes in image 1 to a white shirt.\n");
   assert.throws(() => queueStageRun("e01", "s02", "characters"), /no base for empty_one: put a picture in data\/characters\/empty_one\//);
+});
+
+test("убрали выбранный персонажем файл: выбор снимается и база снова из библиотеки", () => {
+  createEpisode("e01");
+  library("kira", ["kira_body.png"]);
+  const shot = shotDir("e01", "s03");
+  fs.mkdirSync(shot, { recursive: true });
+  fs.writeFileSync(path.join(shot, "shot.md"), "# Кадр\n\n- characters: kira\n- location: kitchen\n");
+  ensureStageDirs("e01", "s03");
+  const refs = path.join(stageDir("e01", "s03", "characters"), "refs");
+  fs.mkdirSync(refs, { recursive: true });
+  fs.writeFileSync(path.join(refs, "pick.png"), PNG);
+  const file = mediaUrlPath(path.join(refs, "pick.png"))!;
+  setCharacterImage("e01", "s03", "kira", file);
+  assert.equal(readRunSettings("e01", "s03", "characters").characterImage?.kira, file);
+  setExcluded("e01", "s03", "characters", file, true);
+  const after = readRunSettings("e01", "s03", "characters");
+  assert.equal(after.characterImage, undefined);
+  assert.deepEqual(after.excluded, [file]);
 });

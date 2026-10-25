@@ -123,6 +123,11 @@ export function setExcluded(
   if (excluded) set.add(clean);
   else set.delete(clean);
   const next: RunSettings = { ...readRunSettings(episodeId, shotId, stageId), excluded: [...set].sort() };
+  // Убрали файл, который стоял персонажем: выбор снимается, иначе он остаётся «выбранным, но неактивным».
+  if (excluded && next.characterImage) {
+    const kept = Object.entries(next.characterImage).filter(([, file]) => file !== clean);
+    next.characterImage = Object.fromEntries(kept);
+  }
   return writeRunSettings(episodeId, shotId, stageId, next);
 }
 
