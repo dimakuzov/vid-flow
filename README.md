@@ -94,6 +94,7 @@ npm run comfy:install -- --comfy "C:\path\to\ComfyUI" --install
 - It asks before downloading, skips files that are already complete, and resumes an interrupted download. Add `--only models` or `--only nodes` to do one part, `--yes` to skip the question, `--pip` to let it install a node pack's Python packages with ComfyUI's Python.
 - `Lightricks/LTX-2.5` (the LTX files) is gated on Hugging Face: log in, accept the terms on the model page, create a read token and set `HF_TOKEN`. Civitai files need `CIVITAI_TOKEN`; two Civitai files have no direct link, and the script prints the page to download them from.
 - Restart ComfyUI afterwards. Tested on ComfyUI 0.41.0 (Windows portable, 16 GB GPU).
+- If an LTX run fails with `cannot access local variable '_buffers'` after a MiniMax run, free ComfyUI's models (the "Unload Models" button, or restart it) and run the stage again. This was seen once on 0.41.0 and the rerun worked.
 - Every model and LoRA has its own license. Study each one before commercial use; see [NOTICE.md](NOTICE.md).
 
 ## What the board does
@@ -119,6 +120,10 @@ A shot is built stage by stage, and a stage can run only when the stages it depe
 5. **Final render.** Renders the approved preview again at higher quality.
 
 A shot with no characters and no location skips stages 1 and 2 and is made directly in the first frame stage (`playbooks/stages/first_frame.en.md`, section "No character and no location").
+
+## Demo episode
+
+`examples/demo/` is a finished episode of three shots (location, first frame, preview and final video for each), with the prompt next to every result. Copy it and open it in the board to see how a shot is built; see [examples/README.md](examples/README.md).
 
 ## Series layout
 
