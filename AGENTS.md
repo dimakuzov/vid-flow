@@ -59,7 +59,7 @@ The board runs ComfyUI, one job per character, into `output/`. Do not queue Comf
 Some final workflows (`final_heygen`) run in Comfy Cloud and cost credits. Only the board sends them, and only after the user ticks «Разрешить платную отправку в Comfy Cloud» on the stage page for that one run. An agent never calls cloud.comfy.org and never queues a job with `target: "cloud"` itself; it only writes `prompt.md`.
 
 ## Comfy queue
-Любой агент ставит прогон файлом `data/comfy_queue/<id>.json` (`status: pending`, `prompt` в формате API Comfy, `uploads`, `saveTo` внутри `data/`). Процесс доски на компьютере с ComfyUI отправляет его на `http://127.0.0.1:8188/` и пишет результат в тот же файл. Сам адрес из чужой оболочки не вызывать.
+Любой агент ставит прогон файлом `data/comfy_queue/<id>.json` (`status: pending`, `prompt` в формате API Comfy, `uploads`, `saveTo` внутри `data/`). Процесс доски на компьютере с ComfyUI отправляет его в ComfyUI (по умолчанию через Comfy SDK и comfy-api-proxy на `http://127.0.0.1:8189/`, в режиме `legacy` напрямую на `http://127.0.0.1:8188/`) и пишет результат в тот же файл. Сам адрес из чужой оболочки не вызывать.
 
 ## Задача для любого LLM
 «Отправить агенту» пишет `llm_task.md` в папку этапа. Claude, Cursor и локальный Gemini читают этот файл и выполняют его. Для этой задачи `git pull` не нужен: файлы уже на диске. ComfyUI — `http://127.0.0.1:8188/` на том же компьютере, где лежит папка проекта. Команды запускать из локальной оболочки, которая видит эту папку.

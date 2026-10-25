@@ -8,6 +8,8 @@ import { after, test } from "node:test";
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "frameboard-queue-"));
 process.env.DATA_ROOT = tmp;
 process.env.COMFY_URL = "http://comfy.test";
+// Эти тесты проверяют прямые HTTP-вызовы, а не SDK (по умолчанию в доске).
+process.env.COMFY_TRANSPORT = "legacy";
 // Фоновые циклы в тесте не запускаем: задания остаются файлами.
 process.env.FRAMEBOARD_LOOPS = "off";
 

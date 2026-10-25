@@ -1,8 +1,8 @@
 English · [Русский](COMFY_SDK.ru.md)
 
-# Comfy SDK as a second transport
+# Comfy SDK transport
 
-The board can talk to ComfyUI and Comfy Cloud through the official `@comfyorg/sdk` (Comfy API v2) instead of direct HTTP calls. The `data/comfy_queue/<id>.json` format and the rules for agents do not change: the choice is made by `src/lib/comfy/transport.ts`, and the SDK implementation is `src/lib/comfy/sdk.ts`. The direct modules `client.ts` and `cloud.ts` stay, and they are the default.
+By default the board talks to ComfyUI and Comfy Cloud through the official `@comfyorg/sdk` (Comfy API v2). Direct HTTP calls (`legacy`) stay as a second transport. The `data/comfy_queue/<id>.json` format and the rules for agents do not change: the choice is made by `src/lib/comfy/transport.ts`, and the SDK implementation is `src/lib/comfy/sdk.ts`. The direct modules `client.ts` and `cloud.ts` stay, and `COMFY_TRANSPORT=legacy` or the "Direct" button in the header selects them.
 
 Node 22+ is required. The package is in beta (checked against 0.5.0).
 
@@ -16,10 +16,10 @@ comfy-api-proxy   # in front of ComfyUI; default port 8189, settings are in the 
 ```
 
 ```bash
-COMFY_TRANSPORT=sdk COMFY_BASE_URL=http://127.0.0.1:8189 npm run dev
+npm run dev
 ```
 
-`COMFY_BASE_URL` defaults to `http://127.0.0.1:8189`. `COMFY_URL` is not used in this mode. The proxy needs no key: the board creates a local client without a key and does not pass it `COMFY_API_KEY` from the environment.
+`COMFY_BASE_URL` defaults to `http://127.0.0.1:8189`. `COMFY_URL` is used in this mode only to read text outputs (see below). The proxy needs no key: the board creates a local client without a key and does not pass it `COMFY_API_KEY` from the environment.
 
 ## Comfy Cloud
 

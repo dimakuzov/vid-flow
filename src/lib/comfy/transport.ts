@@ -29,12 +29,12 @@ export function writeTransportSetting(name: ComfyTransportName): void {
 }
 
 function fromEnv(env: Record<string, string | undefined>): ComfyTransportName {
-  return env.COMFY_TRANSPORT?.trim().toLowerCase() === "sdk" ? "sdk" : "legacy";
+  return env.COMFY_TRANSPORT?.trim().toLowerCase() === "legacy" ? "legacy" : "sdk";
 }
 
 /**
  * Транспорт. С явным env (тесты) — только он. Без него: выбор из интерфейса доски,
- * иначе COMFY_TRANSPORT, иначе legacy.
+ * иначе COMFY_TRANSPORT (legacy — прямые вызовы), иначе sdk.
  */
 export function transportName(env?: Record<string, string | undefined>): ComfyTransportName {
   if (env) return fromEnv(env);

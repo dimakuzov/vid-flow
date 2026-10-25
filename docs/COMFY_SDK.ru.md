@@ -1,8 +1,8 @@
 [English](COMFY_SDK.md) · Русский
 
-# Comfy SDK как второй транспорт
+# Транспорт Comfy SDK
 
-Доска может ходить в ComfyUI и Comfy Cloud через официальный `@comfyorg/sdk` (Comfy API v2) вместо прямых HTTP-вызовов. Формат `data/comfy_queue/<id>.json` и правила для агентов не меняются: выбор делает `src/lib/comfy/transport.ts`, реализация SDK — `src/lib/comfy/sdk.ts`. Прямые модули `client.ts` и `cloud.ts` остаются, по умолчанию работают они.
+По умолчанию доска ходит в ComfyUI и Comfy Cloud через официальный `@comfyorg/sdk` (Comfy API v2). Прямые HTTP-вызовы (`legacy`) остаются вторым транспортом. Формат `data/comfy_queue/<id>.json` и правила для агентов не меняются: выбор делает `src/lib/comfy/transport.ts`, реализация SDK — `src/lib/comfy/sdk.ts`. Прямые модули `client.ts` и `cloud.ts` остаются, их включают `COMFY_TRANSPORT=legacy` или кнопка «Напрямую» в шапке.
 
 Нужен Node 22+. Пакет в бете (проверено на 0.5.0).
 
@@ -16,10 +16,10 @@ comfy-api-proxy   # перед ComfyUI; порт по умолчанию 8189, �
 ```
 
 ```bash
-COMFY_TRANSPORT=sdk COMFY_BASE_URL=http://127.0.0.1:8189 npm run dev
+npm run dev
 ```
 
-`COMFY_BASE_URL` по умолчанию `http://127.0.0.1:8189`. `COMFY_URL` в этом режиме не используется. Ключ для прокси не нужен: доска создаёт локальный клиент без ключа и не передаёт ему `COMFY_API_KEY` из окружения.
+`COMFY_BASE_URL` по умолчанию `http://127.0.0.1:8189`. `COMFY_URL` в этом режиме нужен только для чтения текстовых выходов (см. ниже). Ключ для прокси не нужен: доска создаёт локальный клиент без ключа и не передаёт ему `COMFY_API_KEY` из окружения.
 
 ## Comfy Cloud
 

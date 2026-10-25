@@ -12,10 +12,17 @@
 
 ## Запуск
 
+Доска отправляет задания в ComfyUI через официальный Comfy SDK, а SDK говорит с ComfyUI через `comfy-api-proxy`. Сначала запустите ComfyUI, затем прокси, затем доску:
+
 ```bash
+pip install comfy-api-proxy
+comfy-api-proxy run        # перед ComfyUI на :8188, слушает :8189
+
 npm install
 npm run dev
 ```
+
+Чтобы обойтись без прокси и звать ComfyUI напрямую, задайте `COMFY_TRANSPORT=legacy` или нажмите «Напрямую» в шапке доски; см. [docs/COMFY_SDK.ru.md](docs/COMFY_SDK.ru.md).
 
 Открой [http://127.0.0.1:3456](http://127.0.0.1:3456). `/` ведёт на открытый эпизод (`data/current_episode.txt`), таблица эпизода — `/e/{episodeId}`, этап — `/e/{episodeId}/shots/{shotId}/{stage}`. Переключатель в шапке меняет адрес и запоминает выбор как эпизод по умолчанию.
 
@@ -27,9 +34,9 @@ npm run dev
 |---|---|---|
 | `DATA_ROOT` | `data/` | папка данных (для проб — временная папка) |
 | `SERIES_ROOT` | — | папка одного эпизода вместо `data/episodes/*` |
-| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. Мёртвый порт (`http://127.0.0.1:9`) — задания висят в «Ожидает очереди», на GPU ничего не уходит |
-| `COMFY_TRANSPORT` | `legacy` | `legacy` — прямые HTTP-вызовы (`COMFY_URL`, cloud.comfy.org). `sdk` — официальный `@comfyorg/sdk`, см. [docs/COMFY_SDK.ru.md](docs/COMFY_SDK.md) |
-| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | только при `COMFY_TRANSPORT=sdk`: comfy-api-proxy перед локальным ComfyUI |
+| `COMFY_TRANSPORT` | `sdk` | `sdk` — официальный `@comfyorg/sdk` через comfy-api-proxy, см. [docs/COMFY_SDK.ru.md](docs/COMFY_SDK.ru.md). `legacy` — прямые HTTP-вызовы (`COMFY_URL`, cloud.comfy.org) |
+| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | в режиме `sdk`: comfy-api-proxy перед вашим ComfyUI. Мёртвый порт (`http://127.0.0.1:9`) — задания висят в «Ожидает очереди», на GPU ничего не уходит |
+| `COMFY_URL` | `http://127.0.0.1:8188` | сам ComfyUI: нужен в режиме `legacy`, а в режиме `sdk` только для чтения текстовых выходов вроде Whisper |
 | `COMFY_CLOUD_API_KEY` | — | ключ Comfy Cloud. Пишите в `.env.local` в корне проекта, не в git |
 | `FRAMEBOARD_AGENT_PROVIDER` | `manual` | кто выполняет «Отправить агенту»: `manual`, `ollama`, `claude` |
 | `FRAMEBOARD_OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama |
@@ -39,7 +46,7 @@ npm run dev
 | `FRAMEBOARD_LOOPS` | — | `off` выключает фоновые циклы (тесты) |
 
 ```bash
-DATA_ROOT=/tmp/frameboard COMFY_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 127.0.0.1
+DATA_ROOT=/tmp/frameboard COMFY_BASE_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 127.0.0.1
 ```
 
 ### Фоновые циклы

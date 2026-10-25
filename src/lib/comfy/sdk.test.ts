@@ -14,13 +14,16 @@ function job(patch: Partial<SdkJobLike>): SdkJobLike {
   return { id: "job-1", status: "succeeded", outputs: [], cancel: async () => undefined, ...patch };
 }
 
-test("COMFY_TRANSPORT выбирает реализацию, по умолчанию legacy", () => {
-  assert.equal(transportName({}), "legacy");
+test("COMFY_TRANSPORT выбирает реализацию, по умолчанию sdk", () => {
+  assert.equal(transportName({}), "sdk");
   assert.equal(transportName({ COMFY_TRANSPORT: "legacy" }), "legacy");
-  assert.equal(transportName({ COMFY_TRANSPORT: "bogus" }), "legacy");
+  assert.equal(transportName({ COMFY_TRANSPORT: " LEGACY " }), "legacy");
+  assert.equal(transportName({ COMFY_TRANSPORT: "bogus" }), "sdk");
   assert.equal(transportName({ COMFY_TRANSPORT: " SDK " }), "sdk");
-  assert.equal(transport({}).submitComfyPrompt, legacyLocal.submitComfyPrompt);
-  assert.equal(transport({}).submitCloudPrompt, legacyCloud.submitCloudPrompt);
+  assert.equal(transport({}).submitComfyPrompt, sdk.submitComfyPrompt);
+  assert.equal(transport({}).submitCloudPrompt, sdk.submitCloudPrompt);
+  assert.equal(transport({ COMFY_TRANSPORT: "legacy" }).submitComfyPrompt, legacyLocal.submitComfyPrompt);
+  assert.equal(transport({ COMFY_TRANSPORT: "legacy" }).submitCloudPrompt, legacyCloud.submitCloudPrompt);
   assert.equal(transport({ COMFY_TRANSPORT: "sdk" }).submitComfyPrompt, sdk.submitComfyPrompt);
   assert.equal(transport({ COMFY_TRANSPORT: "sdk" }).readCloudJob, sdk.readCloudJob);
 });
@@ -141,7 +144,7 @@ test("выбор в интерфейсе хранится в data/ и важне
   try {
     delete process.env.COMFY_TRANSPORT;
     assert.equal(readTransportSetting(), null);
-    assert.equal(transportName(), "legacy");
+    assert.equal(transportName(), "sdk");
     process.env.COMFY_TRANSPORT = "sdk";
     assert.equal(transportName(), "sdk");
     writeTransportSetting("legacy");
@@ -172,6 +175,8 @@ test("переключение блокируется, пока есть зад�
   const post = (transport: string) =>
     POST(new Request("http://x/api/comfy/transport", { method: "POST", body: JSON.stringify({ transport }) }));
   try {
+    assert.deepEqual(await (await GET()).json(), { transport: "sdk", locked: false });
+    assert.equal((await post("legacy")).status, 200);
     assert.deepEqual(await (await GET()).json(), { transport: "legacy", locked: false });
     assert.equal((await post("sdk")).status, 200);
     assert.deepEqual(await (await GET()).json(), { transport: "sdk", locked: false });

@@ -14,6 +14,8 @@ process.env.PLAYBOOKS_ROOT = path.resolve(__dirname, "../../../playbooks");
 process.env.COMFY_URL = "http://127.0.0.1:9";
 process.env.FRAMEBOARD_LOOPS = "off";
 process.env.COMFY_CLOUD_API_KEY = "test-key";
+// Тест проверяет прямые HTTP-вызовы облака, а не SDK (по умолчанию в доске).
+process.env.COMFY_TRANSPORT = "legacy";
 delete process.env.SERIES_ROOT;
 
 import { createEpisode, ensureStageDirs, shotDir, stageDir } from "../series/paths";

@@ -12,10 +12,17 @@ Files are the source of truth. The UI reads and writes the series directory, so 
 
 ## Run
 
+The board sends jobs to ComfyUI through the official Comfy SDK, which talks to ComfyUI through `comfy-api-proxy`. Start ComfyUI first, then the proxy, then the board:
+
 ```bash
+pip install comfy-api-proxy
+comfy-api-proxy run        # in front of ComfyUI on :8188, listens on :8189
+
 npm install
 npm run dev
 ```
+
+To skip the proxy and call ComfyUI directly, set `COMFY_TRANSPORT=legacy` or press "Direct" in the board header; see [docs/COMFY_SDK.md](docs/COMFY_SDK.md).
 
 Open [http://127.0.0.1:3456](http://127.0.0.1:3456). `/` leads to the open episode (`data/current_episode.txt`), the episode table is `/e/{episodeId}`, a stage is `/e/{episodeId}/shots/{shotId}/{stage}`. The switch in the header changes the address and remembers the choice as the default episode.
 
@@ -27,9 +34,9 @@ One series per repository. Shared folders: `data/characters`, `data/locations`, 
 |---|---|---|
 | `DATA_ROOT` | `data/` | data folder (use a temporary folder for trials) |
 | `SERIES_ROOT` | — | folder of a single episode instead of `data/episodes/*` |
-| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI. A dead port (`http://127.0.0.1:9`) leaves jobs waiting in the queue and nothing goes to the GPU |
-| `COMFY_TRANSPORT` | `legacy` | `legacy`: direct HTTP calls (`COMFY_URL`, cloud.comfy.org). `sdk`: the official `@comfyorg/sdk`, see [docs/COMFY_SDK.md](docs/COMFY_SDK.md) |
-| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | only with `COMFY_TRANSPORT=sdk`: comfy-api-proxy in front of a local ComfyUI |
+| `COMFY_TRANSPORT` | `sdk` | `sdk`: the official `@comfyorg/sdk` through comfy-api-proxy, see [docs/COMFY_SDK.md](docs/COMFY_SDK.md). `legacy`: direct HTTP calls (`COMFY_URL`, cloud.comfy.org) |
+| `COMFY_BASE_URL` | `http://127.0.0.1:8189` | in `sdk` mode: comfy-api-proxy in front of your ComfyUI. A dead port (`http://127.0.0.1:9`) leaves jobs waiting in the queue and nothing goes to the GPU |
+| `COMFY_URL` | `http://127.0.0.1:8188` | ComfyUI itself: used in `legacy` mode, and in `sdk` mode only to read text outputs such as Whisper |
 | `COMFY_CLOUD_API_KEY` | — | Comfy Cloud key. Put it in `.env.local` in the project root, never in git |
 | `FRAMEBOARD_AGENT_PROVIDER` | `manual` | who runs "Send to agent": `manual`, `ollama`, `claude` |
 | `FRAMEBOARD_OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama |
@@ -39,7 +46,7 @@ One series per repository. Shared folders: `data/characters`, `data/locations`, 
 | `FRAMEBOARD_LOOPS` | — | `off` turns off the background loops (tests) |
 
 ```bash
-DATA_ROOT=/tmp/frameboard COMFY_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 127.0.0.1
+DATA_ROOT=/tmp/frameboard COMFY_BASE_URL=http://127.0.0.1:9 npx next dev -p 3466 -H 127.0.0.1
 ```
 
 ### Background loops
