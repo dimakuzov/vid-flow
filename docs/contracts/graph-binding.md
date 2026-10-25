@@ -1,33 +1,33 @@
-# Контракт: манифест привязки графа
+# Contract: graph binding manifest
 
-Типы: `src/lib/contracts/graph-binding.ts`. Проверка: `src/lib/contracts/graph-binding.test.ts` (`npm test`).
+Types: `src/lib/contracts/graph-binding.ts`. Check: `src/lib/contracts/graph-binding.test.ts` (`npm test`).
 
-Граф ComfyUI в формате API и код доски связаны только через манифест. Код не знает node id. Новый воркфлоу = положить в `playbooks/workflows/comfy/` JSON графа и `<id>.bind.json`, без правки кода.
+A ComfyUI graph in API format and the board code are linked only through a manifest. The code does not know node ids. A new workflow means putting the graph JSON and `<id>.bind.json` into `playbooks/workflows/comfy/`, with no code change.
 
-## Где лежит
+## Where it lives
 
 ```
 playbooks/workflows/comfy/
-  location_views_multiple_angles.json   # граф (формат API)
-  location_views.bind.json              # манифест, id = имя файла без .bind.json
+  location_krea2_api.json    # the graph (API format)
+  location_krea2.bind.json   # the manifest, id = the file name without .bind.json
 ```
 
-Один граф может иметь несколько манифестов (например, `video_i2v` для превью и `final_i2v` для финала).
+One graph can have several manifests (for example `video_ltx` for the preview and `final_ltx` for the final).
 
-## Несколько воркфлоу на этап
+## Several workflows per stage
 
-- У каждого манифеста ровно один `stage` и `order`.
-- Меню этапа — все манифесты этого этапа по `order` (`StageDetail.workflows`, тип `WorkflowChoice`).
-- Вариант доступен (`available`), если все обязательные входы на месте; иначе `missing` перечисляет подписи недостающих входов.
-- **По умолчанию** — первый доступный, у которого совпал `whenSketch` (эскиз LTX → финал LTX); иначе первый доступный, чей `defaultWhen` подходит кадру (`speech` / `dialogue` / `silent`); иначе первый доступный по `order`. Доступных нет — первый по `order`. Доска сама выбор не меняет: `suggestedWorkflow` только показывает.
-- Выбор пользователя хранится в `run_settings.json` этапа (`{ "workflow": "<id>" }`), пишет только доска (`PATCH .../stages/{stage}` с полем `runWorkflow`; пустая строка — сбросить на вариант по умолчанию).
-- Запуск: `runWorkflow` из тела `POST .../run` → иначе `run_settings.json` → иначе по умолчанию. Старые имена `i2v`/`flf` принимаются через `aliases`.
-- Агент может предложить другой вариант (`suggestedWorkflow` в `agent_request.json`, см. `agent-request.md`). Доска показывает предложение, сама не переключает.
-- Этап без манифестов доска не запускает (сейчас `characters`).
+- Every manifest has exactly one `stage` and one `order`.
+- The stage menu is all manifests of that stage by `order` (`StageDetail.workflows`, type `WorkflowChoice`).
+- A choice is available (`available`) when every required input is present; otherwise `missing` lists the labels of the missing inputs.
+- **The default** is the first available choice whose `whenSketch` matches (LTX preview → LTX final); otherwise the first available choice whose `defaultWhen` fits the shot (`speech` / `dialogue` / `silent`); otherwise the first available by `order`. If none is available, the first by `order`. The board never changes the choice itself: `suggestedWorkflow` only shows a suggestion.
+- The user's choice is stored in the stage's `run_settings.json` (`{ "workflow": "<id>" }`). Only the board writes it (`PATCH .../stages/{stage}` with the field `runWorkflow`; an empty string resets to the default).
+- A run uses `runWorkflow` from the body of `POST .../run`, otherwise `run_settings.json`, otherwise the default. Old names can be accepted through `aliases`.
+- An agent can suggest another choice (`suggestedWorkflow` in `agent_request.json`, see `agent-request.md`). The board shows the suggestion and does not switch.
+- A stage without manifests is not run by the board.
 
-Функции (модуль 3, `src/lib/comfy/workflows.ts`): `listWorkflowChoices(ep, shot, stage)`, `resolveWorkflowId(ep, shot, stage, requested)`. Сигнатуры зафиксированы. Сейчас тело — временный список по текущему коду; модуль 3 заменяет его чтением манифестов.
+Functions (`src/lib/comfy/workflows.ts`): `listWorkflowChoices(ep, shot, stage)`, `resolveWorkflowId(ep, shot, stage, requested)`.
 
-## Формат
+## Format
 
 ```json
 {
@@ -35,107 +35,106 @@ playbooks/workflows/comfy/
   "id": "first_frame_compositing",
   "graph": "qwen21_character_compositing.json",
   "stage": "first_frame",
-  "label": "Первый кадр: персонажи в локации",
-  "description": "Вписать утверждённых персонажей (1–2) в утверждённую локацию.",
+  "label": "First frame: characters in the location",
+  "description": "Places the approved characters (1–2) into the approved location.",
   "playbook": "models/qwen_first_frame.en.md",
   "order": 10,
   "aliases": [],
-  "inputs": { "...": "см. ниже" },
-  "slots": [ "...см. ниже" ]
+  "inputs": { "...": "see below" },
+  "slots": [ "...see below" ]
 }
 ```
 
-| Поле | Что |
+| Field | Meaning |
 |---|---|
-| `id` | уникальный, = имя файла. Пишется в `run_settings.json` и в задание очереди (`ComfyJob.workflow`) |
-| `graph` | файл графа рядом |
-| `label` | название в меню, по-русски, для пользователя |
-| `description` | одна строка: когда выбирать |
-| `playbook` | плейбук модели для агента (`.en.md`), путь от `playbooks/`. Агент пишет `prompt.md` по шаблону оттуда |
-| `imageLabel` | как модель называет картинки, `{n}` — номер: `<Picture {n}>` у MiniMax H3. Есть — агент получает список картинок графа под этими именами на любом этапе, людей зовёт `<Subject N>`; нет — `image {n}` и `characterN`, список только на первом кадре |
-| `order` | порядок в меню, без повторов внутри этапа |
-| `aliases` | старые имена для совместимости |
+| `id` | unique, equals the file name. Written to `run_settings.json` and to the queue job (`ComfyJob.workflow`) |
+| `graph` | the graph file next to the manifest |
+| `label` | the name in the menu, in English, for the user |
+| `description` | one line: when to choose it |
+| `playbook` | the model playbook for the agent (`.en.md`), a path from `playbooks/`. The agent writes `prompt.md` from the template there |
+| `imageLabel` | how the model names pictures, `{n}` is the number: `<Picture {n}>` for MiniMax H3. If present, the agent gets the list of the graph's pictures under these names on any stage and calls people `<Subject N>`; if absent, it is `image {n}` and `characterN`, and the list appears only on the first frame |
+| `order` | order in the menu, unique within a stage |
+| `aliases` | old names for compatibility |
 
-### `inputs` — обязательные входы
+### `inputs`: the required inputs
 
-Именованные. Три вида:
+Named. Three kinds:
 
 ```json
-"location": { "kind": "image", "from": "approve:location", "pick": "newest", "label": "Утверждённая локация" },
-"people":   { "kind": "image", "from": "approve:characters", "pick": "all", "min": 1, "max": 2, "label": "Утверждённые персонажи" },
-"view":     { "kind": "image", "from": ["refs", "library:location"], "pick": "first", "label": "Общий вид" },
-"end":      { "kind": "image", "from": "refs", "pick": "newest", "uploadAs": "{shotId}_end{ext}", "label": "Последний кадр в refs/" },
+"location": { "kind": "image", "from": "approve:location", "pick": "newest", "label": "Approved location" },
+"people":   { "kind": "image", "from": "approve:characters", "pick": "all", "min": 1, "max": 2, "label": "Approved characters" },
+"view":     { "kind": "image", "from": ["refs", "library:location"], "pick": "first", "label": "General view" },
+"end":      { "kind": "image", "from": "refs", "pick": "newest", "uploadAs": "{shotId}_end{ext}", "label": "Last frame in refs/" },
 "text":     { "kind": "text", "from": "prompt", "required": true, "label": "prompt.md" },
-"seconds":  { "kind": "number", "from": "settings:seconds", "fallback": "prompt:seconds", "min": 2, "max": 12, "label": "Длительность клипа" }
+"seconds":  { "kind": "number", "from": "settings:seconds", "fallback": "prompt:seconds", "min": 2, "max": 12, "label": "Clip duration" }
 ```
 
-Картинки (`kind: image`):
+Pictures (`kind: image`):
 
-| `from` | Откуда |
+| `from` | Where from |
 |---|---|
-| `refs` | `refs/` этого этапа |
-| `approve:<stage>` | `approve/` другого этапа этого кадра |
-| `refs:<stage>` | `refs/` другого этапа этого кадра (финал FLF берёт последний кадр эскиза из `refs:video_preview`) |
-| `refs:other` | `refs/` этого этапа без файлов персонажей кадра (`{name}_face*`, `{name}_base*`, `{name}_clothes*`): вещи, одежда, образцы позы пользователя |
-| `refs:other:<stage>` | то же из `refs/` другого этапа кадра. MiniMax H3: `refs:other`, на финале иначе `refs:other:video_preview`, иначе `refs:other:first_frame`; слоты 301–306 — сначала лица, потом эти референсы |
-| `library:location` | `data/locations/<location из shot.md>/`: `view.png`, иначе первая картинка без `copy` в имени |
-| `library:faces` | лица персонажей: по одному на файл в `approve/` этапа characters, в том же порядке (по алфавиту). `refs/{name}_face.*` этого этапа, иначе в `data/characters/{name}/` — `face`, `portrait`, `portret` (в том числе `{name}_portret`, `portret_{name}`), иначе первая картинка с face/portr в имени без side и copy. Персонаж без лица пропускается |
-| `library:faces-or-characters` | по картинке на персонажа из `approve/` этапа characters, в том же порядке: лист лица (`refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`), иначе лицо (как у `library:faces`), иначе сам утверждённый персонаж. Никто не пропадает. В задаче агенту лист помечен «face sheet» |
-| `library:face-sheets` | листы лица персонажей из `approve/` этапа characters, в том же порядке: `refs/{name}_face_sheet.*` этапа, иначе картинка с `face_sheet` в имени в `data/characters/{name}/`. Без листа персонаж пропускается |
-| массив | источники по порядку, берётся первый непустой |
+| `refs` | `refs/` of this stage |
+| `approve:<stage>` | `approve/` of another stage of this shot |
+| `refs:<stage>` | `refs/` of another stage of this shot |
+| `refs:other` | `refs/` of this stage without the shot characters' files (`{name}_face*`, `{name}_base*`, `{name}_clothes*`): things, clothes, pose samples from the user |
+| `refs:other:<stage>` | the same from `refs/` of another stage of the shot. MiniMax H3 uses `refs:other`, and on the final otherwise `refs:other:video_preview`, otherwise `refs:other:first_frame`; slots 301–306 take the faces first and these references after them |
+| `library:location` | `data/locations/<location from shot.md>/`: `view.png`, otherwise the first picture without `copy` in its name |
+| `library:faces` | the characters' faces: one per file in `approve/` of the characters stage, in the same order (alphabetical). `refs/{name}_face.*` of this stage, otherwise in `data/characters/{name}/` a `face`, `portrait` or `portret` file (including `{name}_portret`, `portret_{name}`), otherwise the first picture with face or portr in its name, without side and copy. A character without a face is skipped |
+| `library:faces-or-characters` | one picture per character from `approve/` of the characters stage, in the same order: a face sheet (`refs/{name}_face_sheet.*` of the stage, otherwise a picture with `face_sheet` in its name in `data/characters/{name}/`), otherwise the face (as in `library:faces`), otherwise the approved character itself. Nobody is dropped. In the agent task the sheet is marked "face sheet" |
+| `library:face-sheets` | face sheets of the characters from `approve/` of the characters stage, in the same order: `refs/{name}_face_sheet.*` of the stage, otherwise a picture with `face_sheet` in its name in `data/characters/{name}/`. A character without a sheet is skipped |
+| array | sources in order, the first non-empty one is used |
 
-`maxAvailable` (у картинки) — вариант доступен, только если файлов входа не больше этого числа; иначе в `missing` строка «<подпись>: не больше N (сейчас M)». Вход может не иметь слотов и служить только условием: так `final_h3_head_swap` требует одного персонажа в кадре.
+`maxAvailable` (on a picture input): a choice is available only if the input has at most that many files; otherwise `missing` gets the line "<label>: at most N (now M)". An input can have no slots and serve only as a condition.
 
-`pick`: `first` — первая по имени (числа по значению), `newest` — самая новая по mtime, `all` — все по имени, не больше `max`. `min` (по умолчанию 1) — сколько нужно для `available`; `min: 0` — вход необязательный. `uploadAs` — имя файла при загрузке в ComfyUI: `{shotId}`, `{episodeId}`, `{index}`, `{ext}` (расширение с точкой, в нижнем регистре, по умолчанию `.png`); без него — имя файла.
+`pick`: `first` is the first by name (numbers by value), `newest` is the newest by mtime, `all` is all by name, at most `max`. `min` (default 1) is how many are needed for `available`; `min: 0` makes the input optional. `uploadAs` is the file name when uploading to ComfyUI: `{shotId}`, `{episodeId}`, `{index}`, `{ext}` (the extension with a dot, lower case, `.png` by default); without it the file name is kept.
 
-`requireSpeech: true` (у входа `text`) — каждая реплика из `speech.md` кадра должна стоять в тексте дословно (регистр, пробелы, кавычки и многоточие не считаются), иначе запуск — ошибка со списком недостающих. Реплика с кириллицей не требуется и в `prompt.md` не допускается: её пишут по-английски. Стоит у MiniMax H3 и HeyGen: модель сама озвучивает кадр.
+`requireSpeech: true` (on a `text` input): every line from the shot's `speech.md` must stand in the text word for word (letter case, spaces, quotes and the ellipsis do not count), otherwise the run fails with a list of the missing lines. A line with Cyrillic is not required and is not allowed in `prompt.md`: lines are written in English. Used by MiniMax H3: the model voices the shot itself.
 
-`defaultWhen` (у манифеста): `speech` — вариант может быть по умолчанию, только если в кадре есть реплики; `dialogue` — реплики от двух и более разных говорящих (имена перед двоеточием в `speech.md`); `silent` — только если реплик нет.
+`defaultWhen` (on a manifest): `speech` means the choice can be the default only if the shot has lines; `dialogue` means lines from two or more different speakers (the names before the colon in `speech.md`); `silent` means only if there are no lines.
 
-`whenSketch` (у манифеста) важнее `defaultWhen`. Вариант становится умолчанием, если самый новый ролик входа `of` (kind: video, `pick: newest`) сделан указанным графом:
+`whenSketch` (on a manifest) wins over `defaultWhen`. A choice becomes the default if the newest video of input `of` (kind: video, `pick: newest`) was made by the given graph:
 
-- в метаданных есть ключ `prompt`, и нашлась первая нода из `nodes` (`{ node, field }`), у которой в сохранённом графе непустой текст;
-- ключа нет — запасной признак `filename`, подстрока имени файла (`_ltx`). Имя не смотрится, если метаданные есть: файл могли переименовать при утверждении.
+- the metadata has the key `prompt`, and the first node from `nodes` (`{ node, field }`) that has non-empty text in the saved graph is found;
+- there is no key: the fallback is `filename`, a substring of the file name (`_ltx`). The name is not looked at when metadata exists, because the file could have been renamed at approval.
 
-Ноды `whenSketch` относятся к графу, которым сделан ролик, а не к графу этого манифеста: код их против своего графа не проверяет. Совпавший вариант недоступен (нет входов) — обычные правила `defaultWhen`. Подходящего доступного нет — первый доступный по `order`.
+The `whenSketch` nodes belong to the graph that made the video, not to the graph of this manifest: the code does not check them against its own graph. If the matching choice is not available (inputs missing), the usual `defaultWhen` rules apply. If no suitable choice is available, the first available by `order`.
 
-`target: "cloud"` + `cost: { credits, perSeconds }` (у манифеста) — прогон идёт в Comfy Cloud (`COMFY_CLOUD_API_KEY` в `.env.local`), платно. `queueStageRun` ставит его только с `allowCloud: true` — галочка на странице этапа, на один запуск (`POST .../run` `{ allowCloud: true }`, или `.../agent-request` `{ allowCloud: true }` — тогда доска запустит облако после ответа агента). Без разрешения — ошибка; кнопки таблицы такие кадры не отправляют. `WorkflowChoice.cloud` — цена для окна разрешения.
+`target: "cloud"` + `cost: { credits, perSeconds }` (on a manifest): the run goes to Comfy Cloud (`COMFY_CLOUD_API_KEY` in `.env.local`) and costs money. `queueStageRun` queues it only with `allowCloud: true`: a checkbox on the stage page, for one run (`POST .../run` `{ allowCloud: true }`, or `.../agent-request` `{ allowCloud: true }`, in which case the board starts the cloud run after the agent replies). Without permission it is an error; the table buttons do not send such shots. `WorkflowChoice.cloud` is the price for the permission window.
 
-`clamp: true` (у числа) — значение вне `min..max` прижимается к границе, а не отбрасывается. `{ "seed": "random", "max": N }` — случайный seed не больше `N` (HeyGen: 4294967295). Подходящего доступного нет — первый доступный по `order`.
+`clamp: true` (on a number): a value outside `min..max` is pressed to the nearest bound instead of being rejected. `{ "seed": "random", "max": N }` is a random seed not above `N`.
 
-`whenPrompt` — регэксп (флаг `i`): вход подключается, только если `prompt.md` этапа с ним совпал; иначе вход пуст и срабатывает `whenEmpty`. Так агент сам решает, нужен ли вход. Вход с `whenPrompt` обязан быть необязательным (`min: 0`). Пример: `"whenPrompt": "\\bface from image \\d+\\b"` — вход уходит, только если агент написал эту фразу (так раньше подключались лица первого кадра; теперь портреты уходят всегда). Номера картинок агент видит в задаче («Images the graph receives»).
+`whenPrompt` is a regexp (flag `i`): the input is connected only if the stage's `prompt.md` matches it; otherwise the input is empty and `whenEmpty` applies. This way the agent decides whether an input is needed. An input with `whenPrompt` must be optional (`min: 0`). Example: `"whenPrompt": "\\bface from image \\d+\\b"`: the input goes only if the agent wrote that phrase. The agent sees the picture numbers in the task ("Images the graph receives").
 
-`whenShot: "strictFirstFrame"` — вход подключается, только если у кадра включена галка «Строго первый кадр» (`shots/{shotId}/shot_settings.json`, ставится на странице превью или финала). Иначе вход пуст и срабатывает `whenEmpty`. Вход обязан быть необязательным (`min: 0`). Это не картинка для модели: в список `<Picture N>` агенту он не входит, вместо этого задача говорит, что первый кадр закреплён. MiniMax H3 (`video_minimax`, `final_h3_cinema`): вход `lock` кладёт утверждённый первый кадр в ноду `29`, ноды `MiniMaxH3AddGuide` (`400`, у финала ещё `401` для второго прохода) закрепляют его на кадре 0. Без галки они убираются, а гайдеры `145`/`146` снова берут `121`.
+`whenShot: "strictFirstFrame"`: the input is connected only if the shot has the "Strict first frame" checkbox on (`shots/{shotId}/shot_settings.json`, set on the preview or final page). Otherwise the input is empty and `whenEmpty` applies. The input must be optional (`min: 0`). This is not a picture for the model: it does not enter the `<Picture N>` list for the agent, and the task says instead that the first frame is pinned. MiniMax H3 (`video_minimax`, `final_h3_cinema`): the input `lock` puts the approved first frame into node `29`, and the `MiniMaxH3AddGuide` nodes (`400`, and `401` on the final for the second pass) pin it to frame 0. Without the checkbox they are removed, and the guiders `145`/`146` take `121` again.
 
-В `prompt.md` нельзя писать пути и имена файлов (`refs/x.png`, `lena_s01.png`): модель видит картинки только по номерам. Такой промпт доска не запускает.
+You must not write paths or file names (`refs/x.png`, `lena_s01.png`) in `prompt.md`: the model sees pictures only by number. The board does not run such a prompt.
 
-Текст (`kind: text`):
+Text (`kind: text`):
 
-- `from: "prompt"` — `prompt.md` этапа, `trim()`, **без фильтров**. `required: true` — пустой `prompt.md` даёт ошибку при запуске.
-- `from: "approve-meta"` — текст ноды из метаданных самого нового ролика входа `of` (kind: video, `pick: newest`). `nodes` — пары `{ node, field }` в сохранённом графе; берётся первая с непустым текстом. Так один манифест читает и Wan (`129:93` / `text`), и LTX (`398:376` / `value`): ноды перечислены в манифесте, код их не знает и против графа этого варианта не проверяет. `fallback: "prompt"` — нет ролика, нет ключа `prompt` или нет текста ни в одной ноде: взять `prompt.md` этапа `stage` (нет `stage` — этап запуска). Доска дописывает пометку в `run_log.md` этапа запуска. Та же строка — `sketchPromptTaskNote` в `binding.ts` (её место в задаче агента — `docs/contracts/agent-request.md`).
+- `from: "prompt"`: the stage's `prompt.md`, `trim()`, **with no filters**. `required: true`: an empty `prompt.md` is an error at run time.
+- `from: "approve-meta"`: the text of a node from the metadata of the newest video of input `of` (kind: video, `pick: newest`). `nodes` are pairs `{ node, field }` in the saved graph; the first with non-empty text is taken. This way one manifest reads both a Wan node and an LTX node (for example `398:376` / `value`): the nodes are listed in the manifest, the code does not know them and does not check them against the graph of this choice. `fallback: "prompt"`: no video, no `prompt` key, or no text in any node: take the `prompt.md` of stage `stage` (no `stage` means the run's stage). The board appends a note to the run stage's `run_log.md`.
 
-На `available` текст и число не влияют: промпт часто пишет агент уже после выбора варианта.
+Text and number inputs do not affect `available`: the prompt is often written by the agent after the choice was made.
 
-`prompt.md` из старых кадров может начинаться с инструкции доски («Собери shot-вариант…», «Правила: playbooks/…»). Такой текст в модель не отправляется: запуск падает с понятной ошибкой «перепиши prompt.md» (вместо прежнего тихого вырезания строк регэкспами).
+A `prompt.md` from old shots can start with a board instruction ("Build a shot variant…", "Rules: playbooks/…"). Such text is not sent to the model: the run fails with a clear error "rewrite prompt.md".
 
-Число (`kind: number`, `from: prompt:seconds`): секунды из `prompt.md` («5 сек», «5s», «5 с»), в пределах `min..max`. Нет числа — значение графа не меняется.
+Number (`kind: number`, `from: prompt:seconds`): seconds from `prompt.md` ("5 sec", "5s"), within `min..max`. No number: the graph's value stays.
 
-### Длительность из меню: `settings:seconds`
+### Duration from the menu: `settings:seconds`
 
-Число `from: "settings:seconds"` — выбор пользователя в меню этапа: `durationSec` из `run_settings.json`. Выбрано, но вне `min..max` этого манифеста — считается «не выбрано».
+A number with `from: "settings:seconds"` is the user's choice in the stage menu: `durationSec` from `run_settings.json`. If it is chosen but outside this manifest's `min..max`, it counts as "not chosen".
 
-- Не выбрано — источник `fallback`. Сейчас допустим только `"prompt:seconds"` (секунды из `prompt.md`, как выше). Нет `fallback` или и там числа нет — значение графа не меняется.
-- `min` и `max` обязательны, целые, `min <= max`: по ним доска строит меню (целые секунды, шаг 1). `fallback` у других источников — ошибка манифеста.
-- Выбран отдельный источник с запасным, а не новый смысл у `prompt:seconds`: старые манифесты (`prompt:seconds`, `final_*`) работают как раньше, порядок «меню → prompt.md → граф» виден в самом манифесте.
-- У манифеста не больше одного такого входа: меню одно на этап.
+- Not chosen: the source `fallback`. Only `"prompt:seconds"` is allowed now (seconds from `prompt.md`, as above). With no `fallback`, or no number there either, the graph's value stays.
+- `min` and `max` are required, integers, `min <= max`: the board builds the menu from them (whole seconds, step 1). `fallback` on other sources is a manifest error.
+- A manifest has at most one such input: there is one menu per stage.
 
-Меню (`StageDetail.durationRange: { min, max, default } | null`) строится по воркфлоу, который уйдёт в запуск (выбор этапа или вариант по умолчанию). `default` — что уйдёт без выбора: секунды из `prompt.md` (если `fallback`), иначе значение графа в первом target слота этого входа. `null` — у воркфлоу нет входа `settings:seconds`, меню не показывается. `StageDetail.durationSec` — выбор (в пределах этого меню) или `null`.
+The menu (`StageDetail.durationRange: { min, max, default } | null`) is built from the workflow that will run (the stage choice or the default). `default` is what goes without a choice: seconds from `prompt.md` (if `fallback`), otherwise the graph's value in the first target of this input's slot. `null` means the workflow has no `settings:seconds` input and no menu is shown. `StageDetail.durationSec` is the choice (within this menu) or `null`.
 
-Выбор пишет только доска: `PATCH .../stages/{stage}` с полем `runDuration` — целое секунд (число или строка из селекта); пустая строка или `null` — сбросить на «по умолчанию». Вне `min..max`, не целое, у воркфлоу нет меню — 400. `runWorkflow` и `runDuration` меняют только своё поле `run_settings.json`.
+Only the board writes the choice: `PATCH .../stages/{stage}` with the field `runDuration`, a whole number of seconds (a number or a string from the select); an empty string or `null` resets to the default. Outside `min..max`, not an integer, or a workflow without a menu gives 400. `runWorkflow` and `runDuration` change only their own field of `run_settings.json`.
 
-Агенту выбор уходит строкой в задаче: в `llm_task.md` — «Длительность клипа: N с. Действие должно уложиться в это время.», в text-режиме (`AgentTask.user`) — `clip duration: N s …`. Плейбук модели (`wan_video`, раздел 8, правило 7): `N sec` в `prompt.md` тогда не писать.
+The choice reaches the agent as a line in the task: in `llm_task.md` "Clip duration: N s. The action must fit into this time.", in text mode (`AgentTask.user`) `clip duration: N s …`. The model playbook then must not write `N sec` in `prompt.md`.
 
-### `slots` — куда в графе
+### `slots`: where in the graph
 
 ```json
 { "targets": [{ "node": "470", "field": "image" }], "value": { "input": "location" } }
@@ -145,26 +144,26 @@ playbooks/workflows/comfy/
 { "targets": [{ "node": "104", "field": "filename_prefix" }], "value": { "template": "frameboard/location/{shotId}_v1_simple" } }
 ```
 
-`targets` — пары нода/поле `inputs`. И нода, и поле обязаны быть в графе, иначе ошибка с именем манифеста, ноды и графа (не тихий прогон). Одно значение пишется во все `targets`; `seed: random` — своё случайное число на каждый target.
+`targets` are node/field pairs of `inputs`. Both the node and the field must exist in the graph, otherwise there is an error naming the manifest, the node and the graph (no silent run). One value is written to all `targets`; `seed: random` gives its own random number per target.
 
 `value`:
 
-| Вид | Что подставляется |
+| Kind | What is substituted |
 |---|---|
-| `{ input, index? }` для картинки | имя загруженного файла (`index` — номер во входе, по умолчанию 0) |
-| `{ inputs: [...], index }` | файл номер `index` из входов подряд (все файлы первого, затем второго…). Так первый кадр заполняет `image_2`…`image_6` персонажами и их портретами без пропусков. Слот обязателен, только если `index` меньше `min` первого входа |
-| `{ input, steps?, templates? }` для текста | текст входа после `steps`, затем первый подходящий шаблон |
-| `{ input }` для числа | число |
-| `{ seed: "random" }` | новое случайное целое |
-| `{ template }` | строка: `{shotId}`, `{episodeId}`, `{stageId}`, `{workflow}` |
+| `{ input, index? }` for a picture | the uploaded file name (`index` is the number in the input, 0 by default) |
+| `{ inputs: [...], index }` | file number `index` from the inputs in a row (all files of the first, then of the second…). This is how the first frame fills `image_2`…`image_6` with characters and their portraits without gaps. The slot is required only if `index` is below the first input's `min` |
+| `{ input, steps?, templates? }` for text | the input's text after `steps`, then the first matching template |
+| `{ input }` for a number | the number |
+| `{ seed: "random" }` | a new random integer |
+| `{ template }` | a string: `{shotId}`, `{episodeId}`, `{stageId}`, `{workflow}` |
 
-`whenEmpty.remove` — если значения нет (картинки с таким `index` нет, текста нет, числа нет): удалить ноды (без `field`) или ключи `inputs` (с `field`). Без `whenEmpty`: для обязательного входа — ошибка, иначе оставить значение графа.
+`whenEmpty.remove`: if there is no value (no picture with that `index`, no text, no number): remove nodes (without `field`) or `inputs` keys (with `field`). Without `whenEmpty`: an error for a required input, otherwise the graph's value stays.
 
-`relink: ["нода", номер]` у удаления с `field` — не удалять поле, а подключить его к этому выходу: связь возвращается в обход убранной ноды. Пример: `{ "node": "145", "field": "conditioning", "relink": ["121", 0] }`.
+`relink: ["node", number]` on a removal with `field`: do not delete the field but connect it to this output, so the link is restored around the removed node. Example: `{ "node": "145", "field": "conditioning", "relink": ["121", 0] }`.
 
-### Текст: `steps` и `templates`
+### Text: `steps` and `templates`
 
-Всё, что доска добавляет к `prompt.md`, видно в манифесте. Других правок текста в коде нет.
+Everything the board adds to `prompt.md` is visible in the manifest. There are no other text edits in the code.
 
 ```json
 "steps": [
@@ -174,8 +173,8 @@ playbooks/workflows/comfy/
 ]
 ```
 
-- `namesTo` — имена персонажей из `shot.md` (как слова, без учёта регистра, длинные первыми) заменить фразой; двойные пробелы схлопнуть.
-- `ensure` — добавить фразу в начало или конец через `separator`, если текст не совпадает с регэкспом `unless` (флаг `i`). Пустой текст — фраза без разделителя.
+- `namesTo`: replace the character names from `shot.md` (as words, case-insensitive, longest first) with a phrase; collapse double spaces.
+- `ensure`: add a phrase to the start or end through `separator` if the text does not match the regexp `unless` (flag `i`). For an empty text the phrase goes without a separator.
 
 ```json
 "templates": [
@@ -184,13 +183,13 @@ playbooks/workflows/comfy/
 ]
 ```
 
-Берётся первый шаблон, у которого выполнено `when` (число картинок во входе), или без `when`. Плейсхолдеры: `{text}`, `{shotId}`, `{episodeId}`. Строка, которая после подстановки пуста и состояла только из плейсхолдера, удаляется целиком.
+The first template whose `when` holds (the number of pictures in an input), or that has no `when`, is taken. Placeholders: `{text}`, `{shotId}`, `{episodeId}`. A line that is empty after substitution and consisted only of a placeholder is removed entirely.
 
-Направление (бриф 4): лучше, когда обвязка живёт в шаблоне `prompt.md` из плейбука модели, а манифест подставляет `{text}` как есть. `steps`/`templates` нужны, чтобы старое поведение было видно и менялось без кода.
+The direction: it is better for the wrapping to live in the `prompt.md` template from the model playbook, with the manifest substituting `{text}` as is. `steps`/`templates` exist so that old behavior is visible and can change without code.
 
-### Разделы `prompt.md`
+### Sections of `prompt.md`
 
-Когда графу нужно несколько текстов (4 ветки локации, разделы Refine у MiniMax H3), `prompt.md` делится заголовками `## <имя>`:
+When a graph needs several texts (the 4 branches of a location, the Refine sections of MiniMax H3), `prompt.md` is split by `## <name>` headings:
 
 ```json
 "text": { "kind": "text", "from": "prompt", "required": true,
@@ -201,14 +200,14 @@ playbooks/workflows/comfy/
   "whenEmpty": { "remove": [{ "node": "104" }] } }
 ```
 
-- `sections` — разрешённые имена (строчная латиница, цифры, `_`). Другое имя, повтор раздела, текст до первого заголовка — ошибка с понятным текстом.
-- `untitled` — куда идёт текст без заголовков: `all` — во все разделы (как было до разделов), имя — только в этот раздел.
-- Пустой раздел — `whenEmpty` (у локации: удалить ноду сохранения, ветка не выполняется). `required: true` у значения — пустой раздел даёт ошибку.
-- `stage` у текстового входа — чей `prompt.md`. Для `from: prompt` это сам текст. Для `approve-meta` это запасной файл, если в ролике нет промпта (финал: `video_preview`).
+- `sections` are the allowed names (lowercase Latin letters, digits, `_`). Another name, a repeated section, or text before the first heading is an error with a clear message.
+- `untitled`: where text without headings goes: `all` means into every section (as before sections existed), a name means only into that section.
+- An empty section triggers `whenEmpty` (for a location: remove the save node so the branch does not run). `required: true` on a value makes an empty section an error.
+- `stage` on a text input is whose `prompt.md` it is. For `from: prompt` it is the text itself. For `approve-meta` it is the fallback file when the video has no prompt (final: `video_preview`).
 
-### Пути внутри JSON-строки, константы
+### Paths inside a JSON string, constants
 
-Некоторые ноды получают всё одним JSON в строковом поле (`MiniMaxH3Creator.creator_data`). Target и removal принимают `json` — путь через точку, номер элемента массива — числом:
+Some nodes get everything as one JSON in a string field. Target and removal accept `json`, a dotted path, with array indexes as numbers:
 
 ```json
 { "targets": [{ "node": "1", "field": "creator_data", "json": "segments.0.refined.body" }],
@@ -219,50 +218,50 @@ playbooks/workflows/comfy/
 { "targets": [{ "node": "1", "field": "creator_data", "json": "short_edge" }], "value": { "const": 1152 } }
 ```
 
-- Родитель пути обязан быть в графе (проверяется при загрузке).
-- Удаление элемента массива вырезает его; элементы одного массива удаляются с конца, номера не сдвигаются.
-- `const` — значение как есть: число, `true`/`false`, строка, объект.
+- The parent of the path must be in the graph (checked at load).
+- Removing an array element cuts it out; elements of one array are removed from the end, so the numbers do not shift.
+- `const` is a value as is: a number, `true`/`false`, a string, an object.
 
-### Ролики и длительность
+### Videos and duration
 
-- `kind: "video"` — как `image`, но файлы `mp4`, `webm`, `mov`, `mkv` (тот же `from`, `pick`, `uploadAs`). Загружаются в ComfyUI тем же `/upload/image`.
-- Число `from: "media:duration"`, `of: "<вход video>"` — длительность ролика по атому `mvhd` (mp4/mov), округление до секунды, в пределах `min..max`.
+- `kind: "video"` is like `image`, but the files are `mp4`, `webm`, `mov`, `mkv` (the same `from`, `pick`, `uploadAs`). They are uploaded to ComfyUI through the same `/upload/image`.
+- A number with `from: "media:duration"`, `of: "<video input>"` is the video's duration from the `mvhd` atom (mp4/mov), rounded to a second, within `min..max`.
 
-### Язык текста
+### Language of the text
 
-Текст для модели проверяется перед запуском: строка инструкции доски («Собери …», «Правила: playbooks/…») или строка с русским текстом (5+ кириллических букв, не считая имён персонажей кадра, дословных реплик из `shots/{shotId}/speech.md` и длительности «5 сек») — ошибка «перепиши prompt.md или отправь агенту». Старые `prompt.md` переводятся скриптом `npm run migrate-prompts` (без `--write` только показывает план).
+The text for the model is checked before a run: a board instruction line ("Build …", "Rules: playbooks/…") or a line with Russian text (5+ Cyrillic letters, not counting the shot's character names, word-for-word lines from `shots/{shotId}/speech.md`, and a duration like "5 sec") is an error "rewrite prompt.md or send it to the agent". Old `prompt.md` files are translated by the script `npm run migrate-prompts` (without `--write` it only shows the plan).
 
-## Метаданные
+## Metadata
 
-Манифест не добавляет нод сохранения метаданных.
+A manifest does not add metadata-saving nodes.
 
-- PNG: ComfyUI сам пишет граф в чанки `tEXt`/`iTXt` с ключом `prompt` (`src/components/stage/png-metadata.ts`).
-- Ролик: файл пишет `SaveVideo`. Скрытые входы ноды — `prompt` (граф в формате API) и `extra_pnginfo`. В mp4/mov это ключи контейнера (`movflags=use_metadata_tags`: атомы `moov/udta/meta/keys` + `ilst`, значение `prompt` — JSON графа). `CreateVideo` только собирает кадры и файл не пишет. webm/mkv доска как источник промпта не читает. Разбор — `readVideoPromptText` в `src/lib/comfy/binding.ts`.
+- PNG: ComfyUI itself writes the graph into `tEXt`/`iTXt` chunks under the key `prompt` (`src/components/stage/png-metadata.ts`).
+- Video: the file is written by `SaveVideo`. The node's hidden inputs are `prompt` (the graph in API format) and `extra_pnginfo`. In mp4/mov these are container keys (`movflags=use_metadata_tags`: atoms `moov/udta/meta/keys` + `ilst`, the value of `prompt` is the graph JSON). `CreateVideo` only assembles frames and writes no file. The board does not read webm/mkv as a prompt source. The parser is `readVideoPromptText` in `src/lib/comfy/binding.ts`.
 
-## Кто что делает
+## Who does what
 
-| Кто | Что |
+| Who | What |
 |---|---|
-| Модуль 3 (`src/lib/comfy/*`) | читает манифесты, проверяет их против графа при загрузке, собирает prompt, реализует `listWorkflowChoices`/`resolveWorkflowId` по манифестам |
-| Модуль 4 (`playbooks/**`) | сопровождает графы и манифесты: пересохранил граф — обновил манифест в том же коммите, `npm test` зелёный; добавляет новые варианты |
-| Модуль 6 (UI) | меню воркфлоу из `StageDetail.workflows`, выбор — `PATCH` с `runWorkflow` |
+| `src/lib/comfy/*` | reads the manifests, checks them against the graph at load, builds the prompt, implements `listWorkflowChoices`/`resolveWorkflowId` from the manifests |
+| `playbooks/**` | maintains graphs and manifests: when a graph is re-saved, update the manifest in the same commit and keep `npm test` green; adds new choices |
+| UI | the workflow menu from `StageDetail.workflows`, the choice is a `PATCH` with `runWorkflow` |
 
-## Текущие манифесты
+## Current manifests
 
-| id | Этап | Граф |
+| id | Stage | Graph |
 |---|---|---|
 | `location_views` | location | `location_views_multiple_angles.json` |
 | `location_krea2` | location | `location_krea2_api.json` |
 | `first_frame_compositing` | first_frame | `qwen21_character_compositing.json` |
-| `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; длительность — `settings:seconds` → `prompt:seconds` → граф (нода `129:161`) |
-| `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 к/с, со звуком); длительность — `settings:seconds` → `prompt:seconds` → граф (нода `398:362`), 2–10 с |
-| `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 к/с; промпт — `approve-meta` эскиза, запасной `prompt.md`) |
-| `final_ltx` | final_render | `ltx25_i2v_api.json` (нода `403`: 1.2 Мп, 9:16 → 832×1472, 24 к/с; `whenSketch` — эскиз LTX) |
-| `video_minimax` | video_preview | `minimax_h3_preview_api.json` (MiniMax H3 по референсам, 0.5 Мп; `imageLabel: <Picture {n}>`). По умолчанию на эскизе теперь `video_ltx` (order 5) |
-| `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 по референсам + ЛоРа Cinema: первый кадр + по картинке на персонажа, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; промпт эскиза из `approve-meta` — только в задаче агенту) |
-| `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (замена головы: утверждённое превью + `library:face-sheets`; вход персонажей с `maxAvailable: 1`; без текста) |
-| `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; запуск только с галочкой на этот раз) |
-| `final_i2v` | final_render | граф Wan i2v превью, префикс `frameboard/final/` |
-| `final_flf` | final_render | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 к/с, промпт эскиза (`approve-meta`), последний кадр из `refs` финала, иначе `refs:video_preview`; `whenSketch` — нода `98` (последний кадр) в метаданных или `_flf` в имени |
+| `video_i2v`, `video_flf` | video_preview | `wan22_i2v_sketch_turbo_api.json`, `wan22_flf_sketch_turbo_api.json`; duration: `settings:seconds` → `prompt:seconds` → graph (node `129:161`) |
+| `video_ltx` | video_preview | `ltx25_i2v_api.json` (LTX 2.5 i2v, 24 fps, with sound); duration: `settings:seconds` → `prompt:seconds` → graph (node `398:362`), 2–10 s |
+| `final_wan_720` | final_render | `wan22_i2v_sketch_turbo_api.json` (720×1280, 24 fps; prompt from `approve-meta` of the preview, fallback `prompt.md`) |
+| `final_ltx` | final_render | `ltx25_i2v_api.json` (node `403`: 1.2 MP, 9:16 → 832×1472, 24 fps; `whenSketch` is the LTX preview) |
+| `video_minimax` | video_preview | `minimax_h3_preview_api.json` (MiniMax H3 from references, 0.5 MP; `imageLabel: <Picture {n}>`). On a preview the default is `video_ltx` (order 5) |
+| `final_h3_cinema` | final_render | `minimax_h3_cinema_api.json` (MiniMax H3 from references + the Cinema LoRA: the first frame plus one picture per character, `library:faces-or-characters`; `imageLabel: <Picture {n}>`; the preview prompt from `approve-meta` goes only into the agent task) |
+| `final_h3_head_swap` | final_render | `minimax_h3_head_swap_api.json` (head swap: approved preview + `library:face-sheets`; the characters input has `maxAvailable: 1`; no text) |
+| `final_heygen` | final_render | `heygen_video_i2v_api.json` (Comfy Cloud; `defaultWhen: dialogue`; runs only with the checkbox for that one run) |
+| `final_i2v` | final_render | the Wan i2v preview graph, prefix `frameboard/final/` |
+| `final_flf` | final_render | `wan22_flf_sketch_turbo_api.json`, 720×1280, 24 fps, the preview prompt (`approve-meta`), the last frame from the final's `refs`, otherwise `refs:video_preview`; `whenSketch` is node `98` (last frame) in the metadata or `_flf` in the name |
 
-Составлены по `stage-run.ts` на момент контракта: собранный по ним prompt должен совпадать с текущим (кроме случайных seed).
+The prompt built from these must match the current one (except random seeds).

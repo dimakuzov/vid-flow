@@ -1,151 +1,153 @@
-# Контракт: запрос агенту и провайдер
+# Contract: the agent request and the provider
 
-Типы: `src/lib/contracts/agent-request.ts` (`AgentRequestFile`, `AgentProvider`, `AgentTask`, `AgentResult`, `AgentProviderInfo`). Владелец кода — модуль 5.
+Types: `src/lib/contracts/agent-request.ts` (`AgentRequestFile`, `AgentProvider`, `AgentTask`, `AgentResult`, `AgentProviderInfo`).
 
-## Решения пользователя (не пересматривать)
+## Decisions of the user (do not revisit)
 
-- Статус этапа пишет только доска. Агент сигналит только `"status": "done"` в `agent_request.json`.
-- В модель идёт только `prompt.md`. Рекомендация (`llm_notes.md`) очищается доской при отправке.
-- Агента вызывает сама доска через провайдера: Ollama (HTTP) или `claude -p` по подписке пользователя. Ручной режим (агент в отдельном чате читает файлы) — запасной.
+- Only the board writes the stage status. The agent signals only `"status": "done"` in `agent_request.json`.
+- Only `prompt.md` goes to the model. The recommendation (`llm_notes.md`) is cleared by the board when sending.
+- The board itself calls the agent through a provider: Ollama (HTTP) or `claude -p` on the user's subscription. Manual mode (an agent in a separate chat reads the files) is the fallback.
 
-## Файлы запроса в папке этапа
+## Request files in the stage folder
 
-| Файл | Что | Пишет |
+| File | What | Written by |
 |---|---|---|
-| `agent_request.json` | состояние запроса (`AgentRequestFile`) | доска; ручной агент — только `status: done` и, по желанию, `suggestedWorkflow` |
-| `llm_task.md` | **единственный** текст задачи, самодостаточный | доска при отправке |
-| `agent_dispatch.json` | связь запроса и прогона: `workflow` (id манифеста), `jobId` | доска |
-| `agent_baseline.json`, `agent_touch.json` | снимок refs для сравнения | доска после text-режима; агент в agent/manual |
-| `run_log.md` | журнал: после каждого прогона доски — блок `## время · провайдер · модель · режим · статус` с расходом (`AgentResult.usage`: токены вход / запись в кэш / из кэша / выход, стоимость по ценам API, время всего и ответа модели, ходы); в агентном режиме ниже — вывод CLI-агента. Агент дописывает свои заметки. Тот же расход — в `agent_request.json`, поле `usage` | доска, агент (дописывает) |
+| `agent_request.json` | the request state (`AgentRequestFile`) | the board; a manual agent writes only `status: done` and optionally `suggestedWorkflow` |
+| `llm_task.md` | **the only** task text, self-contained | the board, on send |
+| `agent_dispatch.json` | the link between a request and a run: `workflow` (manifest id), `jobId` | the board |
+| `agent_baseline.json`, `agent_touch.json` | a snapshot of refs for comparison | the board after text mode; the agent in agent/manual mode |
+| `run_log.md` | the log: after every board run a block `## time · provider · model · mode · status` with the usage (`AgentResult.usage`: tokens in / cache write / cache read / out, cost at API prices, total time and model time, turns); in agent mode below it the CLI agent's output. The agent appends its own notes. The same usage is in `agent_request.json`, field `usage` | the board, the agent (appends) |
 
-`agent_request.md` — устаревшая копия задачи; модуль 5 может убрать её, оставив `llm_task.md`. `agent_inbox.md` эпизода — только оглавление `pending`-запросов для ручного режима.
+`agent_request.md` is an outdated copy of the task and may be removed in favor of `llm_task.md`. The episode's `agent_inbox.md` is only a table of contents of the `pending` requests for manual mode.
 
-## Жизненный цикл
+The request also stores `character` on the characters stage: the character the user had selected on the page. The task then says that the request is only about that character and that the sections of the others stay empty (`llm_task.md` and the text-mode task both get the line). If the name is not a character of the shot, it is ignored.
+
+## Life cycle
 
 ```
-«Отправить агенту» ──> pending ──провайдер text/agent──> running ──> done | error
-                          │                                  │
-                          │ manual: агент сам ставит done ───┘
-                          └──────────── «Отменить» ─────────────> cancelled
+"Send to agent" ──> pending ──provider text/agent──> running ──> done | error
+                        │                                │
+                        │ manual: the agent sets done ───┘
+                        └──────────── "Cancel" ────────────> cancelled
 ```
 
-| status | Кто ставит | Поля |
+| status | Set by | Fields |
 |---|---|---|
 | `pending` | `submitAgentRequest` | `createdAt`, `provider`, `mode`, `message` |
-| `running` | исполнитель доски | `startedAt` |
-| `done` | исполнитель доски (text/agent) или агент (manual) | `finishedAt` (доска), `suggestedWorkflow` |
-| `error` | исполнитель доски / фоновый цикл (таймаут, перезапуск) | `error`, `finishedAt` |
+| `running` | the board's executor | `startedAt` |
+| `done` | the board's executor (text/agent) or the agent (manual) | `finishedAt` (board), `suggestedWorkflow` |
+| `error` | the board's executor / the background loop (timeout, restart) | `error`, `finishedAt` |
 | `cancelled` | `cancelStage` | `finishedAt` |
 
-Фаза этапа (`stage_state.json`, `docs/contracts/stage-folder.md`) всё это время — `agent`. Фоновый цикл (`reconcileStage`) переводит её:
+All this time the stage phase (`stage_state.json`, `docs/contracts/stage-folder.md`) is `agent`. The background loop (`reconcileStage`) moves it:
 
-- запрос `done` → `comfy` (доска ставит прогон с `agent_dispatch.workflow`, иначе выбором этапа) или `idle` (агент сам гонял ComfyUI — `agentRunsComfy`);
-- запрос `error` → фаза `error` с текстом `request.error`;
-- запрос `cancelled` → `idle`;
-- `running`, а процесса в этой доске нет (сервер перезапущен) → `error` «доска перезапущена, пока работал агент»;
-- нет ответа дольше таймаута режима → `error`.
+- request `done` → `comfy` (the board queues a run with `agent_dispatch.workflow`, otherwise the stage choice) or `idle` (the agent ran ComfyUI itself: `agentRunsComfy`);
+- request `error` → phase `error` with the text `request.error`;
+- request `cancelled` → `idle`;
+- `running` but no process in this board (the server was restarted) → `error` "the board was restarted while the agent worked";
+- no answer for longer than the mode's timeout → `error`.
 
-## Режимы и провайдеры
+## Modes and providers
 
-| Режим | Когда | Что делает доска |
+| Mode | When | What the board does |
 |---|---|---|
-| `text` | у этапа есть доступный воркфлоу доски (`listWorkflowChoices` → `available`): location, first_frame, video | собирает `AgentTask.system` (плейбук модели выбранного воркфлоу, поле `playbook` манифеста, плюс правило «верни только текст промпта») и `user` (сообщение, текущий `prompt.md`, действие кадра из `shot.md`, имена файлов в `refs/`, персонажи). Один запрос к LLM. Ответ без обрамления ``` пишет в `prompt.md` через `updateStageDocs` (история промпта), обновляет `agent_baseline.json`, ставит `done` |
-| `agent` | у этапа нет воркфлоу доски (`characters`) или пользователь выбрал | запускает CLI-агента в корне репо с `llm_task.md`, вывод пишет в `run_log.md`, по выходу процесса: 0 → `done`, иначе `error` |
-| `manual` | провайдер `manual` | ничего не запускает; запрос ждёт `done` от агента в чате |
+| `text` | the stage has an available board workflow (`listWorkflowChoices` → `available`): location, first_frame, video | builds `AgentTask.system` (the model playbook of the selected workflow, the manifest's `playbook` field, plus the rule "return only the prompt text") and `user` (the message, the current `prompt.md`, the shot action from `shot.md`, the file names in `refs/`, the characters). One request to the LLM. The answer, without ``` fences, is written to `prompt.md` through `updateStageDocs` (prompt history), `agent_baseline.json` is updated, and `done` is set |
+| `agent` | the stage has no board workflow (`characters`) or the user chose it | starts a CLI agent in the repo root with `llm_task.md`, writes the output to `run_log.md`; on process exit: 0 → `done`, otherwise `error` |
+| `manual` | provider `manual` | starts nothing; the request waits for `done` from an agent in a chat |
 
-| Провайдер | Режимы | Вызов |
+| Provider | Modes | Call |
 |---|---|---|
-| `manual` | manual | — |
-| `ollama` | text | `POST {FRAMEBOARD_OLLAMA_URL}/api/chat`, `stream: false`, модель `FRAMEBOARD_OLLAMA_MODEL` |
-| `claude` | text, agent | `claudeInvocation` в `providers.ts`. Оба режима стартуют в пустой папке вне репозитория (`%TEMP%/frameboard-claude`: без `CLAUDE.md`, `AGENTS.md`, памяти проекта), с `--strict-mcp-config` (без MCP-серверов) и `--no-session-persistence`. text: `--tools ""` (без инструментов), `--system-prompt` = правила и плейбук этапа, задача на stdin, ответ в `.result` — один запрос, один ответ. agent: `--restricted` (без настроек, файловые инструменты только в `--add-dir`), `--tools`/`--allowedTools Read,Write,Edit,Glob,Grep,Bash`, `--add-dir`: папка кадра, `playbooks/`, `data/comfy_queue/`, `docs/contracts/`, библиотека этапа (`data/characters/` или `data/locations/`); `--append-system-prompt` — рамки «один этап одного кадра». Ошибка — поле `result` ответа. Подписка пользователя, без API-ключа |
+| `manual` | manual | none |
+| `ollama` | text | `POST {FRAMEBOARD_OLLAMA_URL}/api/chat`, `stream: false`, model `FRAMEBOARD_OLLAMA_MODEL` |
+| `claude` | text, agent | `claudeInvocation` in `providers.ts`. Both modes start in an empty folder outside the repository (`%TEMP%/frameboard-claude`: no `CLAUDE.md`, no `AGENTS.md`, no project memory), with `--strict-mcp-config` (no MCP servers) and `--no-session-persistence`. text: `--tools ""` (no tools), `--system-prompt` = the rules and the stage playbook, the task on stdin, the answer in `.result`: one request, one answer. agent: `--restricted` (no settings, file tools only in `--add-dir`), `--tools`/`--allowedTools Read,Write,Edit,Glob,Grep,Bash`, `--add-dir`: the shot folder, `playbooks/`, `data/comfy_queue/`, `docs/contracts/`, the stage's library (`data/characters/` or `data/locations/`); `--append-system-prompt` sets the frame "one stage of one shot". An error is the `result` field of the answer. The user's subscription, no API key |
 
-Провайдер не умеет нужный режим (например, `ollama` на `characters`) — запрос сразу `error` с понятным текстом; интерфейс такой выбор не предлагает.
+If a provider cannot do the needed mode (for example `ollama` on `characters`), the request is an `error` at once with a clear text; the interface does not offer such a choice.
 
-## Настройка
+## Settings
 
-| Переменная | По умолчанию | Что |
+| Variable | Default | What |
 |---|---|---|
-| `FRAMEBOARD_AGENT_PROVIDER` | `manual` | провайдер по умолчанию |
+| `FRAMEBOARD_AGENT_PROVIDER` | `manual` | the default provider |
 | `FRAMEBOARD_OLLAMA_URL` | `http://127.0.0.1:11434` | |
-| `FRAMEBOARD_OLLAMA_MODEL` | — | без неё `ollama` недоступен |
-| `FRAMEBOARD_CLAUDE_BIN` | `claude` | путь к CLI |
-| `FRAMEBOARD_AGENT_TEXT_TIMEOUT_MIN` | 5 | таймаут text |
-| `FRAMEBOARD_AGENT_RUN_TIMEOUT_MIN` | 30 | таймаут agent |
-| `FRAMEBOARD_AGENT_TIMEOUT_MIN` | 60 | таймаут manual (уже есть, бриф 1) |
+| `FRAMEBOARD_OLLAMA_MODEL` | none | without it `ollama` is unavailable |
+| `FRAMEBOARD_CLAUDE_BIN` | `claude` | the path to the CLI |
+| `FRAMEBOARD_AGENT_TEXT_TIMEOUT_MIN` | 5 | the text timeout |
+| `FRAMEBOARD_AGENT_RUN_TIMEOUT_MIN` | 30 | the agent timeout |
+| `FRAMEBOARD_AGENT_TIMEOUT_MIN` | 60 | the manual timeout |
 
-## Отмена
+## Cancel
 
-Исполнитель держит `AbortController` на запрос (по `request.id`) в памяти процесса. `cancelStage` помечает запрос `cancelled` и вызывает abort: HTTP-запрос к Ollama обрывается, процесс `claude` убивается вместе с дочерними. Результат, пришедший после отмены, не пишется.
+The executor keeps an `AbortController` per request (by `request.id`) in the process memory. `cancelStage` marks the request `cancelled` and calls abort: the HTTP request to Ollama is cut, and the `claude` process is killed with its children. A result that arrives after the cancel is not written.
 
 ## API
 
-| Метод и путь | Тело / ответ |
+| Method and path | Body / answer |
 |---|---|
-| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot?, allowCloud?, takes? }` (`workflow` — заметка `workflow.md`; `runWorkflow` — id манифеста; `videoWorkflow` — старое имя; `rememberForShot: true` — после принятого запроса записать `provider`/`model` агентом кадра; `allowCloud: true` — галочка платной отправки: доска запустит облачный воркфлоу после ответа агента, один раз; `takes` — 1–8 файлов с тем же промптом и разными seed, нет — 1, финал всегда 1, между заходами не запоминается; хранится в `agent_dispatch.json`). Ответ `{ message, refsChangedByUser, stage: StageDetail }` |
-| `POST .../stages/{stage}/cancel` | отмена (общая с прогоном) |
-| `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }` — агент кадра и что он делает |
-| `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }` — «Сохранить» в меню агента кадра. Неизвестный провайдер или модель — 400 |
-| `POST /api/episodes/{ep}/shots/{shot}/next-stage` | `{ provider?, model? }` — следующий неутверждённый этап агентом кадра. Кнопки на столбце «Кадр» больше нет. Ответ `{ started, skipped, assigned }` |
-| `POST /api/episodes/{ep}/assign-agents` | `{ provider, model? }` — агент кадрам без агента, ничего не запускает. Кнопки на столбце «Кадр» больше нет. Ответ `{ started: [], skipped: [], assigned }` |
-| `POST /api/episodes/{ep}/stages/{stage}/run-all` | `{ provider?, model?, redo? }` — агент для кадров **без своего агента**, назначается им; кадры с агентом идут своим. Ответ `{ started, skipped, assigned }` |
+| `POST /api/episodes/{ep}/shots/{shot}/stages/{stage}/agent-request` | `{ message, character?, prompt, refs, workflow, runWorkflow?, provider?, model?, rememberForShot?, allowCloud?, takes? }` (`character` is the character selected on the characters page; `workflow` is the `workflow.md` note; `runWorkflow` is a manifest id; `videoWorkflow` is the old name; `rememberForShot: true` makes `provider`/`model` the shot's agent after an accepted request; `allowCloud: true` is the paid-send checkbox: the board runs the cloud workflow after the agent answers, once; `takes` is 1–8 files with the same prompt and different seeds, 1 if absent, always 1 for the final, not remembered between runs; stored in `agent_dispatch.json`). Answer `{ message, refsChangedByUser, stage: StageDetail }` |
+| `POST .../stages/{stage}/cancel` | cancel (shared with the run) |
+| `GET /api/episodes/{ep}/shots/{shot}/agent` | `{ agent: ShotAgent \| null, activity }`: the shot's agent and what it is doing |
+| `PUT /api/episodes/{ep}/shots/{shot}/agent` | `{ provider, model? }`: "Save" in the shot agent menu. An unknown provider or model gives 400 |
+| `POST /api/episodes/{ep}/shots/{shot}/next-stage` | `{ provider?, model? }`: the next unapproved stage by the shot's agent. Answer `{ started, skipped, assigned }` |
+| `POST /api/episodes/{ep}/assign-agents` | `{ provider, model? }`: an agent for the shots that have none, starts nothing. Answer `{ started: [], skipped: [], assigned }` |
+| `POST /api/episodes/{ep}/stages/{stage}/run-all` | `{ provider?, model?, redo? }`: an agent for the shots **without their own agent**, assigned to them; shots with an agent use theirs. Answer `{ started, skipped, assigned }` |
 | `GET /api/agent/providers` | `AgentProviderInfo[]`: `id`, `label`, `modes`, `available`, `reason`, `isDefault` |
-| `GET /api/agent/runs` | `{ running, queued }` по всем эпизодам — см. «Агенты доски в CLI» |
-| `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }`, `{ episodeId, shotId }` (все этапы кадра), `{ episodeId, format: true }` или `{ all: true }`. Ответ `{ stopped, running, queued }` |
+| `GET /api/agent/runs` | `{ running, queued }` across all episodes, see "Board agents in the CLI" |
+| `POST /api/agent/runs/stop` | `{ episodeId, shotId, stageId }`, `{ episodeId, shotId }` (all stages of the shot), `{ episodeId, format: true }` or `{ all: true }`. Answer `{ stopped, running, queued }` |
 
-`StageDetail.agentRequest` отдаёт `status`, `provider`, `error`, `suggestedWorkflow` (поля уже в `types.ts`). `StageDetail.shotAgent` — агент кадра.
+`StageDetail.agentRequest` gives `status`, `provider`, `error`, `suggestedWorkflow` (the fields are already in `types.ts`). `StageDetail.shotAgent` is the shot's agent.
 
-## Агент кадра
+## The shot's agent
 
-`shots/{shotId}/agent.json` → `{ provider, model, updatedAt }` (`model: null` — модель провайдера по умолчанию). Пишет **только доска** (`writeShotAgent` в `src/lib/series/shot-agent.ts`; провайдер и модель проверяются как в запросе). Агент файл не трогает.
+`shots/{shotId}/agent.json` → `{ provider, model, updatedAt }` (`model: null` means the provider's default model). **Only the board** writes it (`writeShotAgent` in `src/lib/series/shot-agent.ts`; the provider and model are checked as in a request). The agent does not touch the file.
 
-- Сам агент ничего не начинает. Этап запускают «Отправить агенту» на странице этапа и «▶ Все кадры» над столбцом этапа. Оба идут агентом кадра. У кадра без агента — агент, выбранный в меню; он назначается кадру. Выбора нет — `FRAMEBOARD_AGENT_PROVIDER` (иначе manual), без назначения. Столбец «Кадр» этап не запускает.
-- «▶ Все кадры» над столбцом этапа назначает выбор **всем кадрам без агента** (и тем, что будут пропущены), кадры с агентом не меняет. Меню спрашивает агента, только если такие кадры есть.
-- Страница этапа: «Отправить агенту» по умолчанию берёт агента кадра; другой выбор уходит на один запуск, с галкой «запомнить» — становится агентом кадра. У кадра без агента галка включена.
-- `agent_request.json` хранит, кем фактически выполнен запуск (`provider`, `model`).
-- `ShotSummary.agent` — `{ provider, model } | null`; `ShotSummary.agentActivity` — `{ stageId, status: running | queued, since, provider } | null`: работающий запрос этапов кадра, иначе ждущий (`pending`, этап в фазе `agent` с этим запросом, включая manual — «ждёт агента в чате»).
+- The agent itself starts nothing. A stage is started by "Send to agent" on the stage page and "▶ Every shot" above a stage column. Both use the shot's agent. For a shot without an agent, it is the agent chosen in the menu, and it is assigned to the shot. With no choice, `FRAMEBOARD_AGENT_PROVIDER` (otherwise manual), without assigning. The "Shot" column does not start a stage.
+- "▶ Every shot" above a stage column assigns the choice to **all shots without an agent** (also those that will be skipped) and leaves shots that have an agent as they are. The menu asks for an agent only if there are such shots.
+- The stage page: "Send to agent" takes the shot's agent by default; another choice goes for one run, and with the "remember" checkbox it becomes the shot's agent. For a shot without an agent the checkbox is on.
+- `agent_request.json` stores who actually executed a run (`provider`, `model`).
+- `ShotSummary.agent` is `{ provider, model } | null`; `ShotSummary.agentActivity` is `{ stageId, status: running | queued, since, provider } | null`: a running request of the shot's stages, otherwise a waiting one (`pending`, the stage in phase `agent` with that request, including manual: "waits for an agent in a chat").
 
-## Агенты доски в CLI
+## Board agents in the CLI
 
-`GET /api/agent/runs` (`listAgentRuns` в `src/lib/series/agent-dispatch.ts`) — что сейчас делают провайдеры доски. Элемент списка (`AgentRunEntry`): `kind` (`stage` или `format` — разметка сценария), `episodeId`, `shotId`, `stageId` (у `format` — `null`), `provider`, `model` (без выбора — модель провайдера по умолчанию), `since`.
+`GET /api/agent/runs` (`listAgentRuns` in `src/lib/series/agent-dispatch.ts`) shows what the board's providers are doing now. A list entry (`AgentRunEntry`): `kind` (`stage` or `format`, formatting a script), `episodeId`, `shotId`, `stageId` (`null` for `format`), `provider`, `model` (with no choice, the provider's default model), `since`.
 
-- `running` — живые прогоны этого процесса доски: исполнитель (`listLiveAgentRuns` в `runner.ts`, без отменённых) и разметка (`isFormatRunLive`). `since` — `startedAt`.
-- `queued` — `pending` у `ollama` / `claude`, которые фоновый цикл запустит, когда у провайдера освободится место (`providerParallel`): этап в фазе `agent` с этим же запросом, плюс разметка `pending`. `since` — `createdAt`.
-- `manual` в список не входит: его исполняет агент в чате, а не доска.
+- `running`: live runs of this board process: the executor (`listLiveAgentRuns` in `runner.ts`, without cancelled ones) and formatting (`isFormatRunLive`). `since` is `startedAt`.
+- `queued`: `pending` for `ollama` / `claude` that the background loop will start when the provider has room (`providerParallel`): a stage in phase `agent` with the same request, plus `pending` formatting. `since` is `createdAt`.
+- `manual` is not in the list: it is run by an agent in a chat, not by the board.
 
-`POST /api/agent/runs/stop` (`stopAgentRuns`): тело `{ episodeId, shotId, stageId }`, `{ episodeId, format: true }` или `{ all: true }`. Для этапа вызывает `cancelStage` — ровно то же, что «Отменить» на этапе. Для разметки сценария — `abortFormatRun` (`src/lib/agent/format-runner.ts`): живой прогон получает abort, ждущий больше не запустится, `format_request.json` становится `error` с текстом «Разметка остановлена», ответ модели, пришедший после остановки, не применяется. `{ all: true }` останавливает все записи из обоих списков. Цель без прогона агента доски не трогается (`stopped: []`). CLI: `npm run agents -- stop e01/format`.
+`POST /api/agent/runs/stop` (`stopAgentRuns`): body `{ episodeId, shotId, stageId }`, `{ episodeId, format: true }` or `{ all: true }`. For a stage it calls `cancelStage`, exactly what "Cancel" does on a stage. For script formatting it calls `abortFormatRun` (`src/lib/agent/format-runner.ts`): a live run gets an abort, a waiting one will not start, `format_request.json` becomes `error` with the text "Formatting stopped", and a model answer that arrives after the stop is not applied. `{ all: true }` stops all entries in both lists. A target with no board agent run is left alone (`stopped: []`). CLI: `npm run agents -- stop e01/format`.
 
-Скрипты без зависимостей: `scripts/frameboard-status.mjs` — строка состояния Claude Code (таймаут 500 мс, код выхода всегда 0), `scripts/frameboard-agents.mjs` — `npm run agents -- list | stop <ep>/<shot>/<stage> | stop --all`. Порт — `FRAMEBOARD_PORT` (3456). Настройка — README, «Агенты доски в Claude Code».
+Scripts without dependencies: `scripts/frameboard-status.mjs` is the Claude Code status line (timeout 500 ms, exit code always 0), and `scripts/frameboard-agents.mjs` is `npm run agents -- list | stop <ep>/<shot>/<stage> | stop --all`. The port is `FRAMEBOARD_PORT` (3456). Setup: the README, "Board agents in Claude Code".
 
-## Что агент знает о кадре: замечания, картинки, действие
+## What the agent knows about a shot: notes, pictures, action
 
-Код: `src/lib/series/shot-notes.ts`, `descriptions.ts`, `shot-action.ts`, текст для агента — `src/lib/agent/shot-context.ts`. Все файлы пишет только доска.
+Code: `src/lib/series/shot-notes.ts`, `descriptions.ts`, `shot-action.ts`; the text for the agent is `src/lib/agent/shot-context.ts`. Only the board writes all these files.
 
-| Файл | Что | Когда |
+| File | What | When |
 |---|---|---|
-| `shots/{shotId}/notes.json` | замечания пользователя ко всем этапам кадра: `{ entries: [{ id, at, stageId, message }] }` | `submitAgentRequest`, если сообщение написал пользователь (у массового запуска `auto: true` — не пишется). Убрать — `DELETE /api/episodes/{ep}/shots/{shot}/notes` `{ id }` |
-| `data/descriptions/{sha256}.json` | что на утверждённой картинке на самом деле: `{ sha256, kind: location \| character \| first_frame, text, model, createdAt, source }` | фоновый цикл `image-descriptions` (20 с, текущий эпизод, не больше 2 сразу) и перед задачей агенту. Ключ — содержимое файла: один файл в нескольких кадрах описывается один раз, замена файла в approve — новое описание |
-| `shots/{shotId}/action.md`, `action.json` | действие кадра под утверждённые картинки, по-русски; `action.json` — `{ basis, textSha, source: agent \| user, at, model? }` | перед задачей агенту на `first_frame`, `video_preview`, `final_render`, если изменилась основа (shot.md, картинки и их описания, замечания). Правка на странице — `PUT /api/episodes/{ep}/shots/{shot}/action` `{ text }`: версия пользователя, она важнее модели и уходит в следующую пересборку как замечание; пустой текст — убрать |
+| `shots/{shotId}/notes.json` | the user's notes to all stages of the shot: `{ entries: [{ id, at, stageId, message }] }` | `submitAgentRequest`, if the user wrote the message (a mass run with `auto: true` does not write it). To remove: `DELETE /api/episodes/{ep}/shots/{shot}/notes` `{ id }` |
+| `data/descriptions/{sha256}.json` | what an approved picture really shows: `{ sha256, kind: location \| character \| first_frame, text, model, createdAt, source }` | the background loop `image-descriptions` (20 s, the current episode, at most 2 at once) and before a task to the agent. The key is the file content: one file in several shots is described once, and replacing a file in approve gives a new description |
+| `shots/{shotId}/action.md`, `action.json` | the shot's action adapted to the approved pictures; `action.json` is `{ basis, textSha, source: agent \| user, at, model? }` | before a task to the agent on `first_frame`, `video_preview`, `final_render`, if the basis changed (shot.md, the pictures and their descriptions, the notes). An edit on the page is `PUT /api/episodes/{ep}/shots/{shot}/action` `{ text }`: the user's version, which wins over the model and goes into the next rebuild as a note; an empty text removes it |
 
-Описание локации называет число пространств, их примерный размер, передний, средний и задний план, проёмы и препятствия, где можно стоять и как далеко будут люди, и свет. Описание первого кадра добавляет число людей, позу, видно ли лицо и примерную долю площади лица и тела, и те же факты о месте. Описания и действие делает `claude -p` (`src/lib/agent/claude-oneshot.ts`): описания — `FRAMEBOARD_VISION_MODEL` (по умолчанию `claude-haiku-5-5`: только «что на картинке»), действие — `FRAMEBOARD_CONTEXT_MODEL` (по умолчанию `claude-sonnet-5-5`); пустая временная папка, картинка копируется туда и открывается инструментом Read. `FRAMEBOARD_DESCRIBE=off` выключает и то и другое; при `FRAMEBOARD_LOOPS=off` (тесты, скрипты) настоящий claude здесь не вызывается. Не вышло — агент работает с тем, что есть.
+A location description names the number of spaces, their rough size, the foreground, middle and background, openings and obstacles, where one can stand and how far the people will be, and the light. A first frame description adds the number of people, the pose, whether the face is visible and the rough share of the area taken by the face and the body, and the same facts about the place. The descriptions and the action are made by `claude -p` (`src/lib/agent/claude-oneshot.ts`): descriptions use `FRAMEBOARD_VISION_MODEL` (`claude-haiku-5-5` by default: only "what is in the picture"), the action uses `FRAMEBOARD_CONTEXT_MODEL` (`claude-sonnet-5-5` by default); an empty temporary folder, the picture is copied there and opened with the Read tool. `FRAMEBOARD_DESCRIBE=off` turns both off; with `FRAMEBOARD_LOOPS=off` (tests, scripts) the real claude is not called here. If it fails, the agent works with what it has.
 
-В задаче агента (text и `llm_task.md`) после shot.md: действие по картинкам, описания картинок (на первом кадре — без его прошлого утверждённого варианта), прошлые замечания кадра (текущее сообщение — только как запрос) и порядок приоритета: запрос → прошлые замечания (позднее важнее) → что на картинках → действие по картинкам → shot.md → остальное.
+In the agent's task (text and `llm_task.md`), after shot.md come: the action by the pictures, the picture descriptions (on the first frame without its own earlier approved variant), the shot's earlier notes (the current message is only the request) and the order of priority: the request → earlier notes (later wins) → what the pictures show → the action by the pictures → shot.md → the rest.
 
-## Видео: какой воркфлоу
+## Video: which workflow
 
-Таблица «когда какой вариант» лежит в плейбуке этапа (`playbooks/stages/video_preview.en.md`, `final_render.en.md`, и в `.en.md`) и повторена в плейбуке модели, который text-режим уже кладёт в системный промпт. Агент, если выбранный вариант не из таблицы, пишет его id в `suggestedWorkflow`. Доска показывает предложение и сама не переключает.
+The table "which choice when" is in the stage playbook (`playbooks/stages/video_preview.en.md`, `final_render.en.md`) and is repeated in the model playbook, which text mode already puts into the system prompt. If the selected choice is not from the table, the agent writes its id into `suggestedWorkflow`. The board shows the suggestion and does not switch.
 
-Пометка, что промпт финала взят из `prompt.md` эскиза, а не из метаданных ролика: `sketchPromptTaskNote` (`src/lib/comfy/binding.ts`). `buildPrompt` дописывает её в `run_log.md` этапа в момент запуска. В текст задачи (text и `llm_task.md`) её ещё нужно вставить сборщику задачи — файл `src/lib/series/agent-request.ts` и `src/lib/agent/task.ts` в этом раунде не правятся.
+The note that the final's prompt was taken from the preview's `prompt.md` and not from the video metadata is `sketchPromptTaskNote` (`src/lib/comfy/binding.ts`). `buildPrompt` appends it to the stage's `run_log.md` at run time.
 
-## Модель этапа
+## The stage model
 
-`STAGE_CLAUDE_MODELS` в `src/lib/agent/config.ts`: у Claude по умолчанию Haiku 5.5, на `first_frame` — Sonnet, даже если кадру назначен другой. Массовый запуск берёт её (`stageModel`), страница этапа предлагает её по умолчанию (`AgentProviderInfo.stageModels`); другая модель, выбранная в меню, уходит на один запуск. Разметка сырого сценария в таблицу по умолчанию — Opus 5.5 (`FORMAT_CLAUDE_MODEL`). Описания картинок по-прежнему пишет Haiku (`FRAMEBOARD_VISION_MODEL`).
+`STAGE_CLAUDE_MODELS` in `src/lib/agent/config.ts`: Claude uses Haiku 5.5 by default, and on `first_frame` Sonnet, even if another model is assigned to the shot. A mass run takes it (`stageModel`), the stage page offers it by default (`AgentProviderInfo.stageModels`); another model chosen in the menu goes for one run. Formatting a raw script into the table uses Opus 5.5 by default (`FORMAT_CLAUDE_MODEL`). The picture descriptions are still written by Haiku (`FRAMEBOARD_VISION_MODEL`).
 
-## Правила `prompt.md` на первых кадре, превью и финале
+## `prompt.md` rules on the first frame, preview and final
 
-Код: `GENERATION_PROMPT_RULES` в `src/lib/agent/task.ts` (text-режим, в system перед плейбуком) и `renderPromptRules` в `src/lib/series/agent-request.ts` (тот же текст по-русски в `llm_task.md`). Одни для всех воркфлоу этих трёх этапов и важнее плейбука модели.
+Code: `GENERATION_PROMPT_RULES` in `src/lib/agent/task.ts` (text mode, in the system prompt before the playbook) and `renderPromptRules` in `src/lib/series/agent-request.ts` (the same text in `llm_task.md`). They are the same for all workflows of these three stages and win over the model playbook.
 
-`prompt.md` на английском, без кириллицы; реплику на русский не переводить. Перед каждым новым проходом агента реплики сверяются заново с `speech.md` этого запроса: в промпте не остаются строки из прошлого `prompt.md`, если реплики изменились. Люди — `character1`, `character2`, `character3` в порядке референсов (список «Images the graph receives», иначе алфавит имён из строки персонажей). Имена из сообщения и shot.md в промпт не попадают: ими пользователь говорит с агентом. Каждого — одно-два предложения, и привязка к картинкам (`character1 is image 2 and the face from image 4`). Промпт — вся инструкция этого запуска: просьбу «всё хорошо, добавь пакет» агент вписывает в полный прошлый текст, а не заменяет его на «сделай как раньше». Сравнение с прошлым кадром (`than before`, `much closer`, `as before`) доска не отправляет: «ещё ближе» переписывается абсолютным крупным планом.
+`prompt.md` is in English, with no Cyrillic; a spoken line is not translated into Russian. Before every new agent pass the lines are checked again against this request's `speech.md`: no lines are left in the prompt from an earlier `prompt.md` if the lines changed. People are `character1`, `character2`, `character3` in the order of the references (the list "Images the graph receives", otherwise the alphabet of the names from the characters line). The names from the message and shot.md do not go into the prompt: the user speaks to the agent with them. Each person gets one or two sentences and a binding to the pictures (`character1 is image 2 and the face from image 4`). The prompt is the whole instruction of this run: a request like "all good, add a package" is written by the agent into the full earlier text, not replaced with "do as before". Comparisons with the previous shot (`than before`, `much closer`, `as before`) are not sent by the board: "even closer" is rewritten as an absolute close-up.
 
-## Ручной режим
+## Manual mode
 
-Ручной режим остаётся: `AGENTS.md` коротко говорит, где взять задачу (`agent_inbox.md` → `llm_task.md`) и что единственный сигнал — `done`.
+Manual mode stays: `AGENTS.md` briefly says where to get the task (`agent_inbox.md` → `llm_task.md`) and that the only signal is `done`.

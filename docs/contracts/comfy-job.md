@@ -1,72 +1,71 @@
-# Контракт: задание очереди ComfyUI
+# Contract: the ComfyUI queue job
 
-Типы: `src/lib/contracts/comfy-job.ts` (`ComfyJob`, `JobSummary`). Владелец кода очереди — модуль 3.
+Types: `src/lib/contracts/comfy-job.ts` (`ComfyJob`, `JobSummary`).
 
-Файл: `data/comfy_queue/<id>.json`. `id`: латиница, цифры, `.`, `_`, `-`, до 81 символа. Рядом временный `<id>.lock` (pid процесса, который сейчас работает с заданием).
+File: `data/comfy_queue/<id>.json`. `id`: Latin letters, digits, `.`, `_`, `-`, up to 81 characters. Next to it is a temporary `<id>.lock` (the pid of the process that is working with the job now).
 
-## Поля и кто пишет
+## Fields and who writes them
 
-| Поле | Пишет | Когда |
+| Field | Written by | When |
 |---|---|---|
-| `id`, `prompt`, `uploads`, `saveTo` | постановщик (`queueStageRun`, агент на `characters`, `POST /api/comfy/queue`) | при постановке |
-| `episodeId`, `shotId`, `stageId`, `workflow` | постановщик доски | при постановке. У ручных заданий могут отсутствовать |
-| `status: pending`, `queuedAt` | `enqueueComfyJob` | при постановке |
-| `status: running`, `promptId`, `submittedAt` | очередь | ComfyUI принял `POST /prompt` |
-| `queuePosition` | очередь | каждый проход по `GET /queue`: 0 — выполняется, 1.. — ждёт; `null` — неизвестно |
-| `lostAt`, `restarts` | очередь | ComfyUI отвечает, а задания нет ни в его очереди, ни в истории (ComfyUI или компьютер перезапускались): `lostAt` — с какого момента. Через минуту задание снова `pending` без `promptId`, `restarts` + 1, и следующий проход отправляет его заново. После двух повторов — `error`. Пока ComfyUI не отвечает, задание ждёт |
-| `status: done`, `files`, `finishedAt` | очередь | файлы скачаны в `saveTo` |
-| `status: error`, `error`, `nodeErrors`, `finishedAt` | очередь | ComfyUI отказал или упал |
-| `status: cancelled`, `finishedAt` | `cancelComfyJob` (кнопка «Отменить») | в любой момент до `done/error` |
-| `updatedAt` | любой писатель | при каждой записи |
+| `id`, `prompt`, `uploads`, `saveTo` | the one who queues (`queueStageRun`, an agent on `characters`, `POST /api/comfy/queue`) | when queued |
+| `episodeId`, `shotId`, `stageId`, `workflow` | the board's queuer | when queued. Manual jobs may lack them |
+| `status: pending`, `queuedAt` | `enqueueComfyJob` | when queued |
+| `status: running`, `promptId`, `submittedAt` | the queue | ComfyUI accepted `POST /prompt` |
+| `queuePosition` | the queue | on every pass over `GET /queue`: 0 is executing, 1.. is waiting; `null` is unknown. In SDK mode it stays `null` (the SDK cannot read the shared queue) |
+| `lostAt`, `restarts` | the queue | ComfyUI answers but the job is neither in its queue nor in its history (ComfyUI or the computer was restarted): `lostAt` is since when. After a minute the job is `pending` again without `promptId`, `restarts` + 1, and the next pass sends it again. After two retries it is `error`. While ComfyUI does not answer, the job waits |
+| `status: done`, `files`, `finishedAt` | the queue | the files are downloaded into `saveTo` |
+| `status: error`, `error`, `nodeErrors`, `finishedAt` | the queue | ComfyUI refused or failed |
+| `status: cancelled`, `finishedAt` | `cancelComfyJob` ("Cancel" button) | at any moment before `done/error` |
+| `updatedAt` | any writer | on every write |
 
-Никто, кроме перечисленных, файл не меняет. Этап (`stage_state.json`) ссылается на задание по `jobId`; статус этапа очередь не пишет.
+Nobody except those listed changes the file. The stage (`stage_state.json`) refers to the job by `jobId`; the queue does not write the stage status.
 
-## Статусы
+## Statuses
 
 ```
-pending ──claim──> running (без promptId) ──POST /prompt──> running (promptId) ──history──> done
-   ^                    │ ComfyUI недоступен                     │ отказ / ошибка          
+pending ──claim──> running (no promptId) ──POST /prompt──> running (promptId) ──history──> done
+   ^                    │ ComfyUI unavailable                    │ refusal / failure
    └────────────────────┘                                         └──────────────────────> error
-pending / running ──«Отменить»──> cancelled   (prompt снимается из ComfyUI: /queue delete, /interrupt)
+pending / running ──"Cancel"──> cancelled   (the prompt is removed from ComfyUI: /queue delete, /interrupt)
 ```
 
-- ComfyUI выключен — задание остаётся `pending` без ошибки. Этап показывает «Ожидает очереди».
-- `cancelled` финальный: очередь перечитывает файл до и после `POST /prompt` и не затирает отмену (тест `src/lib/comfy/queue.test.ts`).
-- `running` без `promptId` дольше 20 минут с мёртвым `.lock` — снова берётся в работу.
+- ComfyUI is off: the job stays `pending` without an error. The stage shows "Waiting in the queue".
+- `cancelled` is final: the queue rereads the file before and after `POST /prompt` and does not overwrite a cancel (test `src/lib/comfy/queue.test.ts`).
+- `running` without `promptId` for longer than 20 minutes with a dead `.lock` is taken into work again.
 
-## `uploads` и `saveTo`
+## `uploads` and `saveTo`
 
-- Пути — от cwd (корень репо), должны лежать внутри `data/` или `playbooks/` (uploads) и внутри `data/` (`saveTo`). Иначе задание не ставится.
-- `uploads[].filename` — имя в ComfyUI (`/upload/image`, `overwrite: true`).
+- Paths are from the cwd (the repo root) and must lie inside `data/` or `playbooks/` (uploads) and inside `data/` (`saveTo`). Otherwise the job is not queued.
+- `uploads[].filename` is the name in ComfyUI (`/upload/image`, `overwrite: true`).
 
-## Файлы результата
+## Result files
 
-- `saveText: true` — сохранить и текстовые выходы нод (`outputs[node].text`, например `PreviewAny`) как `{node}.txt` (только локальный ComfyUI). Нужно графам без картинок: распознавание речи Whisper для поста (`docs/contracts/post.md`).
+- `saveText: true` also saves the text outputs of nodes (`outputs[node].text`, for example `PreviewAny`) as `{node}.txt` (a local ComfyUI only). Needed for graphs without pictures: Whisper speech recognition for the post stage (`docs/contracts/post.md`).
+- Files are saved into `saveTo` byte for byte (no re-encoding): a PNG keeps the workflow and seed metadata.
+- **Names are unique**: an existing file in `saveTo` is not overwritten; on a clash a suffix is added. The final names are in `files`.
 
-- Сохраняются в `saveTo` байт в байт (без перекодирования): PNG сохраняет метаданные с воркфлоу и seed.
-- **Имена уникальные**: существующий файл в `saveTo` не затирается; при совпадении добавляется суффикс (формат выбирает модуль 3). Итоговые имена — в `files`.
+## Errors
 
-## Ошибки
+`error` is one line for the user. `nodeErrors` are per node: `{ node, classType, message }`, human text (from `node_errors[...].errors[].message/details`), not JSON.
 
-`error` — одна строка для пользователя. `nodeErrors` — по ноде: `{ node, classType, message }`, текст человеческий (из `node_errors[...].errors[].message/details`), а не JSON.
+## What the interface sees
 
-## Что видит интерфейс
+`StageDetail.job: JobSummary | null` is the stage's latest job (`stage_state.jobId`), read by `readJobSummary()` without writing. Fields: `status`, `workflow`, `queuedAt`, `submittedAt`, `finishedAt`, `queuePosition`, `files`, `error`, `nodeErrors`.
 
-`StageDetail.job: JobSummary | null` — последнее задание этапа (`stage_state.jobId`), читается `readJobSummary()` без записи. Поля: `status`, `workflow`, `queuedAt`, `submittedAt`, `finishedAt`, `queuePosition`, `files`, `error`, `nodeErrors`.
+Take the cell phase from `StageDetail.state.phase` / `StageSummary.status`, not from `job.status`: `running` without `submittedAt` means the queue is only trying to send, which for the user is still "Waiting in the queue".
 
-Фазу клетки берите из `StageDetail.state.phase` / `StageSummary.status`, а не из `job.status`: `running` без `submittedAt` — очередь только пытается отправить, для пользователя это ещё «Ожидает очереди».
+## The process
 
-## Процесс
+The queue and the agent loop run inside the Next process (`src/instrumentation.ts` → `src/lib/background.ts`, one timer per name, hot reload replaces the loop function). There is no separate worker. `npm run comfy-queue` is a debug run of the same queue without the board; do not run it together with `npm run dev` (it will not break because of `.lock`, but two processes poll ComfyUI). `FRAMEBOARD_LOOPS=off` turns the loops off (tests).
 
-Очередь и цикл агента работают внутри процесса Next (`src/instrumentation.ts` → `src/lib/background.ts`, один таймер на имя, горячая перезагрузка подменяет функцию цикла). Отдельного воркера нет. `npm run comfy-queue` — отладочный запуск той же очереди без доски; вместе с `npm run dev` не запускать (не сломается из-за `.lock`, но два процесса опрашивают ComfyUI). `FRAMEBOARD_LOOPS=off` выключает циклы (тесты).
-
-`COMFY_URL` — адрес ComfyUI, по умолчанию `http://127.0.0.1:8188`.
+How the queue reaches ComfyUI is chosen by the transport (`docs/COMFY_SDK.md`): by default the official SDK through `comfy-api-proxy` (`COMFY_BASE_URL`, `http://127.0.0.1:8189`), or with `COMFY_TRANSPORT=legacy` direct calls to ComfyUI at `COMFY_URL` (`http://127.0.0.1:8188` by default).
 
 ## Comfy Cloud (`target: "cloud"`)
 
-Задание с `target: "cloud"` очередь отправляет не в локальный ComfyUI, а в Comfy Cloud (`https://cloud.comfy.org`, API v1, ключ `COMFY_CLOUD_API_KEY` из `.env.local`; `COMFY_CLOUD_URL` — другой адрес, для тестов).
+A job with `target: "cloud"` is sent by the queue not to the local ComfyUI but to Comfy Cloud (`https://cloud.comfy.org`, API v1, the key `COMFY_CLOUD_API_KEY` from `.env.local`; `COMFY_CLOUD_URL` is another address, for tests).
 
-- Отправка: `POST /api/upload/image` для каждого файла `uploads` → облачное имя подставляется во все входы графа с этим именем → `POST /api/prompt` с `extra_data.api_key_comfy_org` (платные ноды, HeyGen). `promptId` — id задания в облаке.
-- Опрос: `GET /api/jobs/{id}` не чаще раза в 15 с. `completed` → файлы из `outputs` скачиваются через `GET /api/view` (302 на подписанную ссылку; по ней — без ключа) в `saveTo`. `failed` → `error`. Сбой сети при опросе или скачивании — не ошибка: спросим снова, прогон уже оплачен.
-- **Повторной отправки нет.** Любая ошибка до ответа `/api/prompt` — `error`. Задание `running` без `promptId` (доска упала посреди отправки) — `error` «Отправка прервалась… проверьте cloud.comfy.org»: кредиты могли уже списаться, решает пользователь.
-- «Отменить» снимает задание из облачной очереди и прерывает его, только если выполняется именно оно.
+- Sending: `POST /api/upload/image` for every file of `uploads` → the cloud name is substituted into all graph inputs with that name → `POST /api/prompt` with `extra_data.api_key_comfy_org` (paid nodes). `promptId` is the job id in the cloud.
+- Polling: `GET /api/jobs/{id}` not more often than every 15 s. `completed` → the files from `outputs` are downloaded through `GET /api/view` (302 to a signed link; the link needs no key) into `saveTo`. `failed` → `error`. A network failure while polling or downloading is not an error: we ask again, the run is already paid for.
+- **There is no resend.** Any error before the answer of `/api/prompt` is `error`. A `running` job without `promptId` (the board fell over in the middle of sending) is `error` "Sending was interrupted… check cloud.comfy.org": credits may have been charged already, and the user decides.
+- "Cancel" removes the job from the cloud queue and interrupts it, only if that very job is the one executing.

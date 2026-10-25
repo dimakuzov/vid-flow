@@ -1,76 +1,76 @@
-# Команда агенту: эпизод и структура кадров
+# Instructions for the agent: the episode and the shot structure
 
-Один сериал на репозиторий. Агент работает с файлами, доска сама агента не запускает.
+One series per repository. The agent works with files, and the board does not start the agent by itself.
 
-## Контекст
-- Общие базы: `data/characters/{name}/`, `data/locations/{locationId}/`
-- Общие референсы сериала: `data/references/`. Это не `refs/` кадра
-- Документы сценариев: `data/scenarios/`. Рабочий текст текущей серии по-прежнему `data/episodes/{episodeId}/scenario.md`
-- Эпизоды: `data/episodes/{episodeId}/`
-- Текущий эпизод: `data/current_episode.txt`
-- Сырой сценарий: `data/episodes/{episodeId}/scenario_raw.md`
-- Размеченный сценарий: `data/episodes/{episodeId}/scenario.md`
-- Входящие: `data/episodes/{episodeId}/agent_inbox.md`
-- Глобальные playbooks: `playbooks/`
-- Этапы каждого shot: `characters`, `location`, `first_frame`, `video_preview`, `final_render`
-- Папки этапа: `refs/`, `output/`, `approve/`
-- Документы этапа: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
-- `workflow.md` — необязательная заметка на кадр. Можно оставить пустым. Выбор графа там не задаётся.
-- `llm_notes.md` — поле ввода рекомендации на доске. Кнопка «Отправить агенту» переносит текст в `agent_request.md`/`llm_task.md`, пишет строку в `agent_inbox.md` эпизода и очищает поле. Агент `llm_notes.md`, `status.json` и `stage_state.json` не трогает: их ведёт доска. Журнал прогона — в `run_log.md`. Предыдущие тексты промпта — в `prompt_history.json`, их можно вернуть с этапа.
-- `prompt.md` — ровно тот текст, который уходит в модель.
+## Context
+- Shared libraries: `data/characters/{name}/`, `data/locations/{locationId}/`
+- Shared series references: `data/references/`. They are not a shot's `refs/`
+- Script documents: `data/scenarios/`. The working text of the current episode is still `data/episodes/{episodeId}/scenario.md`
+- Episodes: `data/episodes/{episodeId}/`
+- Current episode: `data/current_episode.txt`
+- Raw script: `data/episodes/{episodeId}/scenario_raw.md`
+- Formatted script: `data/episodes/{episodeId}/scenario.md`
+- Inbox: `data/episodes/{episodeId}/agent_inbox.md`
+- Global playbooks: `playbooks/`
+- The stages of every shot: `characters`, `location`, `first_frame`, `video_preview`, `final_render`
+- Stage folders: `refs/`, `output/`, `approve/`
+- Stage documents: `prompt.md`, `llm_notes.md`, `refs.md`, `workflow.md`, `status.json`
+- `workflow.md` is an optional note for a shot. It can stay empty. The graph choice is not set there.
+- `llm_notes.md` is the recommendation input field on the board. The "Send to agent" button moves the text into `agent_request.md`/`llm_task.md`, writes a line into the episode's `agent_inbox.md` and clears the field. The agent does not touch `llm_notes.md`, `status.json` or `stage_state.json`: the board owns them. The run log is `run_log.md`. Earlier prompt texts are in `prompt_history.json` and can be restored from the stage.
+- `prompt.md` is exactly the text that goes to the model.
 
-## Сырой сценарий
-Если во входящих есть `format-scenario` со статусом `pending`:
+## Raw script
+If the inbox has a `format-scenario` item with the status `pending`:
 
-1. Прочитай `format_request.md` и `scenario_raw.md` текущего эпизода.
-2. Запиши `scenario.md` блоками кадров. Сюжет не выдумывай.
-3. Папки `shots/` не создавай.
-4. Поставь `"status": "done"` в `format_request.json`.
+1. Read `format_request.md` and `scenario_raw.md` of the current episode.
+2. Write `scenario.md` as shot blocks. Do not invent the plot.
+3. Do not create the `shots/` folders.
+4. Set `"status": "done"` in `format_request.json`.
 
-Формат:
+Format:
 
 ```md
-# Название эпизода
+# Episode title
 
-## s01 Название кадра
+## s01 Shot title
 - characters: lena, mark
 - location: night_cafe
 - duration: 6
-- speech: Лена: Ты опоздал.
-Текст действия.
+- speech: Lena: You are late.
+The action text.
 ```
 
-`duration` — длительность клипа, 2–12 секунд. `speech` — реплика дословно, одна на строку; никто не говорит — строк нет. Доска при создании кадров кладёт реплики в `shots/{shotId}/speech.md`, длительность — в выбор длительности этапа видео. Полные правила — `FORMAT_RULES` в `src/lib/series/format-request.ts` (их же получает модель разметки).
+`duration` is the clip length, 2–12 seconds. `speech` is a line word for word, one per row; if nobody speaks there are no such rows. When the board creates the shots it puts the lines into `shots/{shotId}/speech.md` and the duration into the video stage's duration choice. The full rules are `FORMAT_RULES` in `src/lib/series/format-request.ts` (the formatting model gets the same).
 
-## Базы identity
-Shot-персонаж и shot-локация собираются из общих баз, а не с нуля:
+## Identity libraries
+A shot's character and location are built from the shared libraries, not from scratch:
 
-- `data/characters/{name}/` — `portrait.png`, `side.png`, `full_body.png`
-- `data/locations/{locationId}/` — `view.png` и `description.txt`
+- `data/characters/{name}/`: the base is `full_body.png`, then `body.png`, then `{name}_body.png`, otherwise the first picture; also `portrait.png`, `side.png` and a face sheet (`{name}_face_sheet.png`)
+- `data/locations/{locationId}/`: `view.png` and `description.txt`
 
-Имя персонажа и локации — как в `scenario.md` эпизода. Эти папки не заменяют этапы `data/episodes/{episodeId}/shots/sXX/characters` и `.../location`.
+The names of the character and location are as in the episode's `scenario.md`. These folders do not replace the stages `data/episodes/{episodeId}/shots/sXX/characters` and `.../location`.
 
-Утверждённый персонаж кадра: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. Отдельной папки `env/` нет.
+A shot's approved character: `shots/{shotId}/characters/approve/{name}_{shotId}.png`. There is no separate `env/` folder.
 
-Перед заполнением этапа прочитай playbook:
+Before filling in a stage, read the playbook:
 
-- персонаж: `playbooks/stages/characters.en.md`, `playbooks/models/qwen_image.en.md`, `playbooks/workflows/characters_comfy.en.md`. Прогон — раздел «Команда» в workflow, его выполняют и Cursor, и Claude
-- локация: `playbooks/stages/location.en.md`, для модели `playbooks/stages/location.en.md`, `playbooks/models/qwen_location.en.md`, `playbooks/workflows/location_comfy.en.md`
-- первый кадр: `playbooks/stages/first_frame.en.md`, для модели `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
+- character: `playbooks/stages/characters.en.md`, `playbooks/models/qwen_image.en.md`, `playbooks/workflows/characters_comfy.en.md`
+- location: `playbooks/stages/location.en.md`, `playbooks/models/krea2_location.en.md`, `playbooks/workflows/location_comfy.en.md`
+- first frame: `playbooks/stages/first_frame.en.md`, `playbooks/models/qwen_first_frame.en.md`, `playbooks/workflows/first_frame_comfy.en.md`
 
-## Собрать папки кадров
-Это отдельный шаг после разметки. Прочитай `scenario.md` текущего эпизода.
+## Build the shot folders
+This is a separate step after formatting. Read the current episode's `scenario.md`.
 
-1. Распарси все shots (`s01`, `s02`, ...).
-2. Для каждого shot создай `data/episodes/{episodeId}/shots/{shotId}/shot.md`.
-3. Для каждого этапа создай папки `refs`, `output`, `approve` и документы этапа.
-4. Не затирай существующие файлы в `output/` и `approve/` без явного подтверждения пользователя.
-5. Имена approved-персонажей: `{character}_{shotId}.ext`.
+1. Parse all shots (`s01`, `s02`, ...).
+2. For every shot create `data/episodes/{episodeId}/shots/{shotId}/shot.md`.
+3. For every stage create the folders `refs`, `output`, `approve` and the stage documents.
+4. Do not overwrite existing files in `output/` and `approve/` without the user's explicit confirmation.
+5. The names of approved characters: `{character}_{shotId}.ext`.
 
-Кнопка «Создать выбранные» делает то же самое скриптом внутри доски. Агента она не вызывает. Если в тексте нет заголовков `## s01`, скрипт папки не создаёт.
+The "Create selected" button does the same with a script inside the board. It does not call the agent. If the text has no `## s01` headings, the script creates no folders.
 
-## Альтернатива через API приложения
-Если dev-server запущен:
+## Alternative through the app's API
+If the dev server is running:
 
 ```bash
 curl -X POST http://127.0.0.1:3456/api/series/bootstrap \
@@ -78,4 +78,4 @@ curl -X POST http://127.0.0.1:3456/api/series/bootstrap \
   -d '{"episodeId":"e01","shotIds":["s01","s02","s03"]}'
 ```
 
-Или через UI: блок «Эпизод и сценарий» на главной.
+Or through the UI: the "Episode and script" block on the main page.
