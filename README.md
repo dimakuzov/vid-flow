@@ -197,4 +197,4 @@ Series data is plain files on disk, no database required.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). You may use and sell this code commercially, but the copyright notice must stay with every copy, so the author is credited. The license covers only this repository's code. Models and tools you run with it have their own licenses. Study the license of each model and LoRA before any commercial use; see [NOTICE.md](NOTICE.md).
+MIT, see [LICENSE](LICENSE). You may use and sell this code commercially, but the copyright notice must stay with every copy, so the author is credited. The license covers only this repository's code. Frameboard runs no model itself: models and LoRAs are used through ComfyUI, which you install separately. Read the license of every model and LoRA you use, and the ComfyUI license, separately; see [NOTICE.md](NOTICE.md).

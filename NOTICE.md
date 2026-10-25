@@ -8,8 +8,8 @@ You may use, modify and sell it, including commercially, as long as you keep the
 
 ## What the license does not cover
 
-- **Models.** Frameboard does not ship any model weights. The models you run through ComfyUI (LTX, Wan, Qwen-Image, LoRAs, VAEs, text encoders and others) each have their own license, set by their authors. Those terms, including any limits on commercial use, apply to you and to everything you generate. Before you use any model or LoRA, or what it generates, for commercial purposes, study the license of each one separately. This repository's license does not grant or replace them.
-- **Tools and services.** ComfyUI, ComfyUI custom nodes, Comfy Cloud, Kdenlive, ffmpeg, Node.js and every npm package keep their own licenses and terms of service.
+- **Models and ComfyUI.** Frameboard ships no model weights and does not run any model itself: every model and LoRA is used through ComfyUI, which you install and run yourself. Read the license of every model and LoRA you use, and what it allows for your use and for what you generate, separately. Read the ComfyUI license, and the licenses of any ComfyUI custom nodes you install, separately as well. This repository's license does not grant or replace any of them.
+- **Other tools and services.** Comfy Cloud, Kdenlive, ffmpeg, Node.js and every npm package keep their own licenses and terms of service.
 - **Your content.** Pictures, scripts, voices and videos you put into `data/` or generate stay yours. This license gives no rights to them and puts no terms on them.
 
 The author gives no warranty for any of the above.
