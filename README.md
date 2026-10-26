@@ -109,7 +109,7 @@ npm run comfy:install -- --comfy "C:\path\to\ComfyUI" --install
 - `Lightricks/LTX-2.5` (the LTX files) is gated on Hugging Face: log in, accept the terms on the model page, create a read token and set `HF_TOKEN`. Civitai files need `CIVITAI_TOKEN`; two Civitai files have no direct link, and the script prints the page to download them from.
 - Restart ComfyUI afterwards. Tested on ComfyUI 0.41.0 (Windows portable, 16 GB GPU).
 - If an LTX run fails with `cannot access local variable '_buffers'` after a MiniMax run, free ComfyUI's models (the "Unload Models" button, or restart it) and run the stage again. This was seen once on 0.41.0 and the rerun worked.
-- Every model and LoRA has its own license. Study each one before commercial use; see [NOTICE.md](NOTICE.md).
+- Every model and LoRA has its own license. Some of them (for example LTX 2.5 and MiniMax H3) are free to download and run locally, but limit or forbid commercial use by company revenue or by region. Get a commercial license from the model's owner before you use the models or their output commercially; see [NOTICE.md](NOTICE.md).
 
 ## What the board does
 
@@ -203,6 +203,22 @@ If you have no model at all: skip "Send to agent" and write each `prompt.md` by 
 - Model and stage guides: `playbooks/`. The stage page shows the related files
 - A shot character is an outfit edit of the library character from `data/characters/` against a sample in `refs/`: graph `playbooks/workflows/comfy/character_outfit_qwen21.json`
 - Raw script: the "Send for formatting" button writes `scenario_raw.md` and a line in `agent_inbox.md`. An agent in Cursor formats it into `scenario.md`. "Create selected" is a separate script; it only creates folders from text that is already formatted
+
+## Local by default, paid services are optional
+
+Everything the demo uses runs on your own computer with downloadable open-weights models: no API keys, no partner nodes, no cloud. Two features can use paid services, and both are off unless you turn them on:
+
+- **Comfy Cloud**: a manifest can mark a workflow as a cloud one. It runs only after you tick "Allow a paid send to Comfy Cloud" for that one run, and needs `COMFY_CLOUD_API_KEY`. No bundled workflow does this.
+- **Voice (post stage)**: the optional post stage can send text to ElevenLabs and needs `ELEVENLABS_API_KEY`. Speech recognition for subtitles (Whisper) runs locally in ComfyUI.
+
+## Built for Open Source Higgsfield
+
+Frameboard started on 2026-09-30, before the contest was announced. What was added for the contest (from 2026-10-08):
+
+- the official Comfy SDK transport through `comfy-api-proxy` as the default way to reach ComfyUI ([docs/COMFY_SDK.md](docs/COMFY_SDK.md)), checked on a real ComfyUI
+- a curated set of open-weights graphs: Qwen Image 2.1 (outfit edit and first frame), Krea 2 (locations), LTX 2.5 and MiniMax H3 with the Cinema LoRA (video previews and final renders)
+- `npm run comfy:install`, which reports and downloads the models and node packs the graphs need ([models.json](models.json))
+- the demo episode in [examples/demo](examples/demo), the character picking and agent-targeting fixes, and English documentation throughout
 
 ## Stack
 
